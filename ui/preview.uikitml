@@ -1,0 +1,126 @@
+<!--
+  Level-preview screen: what the cook sees after picking a recipe and before committing.
+
+  Shows difficulty, average time and description, then the ingredient checklist split into what
+  the counter has and what it is missing. The Start button is disabled when anything is missing
+  — starting a dish you cannot finish is the one outcome this screen exists to prevent.
+
+  Ingredient slots are pre-declared for the same reason as the library rows; see that file.
+-->
+<style>
+  .root {
+    display: flex;
+    flex-direction: column;
+    width: 900px;
+    height: 620px;
+    padding: 30px;
+    background-color: #12151a;
+    border-radius: 24px;
+    gap: 16px;
+  }
+
+  .top { display: flex; flex-direction: row; gap: 22px; align-items: center; }
+  .bigIcon { font-size: 78px; width: 100px; }
+  .titles { display: flex; flex-direction: column; gap: 6px; flex-grow: 1; }
+  .name { font-size: 38px; font-weight: 700; color: #e8ecf1; }
+
+  .chips { display: flex; flex-direction: row; gap: 10px; }
+  .chip {
+    font-size: 16px;
+    font-weight: 600;
+    color: #12151a;
+    background-color: #96a1ae;
+    border-radius: 10px;
+    padding-left: 12px;
+    padding-right: 12px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+  }
+  .chipEasy { background-color: #8ee06a; }
+  .chipMedium { background-color: #e0b86a; }
+  .chipHard { background-color: #e06a6a; }
+
+  .description { font-size: 19px; color: #96a1ae; }
+
+  .sectionTitle {
+    font-size: 17px;
+    font-weight: 700;
+    color: #96a1ae;
+    padding-top: 6px;
+  }
+
+  .ingredients { display: flex; flex-direction: row; flex-wrap: wrap; gap: 10px; flex-grow: 1; }
+  .ing {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    height: 54px;
+    padding-left: 14px;
+    padding-right: 16px;
+    background-color: #1b2027;
+    border-radius: 14px;
+    border-width: 1px;
+    border-color: #2b323d;
+  }
+  .ingHave { border-color: #8ee06a; }
+  .ingMissing { border-color: #e06a6a; }
+  .ingIcon { font-size: 26px; }
+  .ingText { font-size: 18px; color: #e8ecf1; }
+
+  .actions { display: flex; flex-direction: row; gap: 14px; }
+  .btn {
+    height: 62px;
+    padding-left: 30px;
+    padding-right: 30px;
+    font-size: 21px;
+    font-weight: 600;
+    border-radius: 16px;
+    align-items: center;
+    justify-content: center;
+  }
+  .btnPrimary { background-color: #8ee06a; color: #12151a; flex-grow: 1; }
+  .btnBlocked { background-color: #3a3f47; color: #8a929c; flex-grow: 1; }
+  .btnGhost { background-color: #1b2027; color: #e8ecf1; border-width: 1px; border-color: #2b323d; }
+</style>
+
+<div id="preview-root" class="root">
+  <div class="top">
+    <span id="preview-icon" class="bigIcon">🥗</span>
+    <div class="titles">
+      <span id="preview-name" class="name">—</span>
+      <div class="chips">
+        <span id="preview-difficulty" class="chip chipEasy">easy</span>
+        <span id="preview-time" class="chip">— min</span>
+        <span id="preview-match" class="chip">—</span>
+      </div>
+    </div>
+  </div>
+
+  <span id="preview-description" class="description">—</span>
+
+  <span class="sectionTitle">ON YOUR COUNTER</span>
+  <div id="preview-have" class="ingredients">
+    <div id="have-0" class="ing ingHave"><span id="have-0-icon" class="ingIcon">🥒</span><span id="have-0-text" class="ingText">—</span></div>
+    <div id="have-1" class="ing ingHave"><span id="have-1-icon" class="ingIcon">🥒</span><span id="have-1-text" class="ingText">—</span></div>
+    <div id="have-2" class="ing ingHave"><span id="have-2-icon" class="ingIcon">🥒</span><span id="have-2-text" class="ingText">—</span></div>
+    <div id="have-3" class="ing ingHave"><span id="have-3-icon" class="ingIcon">🥒</span><span id="have-3-text" class="ingText">—</span></div>
+    <div id="have-4" class="ing ingHave"><span id="have-4-icon" class="ingIcon">🥒</span><span id="have-4-text" class="ingText">—</span></div>
+    <div id="have-5" class="ing ingHave"><span id="have-5-icon" class="ingIcon">🥒</span><span id="have-5-text" class="ingText">—</span></div>
+  </div>
+
+  <span id="preview-missing-title" class="sectionTitle">STILL NEEDED</span>
+  <div id="preview-missing" class="ingredients">
+    <div id="miss-0" class="ing ingMissing"><span id="miss-0-icon" class="ingIcon">🍅</span><span id="miss-0-text" class="ingText">—</span></div>
+    <div id="miss-1" class="ing ingMissing"><span id="miss-1-icon" class="ingIcon">🍅</span><span id="miss-1-text" class="ingText">—</span></div>
+    <div id="miss-2" class="ing ingMissing"><span id="miss-2-icon" class="ingIcon">🍅</span><span id="miss-2-text" class="ingText">—</span></div>
+    <div id="miss-3" class="ing ingMissing"><span id="miss-3-icon" class="ingIcon">🍅</span><span id="miss-3-text" class="ingText">—</span></div>
+    <div id="miss-4" class="ing ingMissing"><span id="miss-4-icon" class="ingIcon">🍅</span><span id="miss-4-text" class="ingText">—</span></div>
+    <div id="miss-5" class="ing ingMissing"><span id="miss-5-icon" class="ingIcon">🍅</span><span id="miss-5-text" class="ingText">—</span></div>
+  </div>
+
+  <div class="actions">
+    <button id="preview-back" class="btn btnGhost">Back</button>
+    <button id="preview-start" class="btn btnPrimary">Start cooking</button>
+  </div>
+</div>

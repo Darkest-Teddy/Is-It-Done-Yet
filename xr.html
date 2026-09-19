@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Is It Done Yet</title>
+    <!--
+      PWA wiring. Quest shows "Install" only when all three are present: a linked manifest with
+      reachable icons, a service worker with a fetch handler, and a secure origin. Any one
+      missing and the option simply never appears, with nothing said about why.
+    -->
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <meta name="theme-color" content="#8ee06a" />
+    <link rel="icon" href="./icons/icon-192.png" />
+    <style>
+      :root {
+        --bg: #0d0f12; --panel: #161a20; --line: #262c35;
+        --ink: #e8ecf1; --dim: #8b95a1; --accent: #8ee06a; --bad: #e06a6a;
+        color-scheme: dark;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0; background: var(--bg); color: var(--ink);
+        font: 400 14px/1.5 ui-sans-serif, system-ui, -apple-system, sans-serif;
+      }
+      /* IWSDK mounts its canvas here and sizes to the container, so it needs real height. */
+      #scene { position: fixed; inset: 0; }
+      #boot {
+        position: fixed; left: 16px; top: 16px; z-index: 10; max-width: min(560px, calc(100vw - 32px));
+        padding: 14px 16px; background: var(--panel); border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+      #boot h1 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
+      #boot p { margin: 0 0 6px; font-size: 12px; color: var(--dim); }
+      #boot code {
+        font: 400 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+        color: var(--accent); word-break: break-word;
+      }
+      #boot .bad { color: var(--bad); }
+      #enter-xr {
+        margin-top: 10px; width: 100%; padding: 14px 18px; font: 600 16px/1 inherit;
+        color: #0d0f12; background: var(--accent); border: 0; border-radius: 10px;
+        cursor: pointer;
+      }
+      #enter-xr[disabled] { background: #3a3f47; color: var(--dim); cursor: not-allowed; }
+      #caps {
+        margin-top: 12px; display: grid; gap: 3px;
+        font: 400 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      #caps div { display: flex; justify-content: space-between; gap: 12px; }
+      #caps .ok { color: var(--accent); }
+      #caps .no { color: var(--bad); }
+    </style>
+    <script type="module" crossorigin src="/Is-It-Done-Yet/assets/xr-B7_Emfc1.js"></script>
+    <link rel="modulepreload" crossorigin href="/Is-It-Done-Yet/assets/segment-CujLMVmA.js">
+  </head>
+  <body>
+    <div id="scene"></div>
+    <div id="boot">
+      <h1>Is It Done Yet</h1>
+      <p id="boot-status">starting…</p>
+      <!--
+        A real button, because WebXR refuses requestSession outside a user gesture and the
+        rejection reads as a generic security error rather than saying so. IWSDK also calls
+        navigator.xr.offerSession(), but that is a suggestion the browser may ignore.
+      -->
+      <button id="enter-xr" disabled>Checking device…</button>
+      <div id="caps"></div>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,152 @@
+<!--
+  Recipe library panel.
+
+  Rows are PRE-DECLARED rather than created at runtime. Eight slots is more recipes than fit on
+  one panel comfortably, and populating fixed slots avoids constructing UIKit components by hand
+  — which is both more code and the kind of code that fails silently in a headset where you
+  cannot open a console. Unused rows get `display: none`; `src/xr/panels.ts` drives them.
+
+  Every id used by the wiring is listed here, so renaming one breaks loudly at
+  `requireElementById` rather than quietly rendering an empty panel.
+-->
+<style>
+  :root {
+    --bg: #12151a;
+    --panel: #1b2027;
+    --line: #2b323d;
+    --ink: #e8ecf1;
+    --dim: #96a1ae;
+    --accent: #8ee06a;
+    --warn: #e0b86a;
+    --bad: #e06a6a;
+  }
+
+  .root {
+    display: flex;
+    flex-direction: column;
+    width: 900px;
+    height: 620px;
+    padding: 28px;
+    background-color: #12151a;
+    border-radius: 24px;
+    gap: 18px;
+  }
+
+  .header { display: flex; flex-direction: row; align-items: center; gap: 16px; }
+  .title { font-size: 34px; font-weight: 700; color: #e8ecf1; }
+  .subtitle { font-size: 18px; color: #96a1ae; }
+
+  .searchRow { display: flex; flex-direction: row; gap: 12px; align-items: center; }
+  .search {
+    flex-grow: 1;
+    height: 56px;
+    padding-left: 18px;
+    padding-right: 18px;
+    font-size: 20px;
+    color: #e8ecf1;
+    background-color: #1b2027;
+    border-radius: 14px;
+    border-width: 1px;
+    border-color: #2b323d;
+  }
+  .recommend {
+    height: 56px;
+    padding-left: 22px;
+    padding-right: 22px;
+    font-size: 19px;
+    font-weight: 600;
+    color: #12151a;
+    background-color: #8ee06a;
+    border-radius: 14px;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .list { display: flex; flex-direction: column; gap: 10px; flex-grow: 1; }
+
+  .row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+    height: 74px;
+    padding-left: 18px;
+    padding-right: 18px;
+    background-color: #1b2027;
+    border-radius: 16px;
+    border-width: 1px;
+    border-color: #2b323d;
+  }
+  .rowIcon { font-size: 34px; width: 46px; }
+  .rowMain { display: flex; flex-direction: column; flex-grow: 1; gap: 2px; }
+  .rowName { font-size: 22px; font-weight: 600; color: #e8ecf1; }
+  .rowMeta { font-size: 16px; color: #96a1ae; }
+  .rowStatus { font-size: 17px; font-weight: 600; color: #8ee06a; width: 210px; }
+
+  .empty { font-size: 20px; color: #96a1ae; padding-top: 24px; }
+</style>
+
+<div id="library-root" class="root">
+  <div class="header">
+    <span class="title">Recipes</span>
+    <span id="library-count" class="subtitle">—</span>
+  </div>
+
+  <div class="searchRow">
+    <input id="library-search" class="search" placeholder="Search recipes, ingredients or tags" />
+    <button id="library-recommend" class="recommend">Recommend a dish</button>
+  </div>
+
+  <div id="library-list" class="list">
+    <div id="row-0" class="row">
+      <span id="row-0-icon" class="rowIcon">🥗</span>
+      <div class="rowMain">
+        <span id="row-0-name" class="rowName">—</span>
+        <span id="row-0-meta" class="rowMeta">—</span>
+      </div>
+      <span id="row-0-status" class="rowStatus">—</span>
+    </div>
+    <div id="row-1" class="row">
+      <span id="row-1-icon" class="rowIcon">🥗</span>
+      <div class="rowMain">
+        <span id="row-1-name" class="rowName">—</span>
+        <span id="row-1-meta" class="rowMeta">—</span>
+      </div>
+      <span id="row-1-status" class="rowStatus">—</span>
+    </div>
+    <div id="row-2" class="row">
+      <span id="row-2-icon" class="rowIcon">🥗</span>
+      <div class="rowMain">
+        <span id="row-2-name" class="rowName">—</span>
+        <span id="row-2-meta" class="rowMeta">—</span>
+      </div>
+      <span id="row-2-status" class="rowStatus">—</span>
+    </div>
+    <div id="row-3" class="row">
+      <span id="row-3-icon" class="rowIcon">🥗</span>
+      <div class="rowMain">
+        <span id="row-3-name" class="rowName">—</span>
+        <span id="row-3-meta" class="rowMeta">—</span>
+      </div>
+      <span id="row-3-status" class="rowStatus">—</span>
+    </div>
+    <div id="row-4" class="row">
+      <span id="row-4-icon" class="rowIcon">🥗</span>
+      <div class="rowMain">
+        <span id="row-4-name" class="rowName">—</span>
+        <span id="row-4-meta" class="rowMeta">—</span>
+      </div>
+      <span id="row-4-status" class="rowStatus">—</span>
+    </div>
+    <div id="row-5" class="row">
+      <span id="row-5-icon" class="rowIcon">🥗</span>
+      <div class="rowMain">
+        <span id="row-5-name" class="rowName">—</span>
+        <span id="row-5-meta" class="rowMeta">—</span>
+      </div>
+      <span id="row-5-status" class="rowStatus">—</span>
+    </div>
+  </div>
+
+  <span id="library-empty" class="empty">Nothing matches that search.</span>
+</div>
