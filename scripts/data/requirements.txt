@@ -1,0 +1,8 @@
+# Python deps for the upstream CaptainCook4D downloader (its requirements.txt is
+# unpinned: "requests", "tqdm"). Pinned from a working install on 2026-09-19.
+certifi==2026.7.22
+charset-normalizer==3.5.1
+idna==3.20
+requests==2.34.2
+tqdm==4.70.1
+urllib3==2.8.0
