@@ -3,8 +3,28 @@ dist/
 .vite/
 *.local
 
-# Secrets. `*.local` already covers Vite's .env.local, but NOT a plain .env -- and this repo
-# has a public remote, so a Gemini key committed here is a key published to the internet.
+# Secrets. `*.local` covers Vite's .env.local but NOT a plain .env, and this repo has a public
+# remote plus a gh-pages deploy -- a key committed here is a key published to the internet.
 .env
 .env.*
 !.env.example
+
+# Unity (unity/) -- generated, machine-specific, or huge
+unity/Library/
+unity/Temp/
+unity/Obj/
+unity/Build/
+unity/Builds/
+unity/Logs/
+unity/UserSettings/
+unity/MemoryCaptures/
+unity/*.csproj
+unity/*.sln
+unity/*.user
+# The ONNX weights are ~6MB of binary that regenerates from one ultralytics command.
+unity/Assets/StreamingAssets/*.onnx
+results/
+
+# CaptainCook4D: downloaded videos and upstream clones/venv (see data/README.md)
+data/captaincook4d/raw/
+data/captaincook4d/.cache/

@@ -29,13 +29,70 @@
         font: 400 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
         color: var(--dim); font-variant-numeric: tabular-nums;
       }
-      #stage { display: grid; place-items: center; padding: 16px; min-width: 0; }
-      canvas { max-width: 100%; max-height: calc(100vh - 100px); border-radius: 6px; }
+      #stage {
+        display: grid; grid-template-rows: 1fr auto; gap: 12px;
+        place-items: center; padding: 16px; min-width: 0; min-height: 0;
+      }
+      canvas { max-width: 100%; max-height: calc(100vh - 230px); border-radius: 6px; }
+      /* Master spec 7.4: "Display plain numbers. A judge parses that in one second." So the
+         sentence is the interface, at a size somebody reads from behind your shoulder. */
+      #readout { width: 100%; display: grid; gap: 8px; }
+      #score {
+        font: 600 28px/1.25 ui-sans-serif, system-ui, sans-serif;
+        font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
+      }
+      #detail {
+        font: 400 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+        color: var(--dim); font-variant-numeric: tabular-nums;
+      }
+      #ticket {
+        font: 500 13px/1.4 ui-sans-serif, system-ui, sans-serif; color: var(--accent);
+      }
+      #cuts {
+        list-style: none; display: flex; flex-wrap: wrap; gap: 6px;
+        margin: 0; padding: 0; max-height: 64px; overflow-y: auto;
+      }
+      /* The booth board. People come back to beat their number, and a crowd is the point. */
+      #board {
+        list-style: none; margin: 0; padding: 0; display: grid; gap: 2px;
+        font: 400 11px/1.5 ui-monospace, monospace; color: var(--dim);
+        font-variant-numeric: tabular-nums;
+      }
+      #board:not(:empty) { border-top: 1px solid var(--line); padding-top: 8px; }
+      #board li:first-child { color: var(--accent); }
+      #cuts li {
+        font: 400 12px ui-monospace, monospace; font-variant-numeric: tabular-nums;
+        padding: 3px 8px; border-radius: 4px;
+        background: var(--panel); border: 1px solid var(--line); color: var(--ink);
+      }
+      /* A low-confidence slice is still recorded, and still says so. */
+      #cuts li.uncertain { color: var(--dim); border-style: dashed; }
       #controls {
         display: flex; flex-direction: column; gap: 14px;
         padding: 18px 16px; border-left: 1px solid var(--line); background: var(--panel);
       }
+      #controls { overflow-y: auto; max-height: 100vh; }
+      #controls h2 {
+        margin: 10px 0 0; font: 600 11px/1 ui-sans-serif, system-ui, sans-serif;
+        text-transform: uppercase; letter-spacing: 0.08em; color: var(--dim);
+        border-bottom: 1px solid var(--line); padding-bottom: 6px;
+      }
       #controls label { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; }
+      #reset {
+        padding: 7px 10px; border-radius: 5px; cursor: pointer;
+        background: var(--bg); color: var(--ink); border: 1px solid var(--line);
+        font: 500 13px ui-sans-serif, system-ui, sans-serif;
+      }
+      #reset:hover, #save:hover { border-color: var(--accent); color: var(--accent); }
+      #save {
+        padding: 7px 10px; border-radius: 5px; cursor: pointer;
+        background: var(--bg); color: var(--ink); border: 1px solid var(--line);
+        font: 500 13px ui-sans-serif, system-ui, sans-serif;
+      }
+      /* The clip stays in the sidebar so its scrub bar is reachable; the canvas shows the
+         analysed frame, which is the thing actually worth looking at. */
+      video.clip { display: none; width: 100%; border-radius: 5px; }
+      video.clip.shown { display: block; }
       #controls span { font-size: 12px; color: var(--dim); }
       #controls output {
         font: 400 12px ui-monospace, monospace; color: var(--accent);
@@ -70,7 +127,16 @@
         <h1>ingredient detection</h1>
         <div id="status" role="status">loading OpenCV…</div>
       </header>
-      <div id="stage"><canvas id="view"></canvas></div>
+      <div id="stage">
+        <canvas id="view"></canvas>
+        <section id="readout">
+          <div id="ticket">Free practice</div>
+          <div id="score">No cuts yet.</div>
+          <div id="detail">waiting for a cucumber</div>
+          <ol id="cuts"></ol>
+          <ol id="board"></ol>
+        </section>
+      </div>
       <aside id="controls"></aside>
     </main>
     <script type="module" src="/src/main.ts"></script>

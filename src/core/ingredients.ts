@@ -52,8 +52,13 @@ export interface IngredientProfile {
 export const PROFILES: readonly IngredientProfile[] = [
   {
     name: 'cucumber',
+    // The window has to hold the stub for the WHOLE session, and a stub gets shorter while its
+    // diameter does not. At 42mm diameter the old 2.6 floor stopped matching once the stub fell
+    // below 109mm -- about nine 8mm cuts into a 180mm cucumber -- so tracking died partway
+    // through the demo and looked like a vision failure. 1.6 holds it down to 67mm. The 20
+    // ceiling is for slices seen edge-on, which are 42/t:1 and clear the old 12 under 3.5mm.
     hueCentreDeg: 95, hueToleranceDeg: 25, minSaturation: 0.25,
-    elongation: { min: 2.6, max: 12 }, minSolidity: 0.9,
+    elongation: { min: 1.6, max: 20 }, minSolidity: 0.9,
   },
   {
     name: 'tomato',

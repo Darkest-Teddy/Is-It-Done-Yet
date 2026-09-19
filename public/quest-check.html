@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Quest capability check</title>
+<!--
+  Gate zero for the WEB path, run inside the headset.
+
+  Master spec section 3 budgets fifteen minutes to answer one question -- does passthrough reach
+  getUserMedia -- and then gates the architecture on it. This page answers that one and five
+  others in the same trip, because every one of them changes what we build and all of them are
+  cheaper to learn now than at hour six.
+
+  Deliberately dependency-free and deliberately huge. It loads with no build step, and text at
+  arm's length through a 3S lens is the reason for the font sizes: a diagnostic you cannot read
+  in the place you have to read it is not a diagnostic.
+
+  Run it: adb reverse tcp:8081 tcp:8081, then open http://localhost:8081/quest-check.html
+  in Quest Browser. localhost IS a secure context, which is what makes the camera and
+  microphone reachable at all without wrestling a self-signed certificate.
+-->
+<style>
+  :root {
+    --bg: #0b0d11; --fg: #e8ecf1; --dim: #8b95a3;
+    --pass: #6ee07a; --fail: #ff7a7a; --warn: #ffc95e; --line: #1e242e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px; background: var(--bg); color: var(--fg);
+    font: 20px/1.5 ui-sans-serif, system-ui, sans-serif;
+  }
+  h1 { font-size: 34px; margin: 0 0 4px; }
+  p.sub { color: var(--dim); margin: 0 0 24px; font-size: 18px; }
+  button {
+    font: 600 22px/1 ui-sans-serif, system-ui, sans-serif;
+    padding: 18px 26px; margin: 0 12px 12px 0; border-radius: 12px;
+    border: 1px solid var(--line); background: #151a22; color: var(--fg); cursor: pointer;
+  }
+  button:active { background: #202836; }
+  .row {
+    display: flex; gap: 16px; align-items: baseline;
+    padding: 14px 0; border-bottom: 1px solid var(--line);
+  }
+  .tag {
+    flex: 0 0 96px; font: 700 18px ui-monospace, monospace; letter-spacing: .04em;
+  }
+  .pass { color: var(--pass); } .fail { color: var(--fail); } .warn { color: var(--warn); }
+  .name { flex: 0 0 240px; font-weight: 600; }
+  .note { color: var(--dim); font-size: 18px; word-break: break-word; }
+  video { width: 320px; border-radius: 10px; background: #000; margin-top: 12px; }
+  #meter { height: 22px; background: #151a22; border-radius: 11px; overflow: hidden; width: 320px; }
+  #meterFill { height: 100%; width: 0%; background: var(--pass); transition: width .06s linear; }
+  textarea {
+    width: 100%; height: 220px; margin-top: 16px; background: #0f131a; color: var(--fg);
+    border: 1px solid var(--line); border-radius: 10px; padding: 12px;
+    font: 15px/1.45 ui-monospace, monospace;
+  }
+</style>
+</head>
+<body>
+<h1>Quest capability check</h1>
+<p class="sub">Passive checks run on load. The rest need a tap, because permission prompts and audio both require a gesture.</p>
+
+<div>
+  <button id="runCamera">Test camera</button>
+  <button id="runMic">Test microphone</button>
+  <button id="runSpeech">Test speech in</button>
+  <button id="runVoice">Test speech out</button>
+  <button id="runXr">Test WebXR</button>
+  <button id="send">Send to laptop</button>
+  <button id="copy">Copy results</button>
+</div>
+
+<div id="results"></div>
+<video id="preview" playsinline muted hidden></video>
+<div id="meter" hidden><div id="meterFill"></div></div>
+<textarea id="out" readonly placeholder="Results appear here. Copy this and paste it back."></textarea>
+
+<script>
+const results = document.getElementById('results');
+const out = document.getElementById('out');
+const lines = [];
+
+function row(name, state, note) {
+  const existing = document.querySelector(`[data-name="${CSS.escape(name)}"]`);
+  const el = existing ?? document.createElement('div');
+  el.className = 'row';
+  el.dataset.name = name;
+  el.innerHTML =
+    `<span class="tag ${state}">${state.toUpperCase()}</span>` +
+    `<span class="name"></span><span class="note"></span>`;
+  el.querySelector('.name').textContent = name;
+  el.querySelector('.note').textContent = note ?? '';
+  if (!existing) results.append(el);
+
+  const i = lines.findIndex((l) => l.startsWith(`${state.toUpperCase()} ${name}`) || l.includes(`| ${name} |`));
+  const text = `${state.toUpperCase().padEnd(4)} | ${name} | ${note ?? ''}`;
+  if (i >= 0) lines[i] = text; else lines.push(text);
+  out.value = lines.join('\n');
+}
+
+// ---- Passive: feature detection, no permission needed ------------------------------------
+
+row('user agent', 'warn', navigator.userAgent);
+row('secure context', isSecureContext ? 'pass' : 'fail',
+  isSecureContext ? location.origin : `${location.origin} -- camera and mic will be blocked`);
+
+const SR = window.SpeechRecognition ?? window.webkitSpeechRecognition;
+row('SpeechRecognition', SR ? 'pass' : 'fail',
+  SR ? 'constructor present' : 'ABSENT -- expected on Quest Browser. Use typed input or cloud STT.');
+
+row('speechSynthesis', 'speechSynthesis' in window ? 'pass' : 'fail',
+  'speechSynthesis' in window ? 'present, voice count below' : 'ABSENT -- chef tier 2 is silent here');
+
+row('AudioContext', (window.AudioContext ?? window.webkitAudioContext) ? 'pass' : 'fail', '');
+row('getUserMedia', navigator.mediaDevices?.getUserMedia ? 'pass' : 'fail', '');
+row('WebAssembly', typeof WebAssembly === 'object' ? 'pass' : 'fail', 'OpenCV.js needs this');
+row('navigator.xr', navigator.xr ? 'pass' : 'fail', navigator.xr ? 'present' : 'no WebXR');
+
+try {
+  localStorage.setItem('__probe', '1'); localStorage.removeItem('__probe');
+  row('localStorage', 'pass', 'tunable overrides will persist');
+} catch (e) { row('localStorage', 'warn', `unavailable: ${e.message}`); }
+
+row('devicePixelRatio', 'warn', String(devicePixelRatio));
+row('screen', 'warn', `${screen.width}x${screen.height}`);
+
+// Frame rate, measured rather than assumed. A 72Hz floor is the master spec's budget.
+let frames = 0;
+const t0 = performance.now();
+(function tick() {
+  frames++;
+  if (performance.now() - t0 < 2000) { requestAnimationFrame(tick); return; }
+  const fps = frames / ((performance.now() - t0) / 1000);
+  row('idle frame rate', fps >= 70 ? 'pass' : 'warn', `${fps.toFixed(1)} fps on an empty page`);
+})();
+
+// ---- Active: need a tap ------------------------------------------------------------------
+
+document.getElementById('runCamera').addEventListener('click', async () => {
+  row('camera', 'warn', 'asking...');
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: 1280, height: 960 },
+    });
+    const preview = document.getElementById('preview');
+    preview.hidden = false;
+    preview.srcObject = stream;
+    await preview.play();
+
+    const track = stream.getVideoTracks()[0];
+    const s = track.getSettings();
+    row('camera', 'pass',
+      `"${track.label || 'unlabelled'}" ${s.width}x${s.height} @ ${s.frameRate ?? '?'}fps ` +
+      `-- if you can SEE THE ROOM below, passthrough reaches getUserMedia.`);
+
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cams = devices.filter((d) => d.kind === 'videoinput');
+    row('video inputs', cams.length ? 'pass' : 'fail',
+      cams.map((d) => d.label || '(unlabelled)').join(' | ') || 'none');
+  } catch (e) {
+    row('camera', 'fail', `${e.name}: ${e.message}`);
+  }
+});
+
+document.getElementById('runMic').addEventListener('click', async () => {
+  row('microphone', 'warn', 'asking...');
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const track = stream.getAudioTracks()[0];
+    const Ctx = window.AudioContext ?? window.webkitAudioContext;
+    const ctx = new Ctx();
+    await ctx.resume();
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 512;
+    ctx.createMediaStreamSource(stream).connect(analyser);
+
+    document.getElementById('meter').hidden = false;
+    const fill = document.getElementById('meterFill');
+    const buf = new Uint8Array(analyser.frequencyBinCount);
+    let peak = 0;
+
+    row('microphone', 'pass', `"${track.label || 'unlabelled'}" -- SPEAK NOW, the bar should move`);
+    (function level() {
+      analyser.getByteTimeDomainData(buf);
+      let max = 0;
+      for (const v of buf) max = Math.max(max, Math.abs(v - 128) / 128);
+      peak = Math.max(peak, max);
+      fill.style.width = `${Math.min(100, max * 300).toFixed(0)}%`;
+      row('mic peak level', peak > 0.02 ? 'pass' : 'warn',
+        peak > 0.02 ? `peak ${(peak * 100).toFixed(0)}% -- audio is really arriving`
+                    : 'still silent -- speak louder, or the mic is delivering zeroes');
+      requestAnimationFrame(level);
+    })();
+  } catch (e) {
+    row('microphone', 'fail', `${e.name}: ${e.message}`);
+  }
+});
+
+document.getElementById('runSpeech').addEventListener('click', () => {
+  if (!SR) { row('speech in', 'fail', 'no SpeechRecognition constructor -- nothing to test'); return; }
+  try {
+    const r = new SR();
+    r.continuous = true; r.interimResults = true; r.lang = 'en-US';
+    r.onresult = (e) => {
+      const last = e.results[e.results.length - 1];
+      row('speech in', last.isFinal ? 'pass' : 'warn',
+        `${last.isFinal ? 'FINAL' : 'interim'}: "${last[0].transcript}"`);
+    };
+    r.onerror = (e) => row('speech in', 'fail', `error: ${e.error}`);
+    r.onend = () => row('speech in session', 'warn', 'session ended (restart needed for continuous)');
+    r.start();
+    row('speech in', 'warn', 'listening -- say "hey chef is it done yet"');
+  } catch (e) {
+    row('speech in', 'fail', `${e.name}: ${e.message}`);
+  }
+});
+
+document.getElementById('runVoice').addEventListener('click', () => {
+  if (!('speechSynthesis' in window)) { row('speech out', 'fail', 'no speechSynthesis'); return; }
+  const voices = speechSynthesis.getVoices();
+  row('voice count', voices.length ? 'pass' : 'warn',
+    voices.length ? `${voices.length} voices, e.g. ${voices.slice(0, 3).map(v => v.name).join(', ')}`
+                  : '0 voices listed -- may still speak, or may be silent');
+  const u = new SpeechSynthesisUtterance('Chef here. If you can hear this, the browser voice works.');
+  u.onstart = () => row('speech out', 'pass', 'started -- DID YOU HEAR IT?');
+  u.onerror = (e) => row('speech out', 'fail', `error: ${e.error}`);
+  u.onend = () => row('speech out finished', 'pass', 'utterance completed');
+  speechSynthesis.cancel();
+  speechSynthesis.speak(u);
+  row('speech out', 'warn', 'requested...');
+});
+
+document.getElementById('runXr').addEventListener('click', async () => {
+  if (!navigator.xr) { row('webxr', 'fail', 'navigator.xr absent'); return; }
+  for (const mode of ['immersive-ar', 'immersive-vr']) {
+    try {
+      const ok = await navigator.xr.isSessionSupported(mode);
+      row(`webxr ${mode}`, ok ? 'pass' : 'warn', ok ? 'supported' : 'not supported');
+    } catch (e) {
+      row(`webxr ${mode}`, 'fail', e.message);
+    }
+  }
+});
+
+// The point of the whole page: get the answers onto the laptop without transcribing them
+// through a face-mounted display. The dev server writes the body to results/.
+document.getElementById('send').addEventListener('click', async () => {
+  row('send', 'warn', 'posting to the dev server...');
+  try {
+    const header = [
+      `when: ${new Date().toISOString()}`,
+      `url:  ${location.href}`,
+      `ua:   ${navigator.userAgent}`,
+      '',
+    ].join('\n');
+    const res = await fetch('/quest-results', { method: 'POST', body: header + out.value });
+    row('send', res.ok ? 'pass' : 'fail',
+      res.ok ? 'written to results/ on the laptop -- tell Claude to read it'
+             : `server said ${res.status}`);
+  } catch (e) {
+    row('send', 'fail', `${e.message} -- use Copy results instead`);
+  }
+});
+
+document.getElementById('copy').addEventListener('click', async () => {
+  out.select();
+  try { await navigator.clipboard.writeText(out.value); row('copied', 'pass', 'results on clipboard'); }
+  catch { row('copied', 'warn', 'clipboard blocked -- select the box manually'); }
+});
+
+// Voice lists populate asynchronously in most browsers.
+if ('speechSynthesis' in window) {
+  speechSynthesis.onvoiceschanged = () => {
+    const v = speechSynthesis.getVoices();
+    row('speechSynthesis', v.length ? 'pass' : 'warn', `${v.length} voices available`);
+  };
+}
+</script>
+</body>
+</html>

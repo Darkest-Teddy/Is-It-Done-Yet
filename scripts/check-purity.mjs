@@ -28,7 +28,7 @@ for (const file of walk(ROOT)) {
 if (failed) {
   console.error('');
   console.error('src/core must stay adapter-free so it can be tested without a camera or a browser.');
-  console.error('Vision SDKs and DOM work belong in src/vision and src/ui, which depend on core -- never the reverse.');
+  console.error('Vision SDKs, audio and DOM work belong in src/vision and src/audio, which depend on core -- never the reverse.');
   process.exit(1);
 }
 
