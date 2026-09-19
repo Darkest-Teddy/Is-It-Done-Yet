@@ -3,3 +3,19 @@ dist/
 .vite/
 .iwsdk/
 *.local
+.env
+
+# Unity (unity/) -- generated, machine-specific, or huge
+unity/Library/
+unity/Temp/
+unity/Obj/
+unity/Build/
+unity/Builds/
+unity/Logs/
+unity/UserSettings/
+unity/MemoryCaptures/
+unity/*.csproj
+unity/*.sln
+unity/*.user
+# The ONNX weights are ~6MB of binary that regenerates from one ultralytics command.
+unity/Assets/StreamingAssets/*.onnx
