@@ -56,11 +56,25 @@ namespace MRPerception
         [Tooltip("Metres. Two sightings closer than this are the same object.")]
         [SerializeField] private float associationRadius = 0.12f;
 
+        [Header("Documents")]
+        [Tooltip("Rectify detected pages into an upright image, ready for OCR or a thumbnail.")]
+        [SerializeField] private bool rectifyDocuments = true;
+
+        /// <summary>
+        /// Fires with a flattened, head-on image of a detected page. The subscriber OWNS the Mat
+        /// and must Dispose it -- it is a fresh allocation per document, not a shared buffer.
+        ///
+        /// This is the hand-off point for OCR. See unity/README.md for why the engine choice is
+        /// left to the caller rather than baked in here.
+        /// </summary>
+        public event System.Action<Mat> DocumentRectified;
+
         [Tooltip("Position smoothing. Lower is steadier and laggier.")]
         [SerializeField, Range(0.05f, 1f)] private float smoothing = 0.35f;
 
         private YoloFoodDetector _foodDetector;
         private DocumentContourDetector _documentDetector;
+        private DocumentRectifier _rectifier;
 
         private Mat _workerMat;
         private volatile bool _busy;
@@ -85,6 +99,7 @@ namespace MRPerception
             public int Misses;
             public bool Seen;
             public GameObject Instance;
+            public DetectionVisualizer Visualizer;
         }
 
         private void Start()
@@ -99,6 +114,7 @@ namespace MRPerception
 
             _foodDetector = new YoloFoodDetector(path, inputSize, confidenceThreshold);
             _documentDetector = new DocumentContourDetector();
+            _rectifier = new DocumentRectifier();
 
             feed.FrameReady += OnFrameReady;
         }
@@ -110,6 +126,7 @@ namespace MRPerception
             SpinWait.SpinUntil(() => !_busy, 2000);
             _foodDetector?.Dispose();
             _documentDetector?.Dispose();
+            _rectifier?.Dispose();
             _workerMat?.Dispose();
         }
 
@@ -179,6 +196,17 @@ namespace MRPerception
             {
                 if (!raycaster.TryPlace(d, _workerFrame, feed, out Detection3D placed)) continue;
                 Integrate(placed);
+
+                // Rectification reads from the worker Mat, which is only valid until the next
+                // capture starts. Doing it here rather than in the worker keeps that lifetime
+                // obvious, and a perspective warp is a single sampling pass -- cheap enough to
+                // sit on the main thread for the one or two pages in view.
+                if (rectifyDocuments && d.Kind == DetectionKind.Document
+                    && DocumentRectified != null)
+                {
+                    Mat flat = _rectifier.Rectify(_workerMat, d);
+                    if (flat != null) DocumentRectified.Invoke(flat);
+                }
             }
 
             Retire();
@@ -227,23 +255,37 @@ namespace MRPerception
             match.Misses = 0;
             match.Seen = true;
 
-            if (match.Instance == null && match.Hits >= confirmFrames)
+            if (match.Instance == null && match.Visualizer == null && match.Hits >= confirmFrames)
             {
                 GameObject prefab = match.Kind == DetectionKind.Document
                     ? documentBoundsPrefab
                     : foodBoundsPrefab;
+
                 if (prefab != null)
                 {
                     match.Instance = Instantiate(prefab, match.Position, match.Rotation, transform);
                 }
+                else
+                {
+                    // No prefab authored yet. Fall back to a runtime wireframe rather than
+                    // drawing nothing -- a correctly working detector that displays nothing is
+                    // an unhelpful thing to be staring at while establishing whether detection
+                    // works at all.
+                    match.Visualizer = DetectionVisualizer.Create(transform, match.Kind);
+                }
             }
+
+            // Thickness is a guess; only the two measured axes are real.
+            var scale = new Vector3(match.Size.x, 0.02f, match.Size.y);
 
             if (match.Instance != null)
             {
                 match.Instance.transform.SetPositionAndRotation(match.Position, match.Rotation);
-                // Thickness is a guess; only the two measured axes are real.
-                match.Instance.transform.localScale =
-                    new Vector3(match.Size.x, 0.02f, match.Size.y);
+                match.Instance.transform.localScale = scale;
+            }
+            else if (match.Visualizer != null)
+            {
+                match.Visualizer.Apply(match.Position, match.Rotation, scale, match.Label);
             }
         }
 
@@ -258,6 +300,7 @@ namespace MRPerception
                 if (t.Misses < forgetFrames) continue;
 
                 if (t.Instance != null) Destroy(t.Instance);
+                if (t.Visualizer != null) Destroy(t.Visualizer.gameObject);
                 _tracked.RemoveAt(i);
             }
         }

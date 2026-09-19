@@ -6,10 +6,13 @@ raycast onto real geometry via the Depth API and MRUK, on a Snapdragon XR2 Gen 2
 ```
 Assets/Scripts/Perception/
 ├── DetectionTypes.cs           structs, and the pose-carrying frame
+├── CameraPermissions.cs        HEADSET_CAMERA at runtime -- without it, black frames
 ├── PassthroughCameraFeed.cs    WebCamTexture → GPU downscale → AsyncGPUReadback → Mat
 ├── YoloFoodDetector.cs         ONNX inference, YOLOv8 output parsing, NMS
 ├── DocumentContourDetector.cs  Canny → dilate → contours → 4-point quads
 ├── DetectionRaycaster.cs       2D pixel → world ray → Depth/MRUK hit → placement
+├── DocumentRectifier.cs        4 corners -> flat page, the OCR input
+├── DetectionVisualizer.cs      runtime wireframe box, so no prefab authoring needed
 └── MRPerceptionManager.cs      threading, tracking, prefab lifecycle
 ```
 
@@ -200,3 +203,74 @@ things at once.
 6. YOLO on a banana
 7. Tracking and smoothing
 8. Tune thresholds on-device with a debug UI, not by rebuilding
+
+---
+
+## OCR: reading the documents you detect
+
+Detecting a page and not reading it is half a feature, so here is the path and an honest account
+of the engine choice.
+
+### The pipeline is already built
+
+`DocumentContourDetector` gives you four ordered corners. `DocumentRectifier` warps them into a
+head-on rectangle. That warp is the part that matters, and it is done:
+
+```
+4 corners → getPerspectiveTransform → warpPerspective → upright page → OCR
+```
+
+**Why the warp beats any amount of preprocessing.** A page on a desk seen from a headset is a
+trapezoid. Every OCR engine ever built assumes text runs along horizontal lines of constant
+height — in a trapezoid, character height varies continuously across the image and the baseline
+is not straight. Tesseract's line finder either refuses the whole thing or segments it into
+nonsense. A perspective warp *removes* the problem rather than mitigating it.
+
+Subscribe and you get the flattened page:
+
+```csharp
+perceptionManager.DocumentRectified += flat =>
+{
+    using (flat)
+    using (Mat ready = DocumentRectifier.PrepareForOcr(flat))
+    {
+        // hand `ready` to whichever engine you picked below
+    }
+};
+```
+
+You own that Mat. Dispose it — it is a fresh allocation per document, not a shared buffer.
+
+### Picking an engine
+
+There is no good first-party on-device OCR in Unity, so this is a real decision rather than a
+default. In rough order of how fast you will have something working:
+
+| Option | Accuracy on scene text | Offline | Setup |
+|---|---|---|---|
+| **Cloud vision API** (Google Vision, Azure Read, Gemini) | Best by a wide margin | No | An hour. POST a PNG, parse JSON |
+| **Unity Sentis** + an ONNX OCR model | Good | **Yes** | A day. Model conversion is the work |
+| **Native Tesseract plugin** | Fair | Yes | Half a day, and `tessdata` bundling on Android is genuinely unpleasant |
+| **OpenCV `text` module** | Fair | Yes | Often **not available** — the contrib `text` module with Tesseract linked is usually absent from OpenCV for Unity's Android build. Check before planning around it |
+
+**Recommendation: cloud first.** Scene text — angled, uneven lighting, glossy paper — is exactly
+where classical OCR is weakest and where a modern vision model is strongest, and you get it
+working in an hour. Wrap it the way the rest of this codebase wraps network calls: a timeout, and
+a local fallback that degrades rather than hangs.
+
+Move to Sentis only if offline is a hard requirement. If it is, budget a day and start with
+PaddleOCR's recognition model — it converts to ONNX cleanly and is small enough for mobile.
+
+### Whatever you choose, vote across frames
+
+A printed label does not change, so every read is a noisy sample of one fixed answer. Reading
+once and trusting it is picking at random among six slightly different strings.
+
+The consensus logic for this is already written and tested on the web side of this repo, in
+`src/core/perception/textVote.ts` — bucket reads by a key that folds the glyph pairs OCR actually
+confuses (`O/0`, `I/1/l`, `S/5`, `B/8`, `Z/2`), accumulate confidence, and commit only when one
+reading has both enough absolute support and a clear margin over the runner-up. It is about 60
+lines and ports to C# directly.
+
+Without it, the label visibly rewrites itself every second, which reads to a user as the system
+being broken rather than as the system being unsure.
