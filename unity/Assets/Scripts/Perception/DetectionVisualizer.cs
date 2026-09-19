@@ -30,6 +30,7 @@ namespace MRPerception
         private TextMesh _label;
         private Transform _labelTransform;
         private Camera _mainCamera;
+        private secondcam _secondcam;
 
         /// <summary>
         /// Builds one visualizer under <paramref name="parent"/>.
@@ -57,7 +58,17 @@ namespace MRPerception
             _lines.numCapVertices = 2;
             // Unlit and unaffected by scene lighting: an MR overlay that dims when the user
             // turns away from a window is an overlay that looks like a bug.
-            _lines.material = new Material(FindUnlitShader()) { color = color };
+            Material lineMaterial = UnlitMaterials.Create(color, transparent: false);
+            if (lineMaterial == null)
+            {
+                // No shader survived the build. Draw nothing rather than throw -- see
+                // UnlitMaterials. The label still renders; TextMesh brings its own material.
+                _lines.enabled = false;
+            }
+            else
+            {
+                _lines.material = lineMaterial;
+            }
             _lines.startColor = color;
             _lines.endColor = color;
             _lines.positionCount = BoxPath.Length;
@@ -144,12 +155,16 @@ namespace MRPerception
             new(-0.5f,  0.5f, -0.5f)
         };
 
-        /// <summary>URP and the built-in pipeline disagree on shader names; try both.</summary>
-        private static Shader FindUnlitShader()
+        /// <summary>
+        /// Frees the runtime-created material.
+        ///
+        /// Destroying this GameObject does NOT free a material made with new Material(...) --
+        /// the renderer's reference goes away and the material leaks. One per tracked object
+        /// that ever appears and retires, and Retire runs every detection pass.
+        /// </summary>
+        private void OnDestroy()
         {
-            return Shader.Find("Universal Render Pipeline/Unlit")
-                   ?? Shader.Find("Unlit/Color")
-                   ?? Shader.Find("Sprites/Default");
+            if (_lines != null) UnlitMaterials.Release(_lines.material);
         }
     }
 }

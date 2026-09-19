@@ -172,14 +172,21 @@ namespace MRPerception
             public bool Vetoed;
         }
 
-        private void Start()
+        private System.Collections.IEnumerator Start()
         {
-            string path = Utils.getFilePath(modelStreamingPath);
+            // Resolve the model BEFORE anything else, and yield while doing it -- see
+            // ResolveModelPath. Until this returns there is no detector, so Update's _busy gate
+            // and the null checks below carry the first few frames.
+            string path = null;
+            yield return ResolveModelPath(p => path = p);
+
             if (string.IsNullOrEmpty(path))
             {
-                Debug.LogError($"[Perception] model not found in StreamingAssets: {modelStreamingPath}");
+                Debug.LogError(
+                    $"[Perception] could not load {modelStreamingPath}. On Android it must be " +
+                    "copied out of the APK first; see ResolveModelPath. Detection is disabled.");
                 enabled = false;
-                return;
+                yield break;
             }
 
             _foodDetector = new YoloFoodDetector(path, inputSize);
@@ -207,6 +214,66 @@ namespace MRPerception
             feed.FrameReady += OnFrameReady;
         }
 
+        /// <summary>
+        /// Gets a real filesystem path to the ONNX model, on Android as well as the Editor.
+        ///
+        /// THIS IS WHY IT IS NOT ONE LINE. On Android -- which is what a Quest is --
+        /// StreamingAssets does not exist on disk. It lives compressed inside the APK, and
+        /// Application.streamingAssetsPath is a "jar:file://..." URL that no file API can open.
+        /// OpenCV's Dnn.readNetFromONNX needs a genuine path, so the bytes have to be pulled out
+        /// with UnityWebRequest and written somewhere real first.
+        ///
+        /// The one-line version, Utils.getFilePath, returns empty on Android. It does not throw
+        /// and it does not warn: the manager simply logs "model not found", disables itself, and
+        /// YOLO never runs for the entire session. Everything else keeps working, so it presents
+        /// as "the model is bad at detecting food" rather than as "the model never loaded".
+        ///
+        /// Cached in persistentDataPath, so the copy happens once per install.
+        /// </summary>
+        private System.Collections.IEnumerator ResolveModelPath(System.Action<string> onDone)
+        {
+            string source = System.IO.Path.Combine(Application.streamingAssetsPath, modelStreamingPath);
+
+            // Desktop and Editor: StreamingAssets is a real directory, use it in place.
+            if (!source.Contains("://"))
+            {
+                onDone(System.IO.File.Exists(source) ? source : null);
+                yield break;
+            }
+
+            string cached = System.IO.Path.Combine(Application.persistentDataPath, modelStreamingPath);
+            if (System.IO.File.Exists(cached))
+            {
+                onDone(cached);
+                yield break;
+            }
+
+            using (var request = UnityEngine.Networking.UnityWebRequest.Get(source))
+            {
+                yield return request.SendWebRequest();
+
+                if (request.result != UnityEngine.Networking.UnityWebRequest.Result.Success)
+                {
+                    Debug.LogError($"[Perception] could not read {source}: {request.error}");
+                    onDone(null);
+                    yield break;
+                }
+
+                try
+                {
+                    string dir = System.IO.Path.GetDirectoryName(cached);
+                    if (!string.IsNullOrEmpty(dir)) System.IO.Directory.CreateDirectory(dir);
+                    System.IO.File.WriteAllBytes(cached, request.downloadHandler.data);
+                    onDone(cached);
+                }
+                catch (System.Exception e)
+                {
+                    Debug.LogError($"[Perception] could not cache the model: {e.Message}");
+                    onDone(null);
+                }
+            }
+        }
+
         private void OnDestroy()
         {
             if (feed != null) feed.FrameReady -= OnFrameReady;
@@ -220,7 +287,9 @@ namespace MRPerception
 
         private void OnFrameReady(Mat rgba, CapturedFrame frame)
         {
-            if (_busy) return;   // still working; skip this capture rather than queue it
+            // _foodDetector is null until ResolveModelPath finishes, which on Android means an
+            // APK read. Frames that arrive first are dropped rather than queued.
+            if (_busy || _foodDetector == null || _documentDetector == null) return;
 
             if (_workerMat == null || _workerMat.cols() != rgba.cols() || _workerMat.rows() != rgba.rows())
             {
@@ -377,13 +446,18 @@ namespace MRPerception
 
                 // Find the 2D box this track came from in THIS frame, so the crop matches what
                 // was actually seen. A stale box crops the wrong pixels.
+                // LARGEST matching box, not smallest. This picked the minimum by having the
+                // comparison inverted, so with two detections of the same label it
+                // systematically cropped the runtiest one and sent that to be identified. Area
+                // is a proxy for "the one actually in view": more pixels is a better crop, and
+                // a tiny box of the same label is usually a partial or a duplicate.
                 int best = -1;
-                float bestScore = float.MaxValue;
+                float bestScore = -1f;
                 for (int r = 0; r < results.Count; r++)
                 {
                     if (results[r].Label != t.Label) continue;
                     float score = Mathf.Abs(results[r].PixelRect.width * results[r].PixelRect.height);
-                    if (score < bestScore) { bestScore = score; best = r; }
+                    if (score > bestScore) { bestScore = score; best = r; }
                 }
                 if (best < 0) continue;
 

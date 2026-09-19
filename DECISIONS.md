@@ -406,3 +406,85 @@ work to its own bounding box made cost proportional to pixels (~125ms/megapixel,
 all three resolutions above) instead of to allocation. Correctness was checked by confirming the
 measured hues of the synthetic scene are unchanged and that repeated runs on one frame are
 byte-identical — a shared mask that failed to clear itself would bleed one blob into the next.
+
+## 16. There is a second build, in Unity, and this log did not say so
+
+**Spec section:** rule #15 — "Log every deviation from this spec in `DECISIONS.md` with the
+reason." This entry exists because that rule was breached.
+
+**Reality:** entry 12 records one pivot, from the Quest/IWSDK simulation to the browser
+measurement app. There was a **second**, and nothing recorded it: `unity/Assets/Scripts/Perception/`
+is a Meta Quest 3/3S mixed-reality perception app in C# — Unity, OpenXR, MRUK, OpenCV for Unity,
+YOLOv8n through the DNN module. Eighteen files, and by commit count the most active part of the
+repository.
+
+It was invisible. `README.md` listed "anything XR" under **Not built** — in the same commit that
+added `unity/`. A newcomer read the README first and never opened the directory holding the
+newest work. The correction is now in `README.md` and in this file's own preamble.
+
+**Decision:** two live builds, one repository, sharing documents and a design but no code.
+
+- `src/` — browser, TypeScript, one fixed camera, measures real slices in millimetres.
+- `unity/` — Quest 3/3S, C#, passthrough cameras, identifies and places holograms.
+
+They cannot share source: one is TypeScript and the other C#. What they share is
+`src/core/perception/**`, which was written framework-free precisely so its algorithms — pose
+ring, unprojection, hysteresis, OCR voting — could be **ported** rather than imported. That is
+why those six modules are fully tested and have no consumer in the web app: they are a
+specification with a test suite attached, staged for the headset.
+
+**What that costs, honestly.** The web bundle carries `tesseract.js` and ~500 lines of
+unreachable TypeScript. That is real waste, and the alternative — deleting the reference
+implementation and rewriting it in C# from the spec — would have cost the tests, which are the
+only reason the coordinate math is trustworthy at all.
+
+**`unity/` is not a Unity project.** It holds `Assets/Scripts/Perception/` and nothing else: no
+`ProjectSettings/`, no `Packages/manifest.json`, no `.meta` files, no scenes, and no
+`StreamingAssets/` even though the model must live there. The scripts are dropped into a project
+you create. Nothing in the tree says so, which is why it is said here.
+
+**None of it has been compiled.** There is no Unity install, no Meta XR SDK and no OpenCV for
+Unity on the machine it was written on, so roughly half of these files cannot resolve a single
+external type as checked in. Brace and parenthesis balance has been verified mechanically and
+two genuine compile errors were caught that way — a field and a method both named `Rejected`,
+and a stale constructor signature — but "it balances" is not "it compiles". Expect API drift on
+first build, most likely `PassthroughCameraUtils`, `EnvironmentRaycastHit.normalConfidence` and
+the `OVRInput` button constants.
+
+## 17. Four bugs an audit found in the Unity build, and what they have in common
+
+**Reality:** the Unity code was reviewed file by file after it was written. Four defects, and
+all four share a shape: **they work in the place you would test them and fail in the place they
+run.**
+
+**`Utils.getFilePath` returns empty on Android.** On a Quest, StreamingAssets is not a directory
+— it is compressed inside the APK, and `Application.streamingAssetsPath` is a `jar:file://` URL
+no file API can open. The manager logged "model not found", set `enabled = false`, and YOLO never
+ran for the entire session. Everything else kept working, so it would have presented as *the
+model is bad at finding food* rather than as *the model never loaded*. Now resolved through
+`UnityWebRequest` into `persistentDataPath`, cached after the first run.
+
+**`Shader.Find` at runtime.** Unity strips every shader no scene material references, so the
+lookup that resolves in the Editor returns null in a build, and `new Material(null)` throws — in
+`DetectionVisualizer`, whose entire purpose is to draw something when nothing else has been set
+up. Now centralised in `UnlitMaterials`, which returns null and logs once instead of throwing,
+and which callers treat as "draw nothing".
+
+**The depth raycast never fell through to MRUK.** Both branches returned, so a low-confidence
+depth normal silently became `Vector3.up` and the scene model was never consulted. The comment
+three lines above said it fell through. **The comment described behaviour the code did not have**,
+which is worse than no comment: it survives review because the reviewer reads the comment.
+
+**Identification cropped the smallest matching box.** `bestScore = float.MaxValue` with a `<`
+comparison selects the minimum, so with two detections of one label it systematically sent the
+runtiest to be identified.
+
+**Decision:** all four fixed. The pattern is worth keeping: every one of them is invisible on the
+machine that writes the code and only appears on the device that runs it, which is an argument
+for getting onto hardware early rather than for reviewing harder.
+
+**Known and not fixed**, recorded so they are chosen rather than discovered: `MedianOf` leaks
+four native Mats per call; the per-inference `float[8400*84]` is a 2.8MB allocation that should
+be reused; `Utils.matToTexture2D` flips by default on most versions, so crops sent for
+identification are probably upside down; and `_workerMat` is paired with its results only by the
+capture rate being slower than inference — a runtime slider can close that gap.
