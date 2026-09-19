@@ -2,16 +2,35 @@
   "name": "Is It Done Yet",
   "short_name": "Done Yet",
   "description": "A mixed-reality cooking coach. Scan your counter, pick a dish, and get walked through it.",
-  "start_url": "/xr.html",
-  "scope": "/",
+  "start_url": "./xr.html",
+  "scope": "./",
   "display": "fullscreen",
   "orientation": "any",
   "background_color": "#12151a",
   "theme_color": "#8ee06a",
-  "categories": ["education", "food", "games"],
+  "categories": [
+    "education",
+    "food",
+    "games"
+  ],
   "icons": [
-    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "./icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }

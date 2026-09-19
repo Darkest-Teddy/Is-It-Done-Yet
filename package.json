@@ -13,8 +13,9 @@
     "check:purity": "node scripts/check-purity.mjs",
     "typecheck": "tsc --noEmit",
     "test": "npm run check:purity && npm run typecheck && vitest run",
-    "dev:usb": "node -e \"process.env.VITE_HTTPS='0';require('child_process').spawn(process.platform==='win32'?'npx.cmd':'npx',['vite'],{stdio:'inherit',env:process.env})\"",
-    "adb:reverse": "adb reverse tcp:8081 tcp:8081"
+    "dev:usb": "node -e \"process.env.VITE_HTTPS='0';require('child_process').spawn('npx',['vite'],{stdio:'inherit',env:process.env,shell:true})\"",
+    "adb:reverse": "adb reverse tcp:8081 tcp:8081",
+    "build:pages": "node -e \"process.env.VITE_BASE='/Is-It-Done-Yet/';require('child_process').spawn('npx',['vite','build'],{stdio:'inherit',env:process.env,shell:true})\""
   },
   "devDependencies": {
     "@types/node": "^26.6.1",

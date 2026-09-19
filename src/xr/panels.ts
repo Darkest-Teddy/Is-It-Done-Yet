@@ -66,8 +66,8 @@ export class RecipePanels {
     callbacks: PanelCallbacks,
   ): Promise<RecipePanels> {
     const [library, preview] = await Promise.all([
-      loadUIKitMLAsset('/ui/library.uikitml'),
-      loadUIKitMLAsset('/ui/preview.uikitml'),
+      loadUIKitMLAsset(`${import.meta.env.BASE_URL}ui/library.uikitml`),
+      loadUIKitMLAsset(`${import.meta.env.BASE_URL}ui/preview.uikitml`),
     ]);
 
     const panels = new RecipePanels(library, preview, callbacks, pantry, recipes);

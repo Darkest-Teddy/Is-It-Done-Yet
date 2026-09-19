@@ -9,9 +9,9 @@
       reachable icons, a service worker with a fetch handler, and a secure origin. Any one
       missing and the option simply never appears, with nothing said about why.
     -->
-    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="manifest" href="./manifest.webmanifest" />
     <meta name="theme-color" content="#8ee06a" />
-    <link rel="icon" href="/icons/icon-192.png" />
+    <link rel="icon" href="./icons/icon-192.png" />
     <style>
       :root {
         --bg: #0d0f12; --panel: #161a20; --line: #262c35;
@@ -61,7 +61,10 @@
       // on an insecure origin it always fails. The app works fine without it — only the
       // Install option and offline launch depend on it.
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js').catch((err) => {
+        navigator.serviceWorker.register(
+          `${import.meta.env.BASE_URL}sw.js`,
+          { scope: import.meta.env.BASE_URL },
+        ).catch((err) => {
           console.info('[mise:xr] service worker not registered (needs HTTPS or localhost)', err);
         });
       }

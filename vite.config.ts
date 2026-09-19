@@ -21,7 +21,19 @@ export default defineConfig({
 
   // 0.0.0.0 so the headset on the same LAN can open it; the CV all runs locally.
   server: { host: '0.0.0.0', port: 8081, open: false },
-  build: { outDir: 'dist', sourcemap: true, target: 'esnext' },
+  build: {
+    outDir: 'dist',
+    // Sourcemaps locally, never in a deployed build. They are ~50MB here (OpenCV and the font
+    // bundles dominate) and a headset pulling them over venue wifi is the slowest possible
+    // first load, for a debugging aid nobody uses on the device.
+    sourcemap: process.env['VITE_BASE'] === undefined,
+    target: 'esnext',
+    // Both pages are real entry points. Without listing them Vite builds only index.html and
+    // xr.html silently never reaches the bundle -- the app appears to deploy and 404s instead.
+    // Object form, not the bare string the IWSDK scaffold used: that one fails the dep scan
+    // outright under Vite 7 (DECISIONS.md #11).
+    rollupOptions: { input: { main: 'index.html', xr: 'xr.html' } },
+  },
   esbuild: { target: 'esnext' },
   optimizeDeps: {
     esbuildOptions: { target: 'esnext' },
@@ -31,5 +43,13 @@ export default defineConfig({
     // forever and the app is a blank canvas with an empty console. See DECISIONS.md #11.
     exclude: ['@babylonjs/havok'],
   },
-  base: './',
+  /**
+   * Public path. Defaults to root for local dev; set `VITE_BASE` when deploying under a
+   * subpath, e.g. `VITE_BASE=/Is-It-Done-Yet/ npm run build` for GitHub Pages.
+   *
+   * NOT `'./'`. A relative base breaks a PWA: the service worker's scope and the manifest's
+   * start_url are resolved against the document, so a page opened one level deep registers a
+   * worker that controls the wrong path and the install silently never appears.
+   */
+  base: process.env['VITE_BASE'] ?? '/',
 });

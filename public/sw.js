@@ -12,13 +12,15 @@
 
 const CACHE = 'is-it-done-yet-v1';
 
+// Relative to the worker's own URL, so the same list is correct at the site root and under a
+// subpath like /Is-It-Done-Yet/. Absolute paths would 404 on GitHub Pages and cache nothing.
 const SHELL = [
-  '/xr.html',
-  '/manifest.webmanifest',
-  '/ui/library.uikitml',
-  '/ui/preview.uikitml',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png',
+  './xr.html',
+  './manifest.webmanifest',
+  './ui/library.uikitml',
+  './ui/preview.uikitml',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
 ];
 
 self.addEventListener('install', (event) => {
@@ -46,8 +48,8 @@ function isUncacheable(url) {
     url.pathname.startsWith('/@vite') ||
     url.pathname.startsWith('/@fs') ||
     url.pathname.startsWith('/@id') ||
-    url.pathname.startsWith('/node_modules/.vite') ||
-    url.pathname.startsWith('/src/') ||
+    url.pathname.includes('/node_modules/.vite') ||
+    url.pathname.includes('/src/') ||
     url.origin !== self.location.origin
   );
 }
