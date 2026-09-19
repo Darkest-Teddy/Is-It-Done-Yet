@@ -56,22 +56,33 @@ export const emptyPantry = (): Pantry => ({ items: [], scannedAtMs: 0 });
  * back to a neutral glyph rather than breaking layout.
  */
 export const INGREDIENT_ICONS: Readonly<Record<string, string>> = {
-  cucumber: '🥒',
-  tomato: '🍅',
-  'red onion': '🧅',
-  onion: '🧅',
-  carrot: '🥕',
-  orange: '🍊',
-  lemon: '🍋',
-  lettuce: '🥬',
-  avocado: '🥑',
-  pepper: '🫑',
-  olive: '🫒',
-  cheese: '🧀',
-  feta: '🧀',
-  egg: '🥚',
-  salt: '🧂',
-  oil: '🫗',
+  // CaptainCook4D recipe ingredients
+  tomato: '\u{1F345}',
+  'cherry tomato': '\u{1F345}',
+  cucumber: '\u{1F952}',
+  mozzarella: '\u{1F9C0}',
+  cheese: '\u{1F9C0}',
+  curd: '\u{1F95B}',
+  yogurt: '\u{1F95B}',
+  basil: '\u{1F33F}',
+  cilantro: '\u{1F33F}',
+  baguette: '\u{1F956}',
+  bread: '\u{1F956}',
+  'olive oil': '\u{1FAD7}',
+  oil: '\u{1FAD7}',
+  salt: '\u{1F9C2}',
+  pepper: '\u{1F9C2}',
+  // common extras a scan may turn up
+  'red onion': '\u{1F9C5}',
+  onion: '\u{1F9C5}',
+  carrot: '\u{1F955}',
+  orange: '\u{1F34A}',
+  lemon: '\u{1F34B}',
+  lettuce: '\u{1F96C}',
+  avocado: '\u{1F951}',
+  egg: '\u{1F95A}',
+  mushroom: '\u{1F344}',
+  garlic: '\u{1F9C4}',
 };
 
 export const iconFor = (ingredient: string): string =>
@@ -200,4 +211,125 @@ export function searchRecipes(recipes: readonly Recipe[], query: string): readon
       .toLowerCase();
     return terms.every((t) => haystack.includes(t));
   });
+}
+
+// ---------------------------------------------------------------------------------------------
+// The setup scan, and the confirmation that makes it trustworthy
+// ---------------------------------------------------------------------------------------------
+
+/** One line as the vision model reported it, before a human has looked at it. */
+export interface RawScanItem {
+  readonly ingredient: string;
+  readonly count: number;
+  readonly category: string;
+  readonly confidence: number;
+}
+
+const CATEGORIES: readonly Category[] = [
+  'vegetable', 'fruit', 'herb', 'protein', 'dairy', 'grain', 'pantry', 'unknown',
+];
+
+const asCategory = (raw: string): Category =>
+  (CATEGORIES as readonly string[]).includes(raw) ? (raw as Category) : 'unknown';
+
+/**
+ * Turns a raw scan into a pantry, normalising as it goes.
+ *
+ * Nothing arrives confirmed. That is the point: the scan is a proposal, and the confirm screen
+ * is what turns it into fact. Counts are floored at 1 and rounded -- a model returning 2.5
+ * tomatoes is telling you it is unsure, which belongs in `confidence`, not in a fractional
+ * tomato that then fails an integer requirement for no visible reason.
+ *
+ * Duplicate lines for one ingredient are merged, keeping the LOWEST confidence of the group.
+ * Merging is where a scan is most likely to be wrong, so the merged line should inherit the
+ * doubt rather than the reassurance.
+ */
+export function pantryFromScan(
+  items: readonly RawScanItem[],
+  scannedAtMs: number,
+): Pantry {
+  const merged = new Map<string, PantryItem>();
+
+  for (const raw of items) {
+    const ingredient = raw.ingredient.trim().toLowerCase();
+    if (ingredient === '') continue;
+
+    const count = Math.max(1, Math.round(raw.count));
+    const confidence = Math.min(1, Math.max(0, raw.confidence));
+    const existing = merged.get(ingredient);
+
+    merged.set(ingredient, existing === undefined
+      ? { ingredient, count, category: asCategory(raw.category), confidence, confirmed: false }
+      : {
+          ...existing,
+          count: existing.count + count,
+          confidence: Math.min(existing.confidence, confidence),
+        });
+  }
+
+  return { items: [...merged.values()], scannedAtMs };
+}
+
+const mapItems = (
+  pantry: Pantry,
+  fn: (item: PantryItem) => PantryItem | null,
+): Pantry => ({
+  ...pantry,
+  items: pantry.items.map(fn).filter((i): i is PantryItem => i !== null),
+});
+
+/** Marks one line as checked by a human. Its confidence becomes certainty. */
+export function confirmItem(pantry: Pantry, ingredient: string): Pantry {
+  return mapItems(pantry, (i) =>
+    i.ingredient === ingredient ? { ...i, confirmed: true, confidence: 1 } : i);
+}
+
+/** Accepts the whole scan as-is. The "looks right" button. */
+export function confirmAll(pantry: Pantry): Pantry {
+  return mapItems(pantry, (i) => ({ ...i, confirmed: true, confidence: 1 }));
+}
+
+/**
+ * Nudges a count, which also confirms the line -- editing a number IS checking it.
+ *
+ * Dropping to zero removes the item rather than leaving a zero-count line, because "0 tomatoes"
+ * and "no tomatoes" would otherwise both appear and match differently.
+ */
+export function adjustCount(pantry: Pantry, ingredient: string, delta: number): Pantry {
+  return mapItems(pantry, (i) => {
+    if (i.ingredient !== ingredient) return i;
+    const count = i.count + delta;
+    return count <= 0 ? null : { ...i, count, confirmed: true, confidence: 1 };
+  });
+}
+
+/** Removes a line the scan hallucinated. */
+export function removeItem(pantry: Pantry, ingredient: string): Pantry {
+  return mapItems(pantry, (i) => (i.ingredient === ingredient ? null : i));
+}
+
+/** Adds something the scan missed. Confirmed by definition -- a human typed it. */
+export function addItem(
+  pantry: Pantry,
+  ingredient: string,
+  count: number,
+  category: Category = 'unknown',
+): Pantry {
+  const name = ingredient.trim().toLowerCase();
+  if (name === '' || count <= 0) return pantry;
+
+  const existing = pantry.items.find((i) => i.ingredient === name);
+  if (existing !== undefined) return adjustCount(pantry, name, count);
+
+  return {
+    ...pantry,
+    items: [...pantry.items, {
+      ingredient: name, count: Math.round(count), category, confidence: 1, confirmed: true,
+    }],
+  };
+}
+
+/** True once nothing is left for the cook to check. Gates entry to the recipe library. */
+export function isReviewed(pantry: Pantry): boolean {
+  return unconfirmed(pantry).length === 0;
 }

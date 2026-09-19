@@ -14,12 +14,19 @@
 import { loadUIKitMLAsset, type UIKitMLAsset } from '@iwsdk/core';
 
 import {
+  adjustCount,
+  confirmAll,
+  emptyPantry,
   iconFor,
+  isReviewed,
   matchRecipe,
+  pantryFromScan,
   rankRecipes,
   recommend,
   searchRecipes,
+  unconfirmed,
   type Pantry,
+  type RawScanItem,
   type RecipeMatch,
 } from '../core/pantry.js';
 import type { Recipe } from '../core/recipe.js';
@@ -28,6 +35,8 @@ import type { Recipe } from '../core/recipe.js';
 export const MAX_ROWS = 6;
 /** Ingredient chip slots declared in preview.uikitml, per section. */
 const MAX_CHIPS = 6;
+/** Editable rows declared in scan.uikitml. */
+const MAX_SCAN_ROWS = 8;
 
 /** UIKit's property types are zod-inferred and enormous; this is the slice we actually use. */
 type El = { setProperties: (props: Record<string, unknown>) => void };
@@ -37,9 +46,22 @@ const show = (el: El, visible: boolean): void =>
 
 const setText = (el: El, text: string): void => el.setProperties({ text });
 
+export interface ScanResult {
+  readonly items: readonly RawScanItem[];
+  /** What limited the scan, if anything. Shown beside the review rows. */
+  readonly notes: string;
+}
+
 export interface PanelCallbacks {
   /** Fired when the cook commits to a dish from the preview screen. */
   readonly onStart: (recipe: Recipe) => void;
+  /**
+   * Captures and analyses the counter. Null on any failure.
+   *
+   * Injected rather than called directly so these panels know nothing about OpenAI, cameras or
+   * the network -- which is also what lets the whole flow be driven from a fixture.
+   */
+  readonly onScan: () => Promise<ScanResult | null>;
 }
 
 export class RecipePanels {
@@ -50,6 +72,7 @@ export class RecipePanels {
   private listed: readonly RecipeMatch[] = [];
 
   private constructor(
+    readonly scan: UIKitMLAsset,
     readonly library: UIKitMLAsset,
     readonly preview: UIKitMLAsset,
     private readonly callbacks: PanelCallbacks,
@@ -65,14 +88,16 @@ export class RecipePanels {
     recipes: readonly Recipe[],
     callbacks: PanelCallbacks,
   ): Promise<RecipePanels> {
-    const [library, preview] = await Promise.all([
+    const [scan, library, preview] = await Promise.all([
+      loadUIKitMLAsset(`${import.meta.env.BASE_URL}ui/scan.uikitml`),
       loadUIKitMLAsset(`${import.meta.env.BASE_URL}ui/library.uikitml`),
       loadUIKitMLAsset(`${import.meta.env.BASE_URL}ui/preview.uikitml`),
     ]);
 
-    const panels = new RecipePanels(library, preview, callbacks, pantry, recipes);
+    const panels = new RecipePanels(scan, library, preview, callbacks, pantry, recipes);
     panels.wire();
-    panels.showLibrary();
+    // Setup comes first: the recipe list is meaningless until we know what is on the counter.
+    panels.showScan();
     return panels;
   }
 
@@ -116,6 +141,112 @@ export class RecipePanels {
     this.el(this.preview, 'preview-back').setProperties({
       onClick: () => this.showLibrary(),
     });
+
+    this.el(this.scan, 'scan-run').setProperties({ onClick: () => void this.runScan() });
+
+    // Skip exists because a scan can fail for reasons the cook cannot fix at the counter -- no
+    // key, no camera, bad light. A dead end there would strand them in setup with no way into
+    // the app at all.
+    this.el(this.scan, 'scan-skip').setProperties({
+      onClick: () => {
+        this.pantry = emptyPantry();
+        this.showLibrary();
+      },
+    });
+
+    this.el(this.scan, 'scan-done').setProperties({
+      onClick: () => {
+        if (this.pantry.items.length === 0) return;
+        this.pantry = confirmAll(this.pantry);
+        this.showLibrary();
+      },
+    });
+
+    for (let i = 0; i < MAX_SCAN_ROWS; i += 1) {
+      const nudge = (delta: number) => () => {
+        const item = this.scanned[i];
+        if (item === undefined) return;
+        this.pantry = adjustCount(this.pantry, item.ingredient, delta);
+        this.renderScan();
+      };
+      this.el(this.scan, `scan-${i}-plus`).setProperties({ onClick: nudge(1) });
+      this.el(this.scan, `scan-${i}-minus`).setProperties({ onClick: nudge(-1) });
+    }
+  }
+
+  /** Rows currently listed, so a +/- press maps back to the right ingredient. */
+  private scanned: readonly Pantry['items'][number][] = [];
+
+  private setScanStatus(text: string, notes = ''): void {
+    setText(this.el(this.scan, 'scan-status'), text);
+    setText(this.el(this.scan, 'scan-notes'), notes);
+  }
+
+  showScan(): void {
+    show(this.el(this.scan, 'scan-root'), true);
+    show(this.el(this.library, 'library-root'), false);
+    show(this.el(this.preview, 'preview-root'), false);
+    this.renderScan();
+  }
+
+  private async runScan(): Promise<void> {
+    this.setScanStatus('Looking at your counter…');
+    const result = await this.callbacks.onScan();
+
+    if (result === null) {
+      // Say what failed and leave Skip available. Pretending a failed scan found nothing would
+      // be indistinguishable from an empty counter, and the cook could not tell which.
+      this.setScanStatus('Scan failed — check the camera and key, or press Skip.');
+      return;
+    }
+
+    this.pantry = pantryFromScan(result.items, 0);
+    const queue = unconfirmed(this.pantry).length;
+    this.setScanStatus(
+      this.pantry.items.length === 0
+        ? 'Nothing recognised. Try again with more light, or press Skip.'
+        : queue === 0
+          ? `Found ${this.pantry.items.length} ingredients. Check them and continue.`
+          : `Found ${this.pantry.items.length} ingredients — ${queue} I am unsure about. Please check the amber rows.`,
+      result.notes,
+    );
+    this.renderScan();
+  }
+
+  private renderScan(): void {
+    this.scanned = this.pantry.items;
+
+    for (let i = 0; i < MAX_SCAN_ROWS; i += 1) {
+      const item = this.scanned[i];
+      const row = this.el(this.scan, `scan-${i}`);
+      if (item === undefined) {
+        show(row, false);
+        continue;
+      }
+      show(row, true);
+
+      setText(this.el(this.scan, `scan-${i}-icon`), iconFor(item.ingredient));
+      setText(this.el(this.scan, `scan-${i}-name`), item.ingredient);
+      setText(this.el(this.scan, `scan-${i}-count`), String(item.count));
+      setText(
+        this.el(this.scan, `scan-${i}-conf`),
+        item.confirmed ? 'confirmed' : `${Math.round(item.confidence * 100)}% sure`,
+      );
+      // Amber rim marks a row as a question rather than a fact.
+      row.setProperties({
+        borderColor: item.confirmed || item.confidence >= 0.75 ? '#2b323d' : '#e0b86a',
+      });
+    }
+
+    const ready = this.pantry.items.length > 0;
+    const done = this.el(this.scan, 'scan-done');
+    setText(done, ready
+      ? isReviewed(this.pantry) ? 'Looks right — show recipes' : 'Accept all — show recipes'
+      : 'Scan first');
+    done.setProperties({
+      backgroundColor: ready ? '#8ee06a' : '#3a3f47',
+      color: ready ? '#12151a' : '#8a929c',
+    });
   }
 
   /** Re-scan and re-render. Called after the setup scan, or when the cook edits the pantry. */
@@ -125,6 +256,7 @@ export class RecipePanels {
   }
 
   showLibrary(): void {
+    show(this.el(this.scan, 'scan-root'), false);
     show(this.el(this.library, 'library-root'), true);
     show(this.el(this.preview, 'preview-root'), false);
     this.renderLibrary();
@@ -177,6 +309,7 @@ export class RecipePanels {
     const fresh = matchRecipe(this.pantry, match.recipe);
     const { recipe } = fresh;
 
+    show(this.el(this.scan, 'scan-root'), false);
     show(this.el(this.library, 'library-root'), false);
     show(this.el(this.preview, 'preview-root'), true);
 

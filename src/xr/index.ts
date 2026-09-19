@@ -23,11 +23,12 @@ import {
   type Entity,
 } from '@iwsdk/core';
 
+import { configFromEnv, scanCounter } from '../ai/openai.js';
 import { emptyPantry, type Pantry } from '../core/pantry.js';
 import { RECIPES } from '../core/recipe.js';
 import { CoachSession } from '../app/session.js';
 import { DEFAULT_SEGMENT_OPTIONS, segment, useOpenCv } from '../vision/segment.js';
-import { RecipePanels } from './panels.js';
+import { RecipePanels, type ScanResult } from './panels.js';
 
 /** How often the board is analysed. Not tied to the render loop; see the file docstring. */
 const ANALYSE_INTERVAL_MS = 1000;
@@ -217,7 +218,7 @@ export async function boot(container: HTMLElement): Promise<BootResult> {
   // keeps returning null -- which the loop treats as "not ready" rather than as an error.
   cameraEntity.addComponent(CameraSource, { facing: 'back', width: 1280, height: 720 });
 
-  await mountPanels(world, session);
+  await mountPanels(world, session, cameraEntity);
 
   if (probe.ok) {
     startAnalysisLoop(cameraEntity, session);
@@ -238,6 +239,45 @@ export async function boot(container: HTMLElement): Promise<BootResult> {
 }
 
 /**
+ * Grabs one frame and asks the vision model to count what is on it.
+ *
+ * A single still rather than a live loop: a one-shot scan can use a full-strength model on a
+ * clean frame, where a live loop forces a fast classifier onto motion-blurred frames under
+ * whatever light the room has. It is both more accurate and far cheaper, and it matches how a
+ * cook actually works -- ingredients get set out once.
+ *
+ * Every failure returns null with a specific reason logged, because "no key", "no camera" and
+ * "model said nothing" need different fixes and are indistinguishable from an empty counter.
+ */
+async function captureAndScan(cameraEntity: Entity): Promise<ScanResult | null> {
+  const cfg = configFromEnv();
+  if (cfg === null) {
+    warn('scan: no VITE_OPENAI_API_KEY, so there is nothing to ask');
+    return null;
+  }
+
+  const canvas = CameraUtils.captureFrame(cameraEntity);
+  if (canvas === null) {
+    warn('scan: no camera frame available on this device');
+    return null;
+  }
+
+  const blob = await new Promise<Blob | null>((resolve) => {
+    canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.85);
+  });
+  if (blob === null) {
+    warn('scan: frame could not be encoded');
+    return null;
+  }
+
+  const result = await scanCounter(cfg, blob);
+  if (result === null) return null;
+
+  log(`scan: ${result.items.length} ingredients`, result.notes);
+  return { items: result.items, notes: result.notes };
+}
+
+/**
  * Places the recipe library and preview in front of the player.
  *
  * Panels are parented to plain transform entities rather than anchored to a detected plane: a
@@ -247,6 +287,7 @@ export async function boot(container: HTMLElement): Promise<BootResult> {
 async function mountPanels(
   world: World,
   session: CoachSession,
+  cameraEntity: Entity,
   pantry: Pantry = emptyPantry(),
 ): Promise<RecipePanels | null> {
   try {
@@ -254,6 +295,7 @@ async function mountPanels(
       onStart: (recipe) => {
         log(`starting "${recipe.name}"`);
       },
+      onScan: () => captureAndScan(cameraEntity),
     });
 
     // 1.6m out and slightly below eye level -- the distance UI stays readable at without

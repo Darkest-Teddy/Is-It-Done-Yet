@@ -1,37 +1,39 @@
 /**
- * What a finished board is supposed to look like.
+ * What a finished dish is supposed to look like.
  *
- * A recipe here is not a list of prose steps -- it is a set of *measurable claims* about the
- * finished board, plus the handful of steps that no camera can check. That split is the whole
- * design. `requires` is what `diff` can verify by looking; `steps` carries the rest, and each
- * one says honestly whether it is checkable or not.
+ * A recipe here is not prose -- it is a set of *measurable claims*, plus the handful of steps
+ * no camera or sensor can check. That split is the whole design. `requires` is what the pantry
+ * and the bowl can be diffed against; `steps` carries the rest, each saying honestly whether it
+ * is checkable.
  *
- * Ingredient names must match a profile in `ingredients.ts` exactly, or the requirement can
- * never be satisfied -- the tally it looks for will never appear. `validateRecipe` exists to
- * catch that at startup rather than in front of a judge.
+ * Ingredient names must match what the scan can produce, or a requirement can never be
+ * satisfied -- the tally it looks for never appears, and the cook is told forever to add
+ * something already in front of them. `unknownIngredients` exists to catch that at startup
+ * rather than in front of a judge.
  */
 
 import type { Range } from './ingredients.js';
 
 /**
- * Whether a step can be confirmed by looking at the board.
+ * Whether a step can be confirmed by looking.
  *
  * `cook-confirmed` is not a cop-out, it is the honest answer for a whole class of real cooking.
- * Salt has no optical signature: a correctly seasoned salad and an unseasoned one are the same
- * photograph. Guessing would produce confident feedback with nothing behind it, which is worse
- * than silence because the cook cannot tell the two apart.
+ * Salt has no optical signature: a seasoned dish and an unseasoned one are the same photograph.
+ * Guessing produces confident feedback with nothing behind it, which is worse than silence
+ * because the cook cannot tell the two apart.
  */
 export type Verifiability = 'vision' | 'cook-confirmed';
 
-/** One measurable claim about a single ingredient on the finished board. */
+export type Difficulty = 'easy' | 'medium' | 'hard';
+
+/** One measurable claim about a single ingredient. */
 export interface IngredientRequirement {
-  /** Must match an `IngredientProfile.name` exactly. */
   readonly ingredient: string;
-  /** How many separate pieces. Omit when the count genuinely does not matter. */
+  /** How many separate units. Omit when the count genuinely does not matter. */
   readonly count?: Range;
-  /** Share of total food area, 0..1. This is what catches "too much cucumber". */
+  /** Share of total food area, 0..1. Catches "too much cucumber". */
   readonly areaShare?: Range;
-  /** Target piece thickness in mm, checked against the blob's minor axis. */
+  /** Target piece thickness in mm. */
   readonly thicknessMm?: Range;
 }
 
@@ -42,17 +44,15 @@ export interface RecipeStep {
   /**
    * Ingredients whose requirements this step is responsible for.
    *
-   * This is what lets a `vision` step complete itself: once no deficit mentions any of these
-   * ingredients, the step has demonstrably been done. Without the link a step could only ever
-   * be marked done by asking, which would make the process tracker a checklist the cook drives
-   * rather than something the camera drives.
+   * This is what lets a `vision` step complete itself: once no deficit mentions any of these,
+   * the step has demonstrably been done. Without the link a step could only ever be ticked off
+   * by asking, which would make the tracker a checklist the cook drives rather than something
+   * the system drives.
    *
    * Empty for `cook-confirmed` steps, which have nothing observable to attach to.
    */
   readonly satisfies?: readonly string[];
 }
-
-export type Difficulty = 'easy' | 'medium' | 'hard';
 
 export interface Recipe {
   readonly id: string;
@@ -66,72 +66,124 @@ export interface Recipe {
    * Emoji standing in for artwork.
    *
    * Deliberately not an image asset: emoji need no loading, no atlas and no licence, they
-   * render identically in a UIKitML panel and in the laptop debug view, and they survive a
-   * designer never arriving. Swap for real icons later by changing this field only.
+   * render identically in a UIKitML panel and in a browser, and they survive a designer never
+   * arriving. Swap for real icons later by changing this field only.
    */
   readonly icon: string;
-  /** Free-text tags the search bar matches against, beyond name and ingredients. */
+  /** Free-text tags the search bar matches, beyond name and ingredients. */
   readonly tags: readonly string[];
   readonly requires: readonly IngredientRequirement[];
   readonly steps: readonly RecipeStep[];
   /**
-   * An ingredient whose pieces cluster more tightly than this fraction of the board's own
-   * spread has not been tossed through. 1.0 would demand perfect mixing and fire constantly;
-   * 0 disables the check. TUNED, not sourced -- 0.55 separated "dumped in a corner" from
-   * "tossed" on a hand-placed board and wants re-checking against a real one.
+   * An ingredient clustering more tightly than this fraction of the bowl's own spread has not
+   * been mixed through. 1.0 would demand perfection and fire constantly; 0 disables the check.
    */
   readonly minMixRatio: number;
 }
 
 /**
- * Only ingredients with a tuned profile in `ingredients.ts` can appear here.
+ * Recipes taken from CaptainCook4D, not invented here.
  *
- * Notably absent: lettuce. It is the obvious salad base and it is deliberately left out,
- * because adding it means inventing an untested hue window and elongation range, and a profile
- * tuned against nothing will classify half the board as lettuce. Add it by colour-picking real
- * leaves under the venue lights, not by guessing here.
+ * Step text is the dataset's own wording, reordered into the sequence a cook actually works in
+ * -- the task graphs number steps by id, not by order. Keeping the wording verbatim matters:
+ * the dataset's ~2,400 annotated errors are described against these exact strings, so a
+ * critique can be checked against how real people were observed getting this wrong rather than
+ * against our guesses.
+ *
+ * Chosen for data volume against simplicity. Cucumber Raita is the most-recorded recipe in the
+ * set (20 recordings); Tomato Mozzarella Salad has the fewest steps of any well-covered one
+ * (9); Caprese Bruschetta is the only short recipe exercising all seven error categories.
+ *
+ * Deliberately absent despite ample data: Scrambled Eggs (23 steps), Broccoli Stir Fry (25),
+ * Mug Cake (20). Too long to walk someone through in a demo.
  */
 export const RECIPES: readonly Recipe[] = [
   {
-    id: 'greek-ish',
-    name: 'Greek-ish Salad',
-    description: 'Cucumber, tomato and shaved red onion, dressed simply. Forgiving, fast, and hard to get wrong.',
+    id: 'tomato-mozzarella-salad',
+    name: 'Tomato Mozzarella Salad',
+    description:
+      'Sliced tomato, olive oil, mozzarella and seasoning on a platter. Nine steps, no heat, and it comes apart as fast as it goes together.',
     difficulty: 'easy',
-    averageMinutes: 10,
-    icon: '🥗',
-    tags: ['salad', 'mediterranean', 'no-cook', 'quick'],
+    averageMinutes: 8,
+    icon: '🍅',
+    tags: ['salad', 'no-cook', 'italian', 'quick', 'captaincook4d'],
     requires: [
-      { ingredient: 'cucumber', count: { min: 8, max: 14 }, areaShare: { min: 0.3, max: 0.5 }, thicknessMm: { min: 4, max: 7 } },
-      { ingredient: 'tomato', count: { min: 6, max: 10 }, areaShare: { min: 0.3, max: 0.5 } },
-      { ingredient: 'red onion', count: { min: 3, max: 8 }, areaShare: { min: 0.05, max: 0.2 }, thicknessMm: { min: 1, max: 3 } },
+      { ingredient: 'tomato', count: { min: 1, max: 3 } },
+      { ingredient: 'mozzarella', count: { min: 1, max: 2 } },
+      { ingredient: 'olive oil', count: { min: 1, max: 1 } },
+      { ingredient: 'salt', count: { min: 1, max: 1 } },
     ],
     steps: [
-      { id: 'cut-cuc', instruction: 'Cut the cucumber into 5mm half-moons', verifiable: 'vision', satisfies: ['cucumber'] },
-      { id: 'quarter-tom', instruction: 'Quarter the tomatoes', verifiable: 'vision', satisfies: ['tomato'] },
-      { id: 'shave-onion', instruction: 'Shave the red onion thin', verifiable: 'vision', satisfies: ['red onion'] },
-      { id: 'season', instruction: 'Salt, pepper, and oil to taste', verifiable: 'cook-confirmed' },
-      { id: 'toss', instruction: 'Toss until evenly distributed', verifiable: 'vision', satisfies: ['cucumber', 'tomato', 'red onion'] },
+      { id: 'rinse', instruction: 'Rinse a tomato', verifiable: 'vision', satisfies: ['tomato'] },
+      { id: 'dry', instruction: 'Gently dry it with a paper or tea towel', verifiable: 'vision', satisfies: ['tomato'] },
+      { id: 'slice', instruction: 'Slice one tomato into about 1/2 inch thick slices', verifiable: 'vision', satisfies: ['tomato'] },
+      { id: 'place', instruction: 'Place the slices on a platter in a single layer', verifiable: 'vision', satisfies: ['tomato'] },
+      { id: 'oil', instruction: 'Add a drizzle of extra-virgin olive oil, about 1 tablespoon', verifiable: 'vision', satisfies: ['olive oil'] },
+      { id: 'salt', instruction: 'Season the tomato slices with salt', verifiable: 'cook-confirmed' },
+      { id: 'pepper', instruction: 'Season the platter with 1/4 teaspoon black pepper', verifiable: 'cook-confirmed' },
+      { id: 'mozzarella', instruction: 'Sprinkle mozzarella over the tomato throughout the platter', verifiable: 'vision', satisfies: ['mozzarella'] },
+      { id: 'garnish', instruction: 'Garnish the platter with italian seasoning', verifiable: 'cook-confirmed' },
     ],
     minMixRatio: 0.55,
   },
   {
-    id: 'carrot-slaw',
-    name: 'Carrot and Orange Slaw',
-    description: 'Julienned carrot with orange segments and a sharp dressing. The knife work is the whole difficulty.',
-    difficulty: 'medium',
-    averageMinutes: 18,
-    icon: '🥕',
-    tags: ['slaw', 'citrus', 'no-cook', 'knife-skills'],
+    id: 'cucumber-raita',
+    name: 'Cucumber Raita',
+    description:
+      'Grated cucumber folded through whisked curd with cumin and chaat masala. The most-recorded dish in the dataset, and almost every mistake in it is one of order.',
+    difficulty: 'easy',
+    averageMinutes: 10,
+    icon: '🥒',
+    tags: ['raita', 'no-cook', 'indian', 'yogurt', 'captaincook4d'],
     requires: [
-      { ingredient: 'carrot', count: { min: 10, max: 30 }, areaShare: { min: 0.45, max: 0.7 }, thicknessMm: { min: 1, max: 4 } },
-      { ingredient: 'orange', count: { min: 4, max: 9 }, areaShare: { min: 0.2, max: 0.4 } },
-      { ingredient: 'red onion', count: { min: 2, max: 6 }, areaShare: { min: 0.03, max: 0.15 } },
+      { ingredient: 'cucumber', count: { min: 1, max: 2 } },
+      { ingredient: 'curd', count: { min: 1, max: 1 } },
+      { ingredient: 'cilantro', count: { min: 1, max: 1 } },
+      { ingredient: 'salt', count: { min: 1, max: 1 } },
     ],
     steps: [
-      { id: 'julienne', instruction: 'Julienne the carrot to 2mm', verifiable: 'vision', satisfies: ['carrot'] },
-      { id: 'segment', instruction: 'Segment the orange', verifiable: 'vision', satisfies: ['orange'] },
-      { id: 'dress', instruction: 'Dress and season to taste', verifiable: 'cook-confirmed' },
-      { id: 'toss', instruction: 'Toss until evenly distributed', verifiable: 'vision', satisfies: ['carrot', 'orange', 'red onion'] },
+      { id: 'rinse', instruction: 'Rinse 1 medium sized cucumber', verifiable: 'vision', satisfies: ['cucumber'] },
+      { id: 'peel', instruction: 'Peel the cucumber', verifiable: 'vision', satisfies: ['cucumber'] },
+      { id: 'chop', instruction: 'Chop or grate the cucumber', verifiable: 'vision', satisfies: ['cucumber'] },
+      { id: 'whisk', instruction: 'Whisk 1 cup of chilled curd in a mixing bowl until smooth', verifiable: 'vision', satisfies: ['curd'] },
+      { id: 'salt', instruction: 'Add 1/4 teaspoon salt to the bowl', verifiable: 'cook-confirmed' },
+      { id: 'chilli', instruction: 'Add 1/4 teaspoon of red chilli powder to the bowl', verifiable: 'cook-confirmed' },
+      { id: 'cumin', instruction: 'Add 1 teaspoon of cumin powder to the bowl', verifiable: 'cook-confirmed' },
+      { id: 'chaat', instruction: 'Add 1/2 teaspoon of chaat masala powder to the bowl', verifiable: 'cook-confirmed' },
+      { id: 'fold', instruction: 'Add the chopped cucumber to the whisked curd', verifiable: 'vision', satisfies: ['cucumber'] },
+      { id: 'cilantro', instruction: 'Add 1 tablespoon of chopped cilantro leaves to the bowl', verifiable: 'vision', satisfies: ['cilantro'] },
+      { id: 'combine', instruction: 'Combine all the ingredients in the bowl', verifiable: 'vision', satisfies: ['cucumber', 'curd', 'cilantro'] },
+    ],
+    minMixRatio: 0.55,
+  },
+  {
+    id: 'caprese-bruschetta',
+    name: 'Caprese Bruschetta',
+    description:
+      'Cherry tomato, mozzarella and basil spooned onto toasted baguette. The only short recipe here that can go wrong in all seven ways the dataset records.',
+    difficulty: 'medium',
+    averageMinutes: 15,
+    icon: '🍞',
+    tags: ['bruschetta', 'italian', 'toast', 'captaincook4d'],
+    requires: [
+      { ingredient: 'cherry tomato', count: { min: 4, max: 12 } },
+      { ingredient: 'mozzarella', count: { min: 1, max: 2 } },
+      { ingredient: 'basil', count: { min: 1, max: 3 } },
+      { ingredient: 'baguette', count: { min: 1, max: 1 } },
+      { ingredient: 'olive oil', count: { min: 1, max: 1 } },
+    ],
+    steps: [
+      { id: 'cut-tomato', instruction: 'Cut 1/4 cup of cherry tomatoes into halves', verifiable: 'vision', satisfies: ['cherry tomato'] },
+      { id: 'bowl-tomato', instruction: 'Add the cut cherry tomatoes to a bowl', verifiable: 'vision', satisfies: ['cherry tomato'] },
+      { id: 'bowl-mozzarella', instruction: 'Add 1/8 cup shredded mozzarella to the bowl', verifiable: 'vision', satisfies: ['mozzarella'] },
+      { id: 'bowl-basil', instruction: 'Add 1/16 cup basil to the bowl', verifiable: 'vision', satisfies: ['basil'] },
+      { id: 'bowl-salt', instruction: 'Add 1/4 tsp salt to the bowl', verifiable: 'cook-confirmed' },
+      { id: 'bowl-pepper', instruction: 'Add 1/4 tsp pepper to the bowl', verifiable: 'cook-confirmed' },
+      { id: 'combine', instruction: 'Combine the contents of the bowl', verifiable: 'vision', satisfies: ['cherry tomato', 'mozzarella', 'basil'] },
+      { id: 'slice', instruction: 'Slice two 1/2 inch thick rounds from a baguette, cut slanted', verifiable: 'vision', satisfies: ['baguette'] },
+      { id: 'brush', instruction: 'Brush both sides of the 2 slices with olive oil', verifiable: 'vision', satisfies: ['olive oil'] },
+      { id: 'toast', instruction: 'Toast both sides for 2 to 3 minutes until lightly charred, then transfer to a plate', verifiable: 'cook-confirmed' },
+      { id: 'spoon', instruction: 'Spoon the mixture from the bowl onto the bread', verifiable: 'vision', satisfies: ['baguette'] },
     ],
     minMixRatio: 0.55,
   },
@@ -142,12 +194,11 @@ export function recipeById(id: string, recipes: readonly Recipe[] = RECIPES): Re
 }
 
 /**
- * Names in a recipe that no profile can ever produce.
+ * Names in a recipe that the scan can never produce.
  *
- * Returns the offenders rather than throwing so a caller can report all of them at once.
- * A requirement for an ingredient the classifier cannot name is not a small bug: the tally
- * stays empty forever, so it reads as a permanently missing ingredient and the cook is told
- * to add something they have already added.
+ * Returns the offenders rather than throwing, so a caller can report all of them at once. A
+ * requirement for an ingredient nothing can name is not a small bug: the tally stays empty
+ * forever, so it reads as permanently missing and the cook is told to add what is already there.
  */
 export function unknownIngredients(
   recipe: Recipe,
