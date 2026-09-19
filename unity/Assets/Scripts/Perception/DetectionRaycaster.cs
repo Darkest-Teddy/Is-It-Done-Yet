@@ -30,15 +30,11 @@ namespace MRPerception
         [Tooltip("Meta's Depth API raycaster. Leave empty to use MRUK only.")]
         [SerializeField] private EnvironmentRaycastManager environmentRaycast;
 
-        [Tooltip("Metres. Beyond this a detection is assumed to be background clutter.")]
-        [SerializeField] private float maxDistance = 4f;
-
-        [Tooltip("Closer than this and it is the user's own hand or the headset's nose guard.")]
-        [SerializeField] private float minDistance = 0.15f;
-
-        [Header("Placement")]
-        [Tooltip("Lift holograms off the surface so they do not z-fight with passthrough geometry.")]
-        [SerializeField] private float surfaceOffset = 0.005f;
+        // Live from the registry so they can be tuned in-headset. Distances in particular are
+        // impossible to guess from a desk -- the right maximum depends on how far the table is.
+        private float maxDistance => PerceptionTunables.Get(PerceptionTunables.RayMaxDistance);
+        private float minDistance => PerceptionTunables.Get(PerceptionTunables.RayMinDistance);
+        private float surfaceOffset => PerceptionTunables.Get(PerceptionTunables.SurfaceOffset);
 
         /// <summary>
         /// Places one detection. Returns false when nothing solid was hit, which is a normal

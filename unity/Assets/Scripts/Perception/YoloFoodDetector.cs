@@ -52,8 +52,6 @@ namespace MRPerception
 
         private readonly Net _net;
         private readonly int _inputSize;
-        private readonly float _confThreshold;
-        private readonly float _nmsThreshold;
         private readonly bool _includeTableware;
 
         // Reused across every inference. Allocating Mats per frame is how you end up with the
@@ -62,16 +60,19 @@ namespace MRPerception
         private Mat _rgbMat;
         private Mat _letterboxed;
 
+        /// <summary>
+        /// Confidence and NMS are NOT constructor parameters. They live in
+        /// <see cref="PerceptionTunables"/> and are read per inference, because they are two of
+        /// the three knobs that genuinely have to be tuned on the device -- YOLO is
+        /// systematically less confident on low-contrast passthrough than its defaults assume,
+        /// and by how much depends on the room.
+        /// </summary>
         public YoloFoodDetector(
             string modelFilePath,
             int inputSize = 320,
-            float confThreshold = 0.4f,
-            float nmsThreshold = 0.45f,
             bool includeTableware = true)
         {
             _inputSize = inputSize;
-            _confThreshold = confThreshold;
-            _nmsThreshold = nmsThreshold;
             _includeTableware = includeTableware;
 
             _net = Dnn.readNetFromONNX(modelFilePath);
@@ -97,6 +98,11 @@ namespace MRPerception
         {
             var results = new List<Detection2D>();
             if (rgbaFrame == null || rgbaFrame.empty()) return results;
+
+            // Read live, every call. Caching these into locals at construction is what makes a
+            // tuning slider appear to do nothing.
+            float confThreshold = PerceptionTunables.Get(PerceptionTunables.YoloConfidence);
+            float nmsThreshold = PerceptionTunables.Get(PerceptionTunables.YoloNms);
 
             int srcW = rgbaFrame.cols();
             int srcH = rgbaFrame.rows();
@@ -131,7 +137,8 @@ namespace MRPerception
 
             using (Mat output = _net.forward())
             {
-                ParseYolov8(output, results, scale, padX, padY, srcW, srcH);
+                ParseYolov8(output, results, scale, padX, padY, srcW, srcH,
+                    confThreshold, nmsThreshold);
             }
 
             return results;
@@ -139,7 +146,8 @@ namespace MRPerception
 
         private void ParseYolov8(
             Mat output, List<Detection2D> results,
-            float scale, int padX, int padY, int srcW, int srcH)
+            float scale, int padX, int padY, int srcW, int srcH,
+            float confThreshold, float nmsThreshold)
         {
             // [1, 84, 8400] -> 84 x 8400 -> transpose -> 8400 x 84.
             using Mat reshaped = output.reshape(1, output.size(1));
@@ -176,7 +184,7 @@ namespace MRPerception
                     }
                 }
 
-                if (bestScore < _confThreshold || bestClass < 0) continue;
+                if (bestScore < confThreshold || bestClass < 0) continue;
                 if (!IsWanted(bestClass)) continue;
 
                 // Centre-form, in letterboxed input space. Undo the padding, then the scale.
@@ -200,7 +208,7 @@ namespace MRPerception
             using var boxesMat = new MatOfRect2d(boxes.ToArray());
             using var scoresMat = new MatOfFloat(scores.ToArray());
             using var indices = new MatOfInt();
-            Dnn.NMSBoxes(boxesMat, scoresMat, _confThreshold, _nmsThreshold, indices);
+            Dnn.NMSBoxes(boxesMat, scoresMat, confThreshold, nmsThreshold, indices);
 
             foreach (int idx in indices.toArray())
             {

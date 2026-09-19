@@ -28,24 +28,22 @@ namespace MRPerception
     /// </summary>
     public sealed class DocumentContourDetector : IDisposable
     {
-        private readonly float _minAreaFraction;
-        private readonly float _maxAreaFraction;
-        private readonly float _approxEpsilonFraction;
-
         private Mat _grey;
         private Mat _blurred;
         private Mat _edges;
         private Mat _kernel;
+        private int _kernelPx;
 
-        public DocumentContourDetector(
-            float minAreaFraction = 0.02f,
-            float maxAreaFraction = 0.95f,
-            float approxEpsilonFraction = 0.02f)
-        {
-            _minAreaFraction = minAreaFraction;
-            _maxAreaFraction = maxAreaFraction;
-            _approxEpsilonFraction = approxEpsilonFraction;
-        }
+        /// <summary>
+        /// The live edge map, for the debug panel. Seeing this is worth more than any slider:
+        /// it turns "detection is not working" into "the edges are broken up, dilate more" in
+        /// about four seconds.
+        ///
+        /// Read from the main thread while the worker writes it, which is a deliberate and
+        /// benign race -- the Mat is allocated once and reused, so the worst outcome is a torn
+        /// frame in a debug view. Do not build anything load-bearing on it.
+        /// </summary>
+        public Mat LastEdges => _edges;
 
         /// <summary>
         /// Off-main-thread safe, same caveat as the detector: one thread at a time, because the
@@ -60,10 +58,23 @@ namespace MRPerception
             int h = rgbaFrame.rows();
             double frameArea = w * (double)h;
 
+            float minAreaFraction = PerceptionTunables.Get(PerceptionTunables.DocMinArea);
+            float maxAreaFraction = PerceptionTunables.Get(PerceptionTunables.DocMaxArea);
+            float epsilonFraction = PerceptionTunables.Get(PerceptionTunables.DocEpsilon);
+            float lowMult = PerceptionTunables.Get(PerceptionTunables.CannyLowMult);
+            float highMult = PerceptionTunables.Get(PerceptionTunables.CannyHighMult);
+            int dilatePx = Mathf.Max(1, PerceptionTunables.GetInt(PerceptionTunables.DocDilate) | 1);
+
             _grey ??= new Mat();
             _blurred ??= new Mat();
             _edges ??= new Mat();
-            _kernel ??= Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(3, 3));
+            if (_kernel == null || _kernelPx != dilatePx)
+            {
+                _kernel?.Dispose();
+                _kernel = Imgproc.getStructuringElement(
+                    Imgproc.MORPH_RECT, new Size(dilatePx, dilatePx));
+                _kernelPx = dilatePx;
+            }
 
             Imgproc.cvtColor(rgbaFrame, _grey, Imgproc.COLOR_RGBA2GRAY);
 
@@ -75,8 +86,8 @@ namespace MRPerception
             // exposure swings hard between a lit desk and a dim room, and a pair of constants
             // tuned in one produces either a solid white edge map or an empty one in the other.
             double median = MedianOf(_blurred);
-            double lower = Math.Max(0, 0.66 * median);
-            double upper = Math.Min(255, 1.33 * median);
+            double lower = Math.Max(0, lowMult * median);
+            double upper = Math.Min(255, highMult * median);
             Imgproc.Canny(_blurred, _edges, lower, upper);
 
             // Close the gaps. See the class comment -- this is the load-bearing line.
@@ -92,8 +103,8 @@ namespace MRPerception
                 using (contour)
                 {
                     double area = Imgproc.contourArea(contour);
-                    if (area < frameArea * _minAreaFraction) continue;
-                    if (area > frameArea * _maxAreaFraction) continue;
+                    if (area < frameArea * minAreaFraction) continue;
+                    if (area > frameArea * maxAreaFraction) continue;
 
                     using var curve = new MatOfPoint2f(contour.toArray());
                     double perimeter = Imgproc.arcLength(curve, true);
@@ -104,7 +115,7 @@ namespace MRPerception
                     // epsilon over-simplifies a small quad into a triangle and under-simplifies
                     // a large one into a twelve-sided blob, so the detector would work at
                     // exactly one distance from the page.
-                    Imgproc.approxPolyDP(curve, approx, _approxEpsilonFraction * perimeter, true);
+                    Imgproc.approxPolyDP(curve, approx, epsilonFraction * perimeter, true);
 
                     if (approx.rows() != 4) continue;
 

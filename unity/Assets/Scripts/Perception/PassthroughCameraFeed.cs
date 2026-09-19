@@ -50,10 +50,6 @@ namespace MRPerception
         [SerializeField] private int processWidth = 320;
         [SerializeField] private int processHeight = 240;
 
-        [Header("Rate")]
-        [Tooltip("Captures per second. Detection cannot keep up with the display and should not try.")]
-        [SerializeField] private float capturesPerSecond = 5f;
-
         [Tooltip(
             "Unity RenderTextures read back bottom-up; OpenCV expects top-down. If every " +
             "detection is vertically mirrored, this is the first thing to toggle.")]
@@ -100,7 +96,10 @@ namespace MRPerception
         {
             if (!IsReady || _requestInFlight) return;
             if (Time.realtimeSinceStartup < _nextCaptureTime) return;
-            _nextCaptureTime = Time.realtimeSinceStartup + 1f / Mathf.Max(0.5f, capturesPerSecond);
+            // Live from the registry: detection cannot keep up with the display and should not
+            // try, but the right rate depends on how fast the scene actually changes.
+            float hz = PerceptionTunables.Get(PerceptionTunables.CaptureHz);
+            _nextCaptureTime = Time.realtimeSinceStartup + 1f / Mathf.Max(0.5f, hz);
 
             EnsureResources();
             Capture();

@@ -13,6 +13,8 @@ Assets/Scripts/Perception/
 ├── DetectionRaycaster.cs       2D pixel → world ray → Depth/MRUK hit → placement
 ├── DocumentRectifier.cs        4 corners -> flat page, the OCR input
 ├── DetectionVisualizer.cs      runtime wireframe box, so no prefab authoring needed
+├── PerceptionTunables.cs       every threshold, one registry, persisted
+├── PerceptionDebugUI.cs        in-headset tuning panel + live edge view
 └── MRPerceptionManager.cs      threading, tracking, prefab lifecycle
 ```
 
@@ -274,3 +276,69 @@ lines and ports to C# directly.
 
 Without it, the label visibly rewrites itself every second, which reads to a user as the system
 being broken rather than as the system being unsure.
+
+
+---
+
+## On-device tuning
+
+Drop `PerceptionDebugUI` on any GameObject, point its three fields at the feed, the manager and
+the permissions component. That is the entire setup — no Canvas, no EventSystem, no prefab, no
+font asset.
+
+### Controls
+
+| Input | Does |
+|---|---|
+| Right thumbstick up/down | Select a parameter |
+| Right thumbstick left/right | Adjust it. Hold to repeat; full deflection moves 5 steps at a time |
+| **A** | Cycle the debug image: off → camera → edges |
+| **B** | Reset the selected parameter |
+| **Grip + B** | Reset everything |
+| **X** (left hand) | Summon the panel in front of you, or hide it |
+| Arrow keys | The same, in the Editor |
+
+Values persist to `PlayerPrefs` and survive a restart. Only overrides are written, so changing a
+default in code still reaches a device that never touched that particular knob.
+
+### Why it is built this way
+
+**No Canvas, no EventSystem, no OVRRaycaster.** The conventional answer is a world-space uGUI
+Canvas with an XR raycaster and an input module. That needs scene authoring, a font asset, a
+correctly configured EventSystem, and a pointer setup that differs between OVR, XRI and the new
+Input System — and when any one of those is wrong the panel renders perfectly and simply does
+not respond. That is a miserable thing to debug while you are *also* debugging the vision stack.
+`TextMesh` and a `Quad` need none of it and cannot fail that way.
+
+**Thumbstick, not ray-pointing.** Aiming a laser at a small slider in a headset is slow, and you
+cannot do it while looking at the thing you are tuning. The whole job is to nudge a Canny
+threshold *while watching the edge map change*, so the control has to be eyes-free.
+
+**World-locked, not head-following.** A panel that chases your gaze is impossible to look away
+from, and the point is to look at the table. Summoning is an explicit act.
+
+**The debug image is the actual feature.** Sliders are guesswork without it. Seeing the live edge
+map turns "detection is not working" into "the edges are broken up, dilate more" in about four
+seconds.
+
+### What is tunable
+
+Sixteen parameters in five groups, all live: capture rate; YOLO confidence and NMS; Canny
+multipliers, area bounds, corner simplification and edge dilation; confirm/forget frames,
+association radius and smoothing; raycast min/max distance and surface offset.
+
+Everything reads from `PerceptionTunables` on **every** use rather than caching into a local at
+construction. A cached copy makes the slider look broken, which is worse than having no slider,
+because you then go and debug the wrong thing.
+
+Canny thresholds are **multipliers on the image median**, not absolute values — absolutes tuned
+under one lighting condition give you a solid white edge map or an empty one in the next room.
+
+### The three to touch first
+
+1. **YOLO confidence.** Trained on web photos, run on low-contrast passthrough, YOLO is
+   systematically less confident here than its defaults assume. 0.4 finds things 0.5 drops.
+2. **Canny low/high multipliers**, with the edge view on. You want page borders continuous and
+   the desk texture mostly gone.
+3. **Edge dilate**, if borders still come out broken. This is the step that decides whether a
+   page is one closed contour or three disconnected arcs.

@@ -40,21 +40,22 @@ namespace MRPerception
         [Header("Model")]
         [Tooltip("Relative to StreamingAssets. Export with: yolo export ... format=onnx opset=12")]
         [SerializeField] private string modelStreamingPath = "yolov8n.onnx";
+        [Tooltip("Must match the imgsz the ONNX was exported at. Not tunable at runtime.")]
         [SerializeField] private int inputSize = 320;
-        [SerializeField, Range(0.1f, 0.9f)] private float confidenceThreshold = 0.4f;
 
-        [Header("Stability")]
-        [Tooltip(
-            "Consecutive sightings before a hologram appears. Raw detections flicker, and a " +
-            "hologram that blinks is worse than none -- nobody can tell whether it saw the " +
-            "object, so they stop believing all of it.")]
-        [SerializeField] private int confirmFrames = 2;
-
-        [Tooltip("Consecutive misses before it is removed. Higher than confirmFrames on purpose.")]
-        [SerializeField] private int forgetFrames = 5;
-
-        [Tooltip("Metres. Two sightings closer than this are the same object.")]
-        [SerializeField] private float associationRadius = 0.12f;
+        // Stability knobs, live from the registry so they are tunable in-headset rather than
+        // through a rebuild.
+        //
+        // confirmFrames: consecutive sightings before a hologram appears. Raw detections
+        // flicker, and a hologram that blinks is worse than none -- nobody can tell whether it
+        // saw the object, so they stop believing all of it.
+        //
+        // forgetFrames sits higher than confirmFrames on purpose. The two lean opposite ways
+        // because the costs do: appearing late is invisible, while vanishing and returning is
+        // the failure everybody notices.
+        private int confirmFrames => PerceptionTunables.GetInt(PerceptionTunables.ConfirmFrames);
+        private int forgetFrames => PerceptionTunables.GetInt(PerceptionTunables.ForgetFrames);
+        private float associationRadius => PerceptionTunables.Get(PerceptionTunables.AssocRadius);
 
         [Header("Documents")]
         [Tooltip("Rectify detected pages into an upright image, ready for OCR or a thumbnail.")]
@@ -69,8 +70,8 @@ namespace MRPerception
         /// </summary>
         public event System.Action<Mat> DocumentRectified;
 
-        [Tooltip("Position smoothing. Lower is steadier and laggier.")]
-        [SerializeField, Range(0.05f, 1f)] private float smoothing = 0.35f;
+        /// <summary>Position smoothing. Lower is steadier and laggier.</summary>
+        private float smoothing => PerceptionTunables.Get(PerceptionTunables.Smoothing);
 
         private YoloFoodDetector _foodDetector;
         private DocumentContourDetector _documentDetector;
@@ -87,6 +88,19 @@ namespace MRPerception
         private bool _hasPendingResults;
 
         private readonly List<TrackedObject> _tracked = new();
+
+        /// <summary>How long the last detection pass took. The number that decides capture rate.</summary>
+        public float LastDetectMs { get; private set; }
+
+        public int TrackedCount => _tracked.Count;
+
+        /// <summary>
+        /// The frame the detectors last ran on, and the edge map they produced, for the debug
+        /// panel. Both are live buffers owned by other objects -- read only, never dispose.
+        /// </summary>
+        public Mat LastFrameMat => _workerMat;
+
+        public Mat LastEdgeMat => _documentDetector?.LastEdges;
 
         private sealed class TrackedObject
         {
@@ -112,7 +126,7 @@ namespace MRPerception
                 return;
             }
 
-            _foodDetector = new YoloFoodDetector(path, inputSize, confidenceThreshold);
+            _foodDetector = new YoloFoodDetector(path, inputSize);
             _documentDetector = new DocumentContourDetector();
             _rectifier = new DocumentRectifier();
 
@@ -149,6 +163,7 @@ namespace MRPerception
 
         private void RunDetectors()
         {
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             try
             {
                 var results = new List<Detection2D>();
@@ -169,6 +184,7 @@ namespace MRPerception
             }
             finally
             {
+                LastDetectMs = (float)stopwatch.Elapsed.TotalMilliseconds;
                 _busy = false;
             }
         }
