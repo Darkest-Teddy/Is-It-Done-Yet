@@ -1,8 +1,8 @@
 # data/
 
-External datasets used for offline experiments. Nothing in here is imported by the app:
-`data/` is outside `src/` and there is no Vite `public/` directory, so none of it is bundled
-by `npm run build`.
+External datasets used for offline experiments. Nothing in here is imported by the app.
+`data/` is outside both `src/` and Vite's `public/` directory, so `npm run build` bundles none
+of it.
 
 ## CaptainCook4D
 
