@@ -15,6 +15,7 @@ Assets/Scripts/Perception/
 ├── DetectionVisualizer.cs      runtime wireframe box, so no prefab authoring needed
 ├── IVisionProvider.cs          identify-what-it-is seam, + offline fallback
 ├── FoodPlausibility.cs         real-world size gating, food/container/ignore roles
+├── LabelMatch.cs               COCO vs GPT vocabulary reconciliation
 ├── Recipe.cs                   steps, ingredients, triggers
 ├── RecipeRunner.cs             the state machine. Pure C#, unit-testable
 ├── RecipeRailUI.cs             left rail + you-need checklist
@@ -597,3 +598,73 @@ because that is what it is.
 Ingredients vision will never see (cumin, paprika) are marked `Optional` and strike through on
 progress rather than on detection. More honest than a checklist stuck forever on "1 teaspoon
 cumin", and it avoids having to explain why.
+
+
+---
+
+## Recipe labels and COCO's vocabulary
+
+COCO-80's **entire** kitchen vocabulary:
+
+```
+bottle, wine glass, cup, fork, knife, spoon, bowl
+banana, apple, sandwich, orange, broccoli, carrot, hot dog, pizza, donut, cake
+diningtable, microwave, oven, toaster, sink, refrigerator
+```
+
+Everything else a kitchen contains — pepper, egg, garlic, onion, cheese, pan, hob — is invisible
+to it and needs the vision provider. There is no threshold that changes this.
+
+### Two recipes, and the default is the offline one
+
+`Recipe.FruitSalad()` is built entirely from real COCO classes — banana, apple, orange, bowl,
+knife — so it runs with **no network at all**. It is the default, per rule #12, and it is the one
+to rehearse with. Master spec 5.2.3 wants the full demo runnable offline; a recipe whose every
+step waits on a cloud round trip cannot satisfy that.
+
+`Recipe.Shakshuka()` matches the reference video but **needs the vision provider**. Pepper, egg
+and garlic have no COCO class and never will. `WorksOffline` is false, and those ingredients
+carry `NeedsVisionProvider` so the rail can explain a stalled checklist rather than leaving
+somebody to work it out.
+
+Switch between them on the manager's **Recipe** dropdown.
+
+### Every label is now a list
+
+One real object has several names. A frying pan seen from above is routinely "bowl" to COCO and
+"frying pan" to GPT, and the step should anchor to it either way:
+
+```csharp
+AnchorLabels = new[] { "frying pan", "pan", "skillet", "bowl" },
+```
+
+Where a COCO class is a plausible stand-in it is listed as a fallback — a tall tin often reads as
+"bottle", an induction top often trips "oven". Those are not corrections to the model, they are
+alternative names for the same pixels.
+
+### Matching is not string equality
+
+COCO says `bottle`, GPT says `bottle of olive oil`. The recipe says `pepper`, GPT says
+`red bell pepper`. All the same object; `==` matches none of them, and the checklist sits there
+never ticking while the thing is plainly on the counter.
+
+`LabelMatch` applies two rules:
+
+- **Contiguous subsequence** — "olive oil" inside "bottle of olive oil"
+- **Shared head noun** — English compound nouns put the head last: "red bell **pepper**",
+  "frying **pan**", "shredded cheddar in a **bowl**"
+
+Articles and prepositions are dropped first, so "in a bowl" has head noun `bowl`, not `a`.
+
+Deliberately **not** edit-distance fuzzy matching. "pan" and "pen" are one character apart and
+are not the same thing, and a recipe that advances on the wrong object is worse than one that
+waits.
+
+### A track carries both names, as one entry
+
+`Observe` takes `IReadOnlyList<string[]>` — one array per tracked object, holding the detector's
+class and the provider's name together.
+
+That shape matters. Flattening them into a list of strings would make `CountAtLeast` score one
+banana as two the moment GPT called it "sliced banana", and the cutting step would fire on a
+single uncut piece of fruit. **One track is one object**, however many names it has.

@@ -38,6 +38,12 @@ namespace MRPerception
             "fall back to the local detector's own label and run fully offline.")]
         [SerializeField] private MonoBehaviour visionProviderBehaviour;
 
+        [Tooltip(
+            "FruitSalad is built entirely from real COCO classes and runs with no network. " +
+            "Shakshuka matches the reference video but needs the vision provider -- pepper, " +
+            "egg and garlic have no COCO class and never will.")]
+        [SerializeField] private RecipeChoice recipe = RecipeChoice.FruitSalad;
+
         [Header("Prefabs")]
         [SerializeField] private GameObject foodBoundsPrefab;
         [SerializeField] private GameObject documentBoundsPrefab;
@@ -83,7 +89,7 @@ namespace MRPerception
         private DocumentRectifier _rectifier;
         private IVisionProvider _vision;
         private RecipeRunner _recipe;
-        private readonly List<string> _visibleLabels = new();
+        private readonly List<string[]> _visibleTracks = new();
 
         /// <summary>
         /// The running recipe. Read by RecipeRailUI; there is exactly one, and the manager owns
@@ -134,6 +140,16 @@ namespace MRPerception
 
         public Mat LastEdgeMat => _documentDetector?.LastEdges;
 
+        /// <summary>
+        /// Which recipe to run. Defaults to the offline-safe one, per rule #12 -- the demo that
+        /// works on saturated venue wifi is the one to have selected by default.
+        /// </summary>
+        public enum RecipeChoice
+        {
+            FruitSalad,
+            Shakshuka
+        }
+
         private sealed class TrackedObject
         {
             public string Label;
@@ -169,7 +185,10 @@ namespace MRPerception
             _foodDetector = new YoloFoodDetector(path, inputSize);
             _documentDetector = new DocumentContourDetector();
             _rectifier = new DocumentRectifier();
-            _recipe = new RecipeRunner(MRPerception.Recipe.Shakshuka());
+            _recipe = new RecipeRunner(
+                recipe == RecipeChoice.Shakshuka
+                    ? MRPerception.Recipe.Shakshuka()
+                    : MRPerception.Recipe.FruitSalad());
 
             _vision = visionProviderBehaviour as IVisionProvider;
             if (_vision == null)
@@ -314,17 +333,24 @@ namespace MRPerception
         {
             if (_recipe == null) return;
 
-            _visibleLabels.Clear();
+            _visibleTracks.Clear();
             foreach (TrackedObject t in _tracked)
             {
                 if (t.Vetoed || t.Hits < confirmFrames) continue;
-                // The identified name where there is one -- "pepper" beats "broccoli" for
-                // matching a recipe, and the whole point of the vision provider is that it
-                // knows words COCO does not.
-                _visibleLabels.Add(string.IsNullOrEmpty(t.DisplayLabel) ? t.Label : t.DisplayLabel);
+
+                // BOTH names, as one entry. COCO says "bottle", the provider says "bottle of
+                // olive oil"; a recipe written against either vocabulary should match. Keeping
+                // them together rather than as two entries is what stops one object counting
+                // twice when a step is waiting for three of something.
+                bool distinct = !string.IsNullOrEmpty(t.DisplayLabel)
+                                && !string.Equals(t.DisplayLabel, t.Label,
+                                    System.StringComparison.OrdinalIgnoreCase);
+                _visibleTracks.Add(distinct
+                    ? new[] { t.Label, t.DisplayLabel }
+                    : new[] { t.Label });
             }
 
-            _recipe.Observe(_visibleLabels, Time.realtimeSinceStartup);
+            _recipe.Observe(_visibleTracks, Time.realtimeSinceStartup);
         }
 
         /// <summary>
