@@ -19,3 +19,8 @@ unity/*.sln
 unity/*.user
 # The ONNX weights are ~6MB of binary that regenerates from one ultralytics command.
 unity/Assets/StreamingAssets/*.onnx
+results/
+
+# CaptainCook4D: downloaded videos and upstream clones/venv (see data/README.md)
+data/captaincook4d/raw/
+data/captaincook4d/.cache/

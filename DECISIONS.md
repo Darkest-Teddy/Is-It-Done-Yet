@@ -407,7 +407,75 @@ all three resolutions above) instead of to allocation. Correctness was checked b
 measured hues of the synthetic scene are unchanged and that repeated runs on one frame are
 byte-identical — a shared mask that failed to clear itself would bleed one blob into the next.
 
-## 16. There is a second build, in Unity, and this log did not say so
+## 16. The chef listens locally first, and the model is the fallback
+
+**Spec section:** §9.2, which specifies the chef as "a conversational agent over WebSocket with
+tool access to live game state" on the ElevenLabs Agents Platform, and lists seven client tools.
+
+**Reality:** the spec's own §9.3 contradicts the architecture in §9.2 for anything time-critical,
+and it is right to. It requires a pre-generated bank played instantly on game events because "a
+round trip after every slice would put the reaction a second behind the knife", with the live
+agent reserved for open conversation. That reasoning does not stop at barks. Most of what a cook
+asks — *is it done yet, what is the target, how am I doing* — is answerable from state already in
+memory, and routing those through a socket buys nothing and costs a second.
+
+**Decision:** invert the default. `src/core/voice/intent.ts` matches the utterance against a
+deterministic table first; `tools.ts` answers from a `GameState` snapshot and returns an
+optional `Effect` the caller applies. A model is consulted **only** when the local layer returns
+`unknown`, behind a timeout, and is optional — the `Oracle` interface is declared and left
+unimplemented rather than wired to a provider we have no key for (rule #13).
+
+Every command in the table works with the network unplugged, which is rule #12, and the whole
+decision layer is provable from a terminal, which is why it sits in `src/core` under the purity
+rule. 67 tests cover it with no microphone in the loop.
+
+**The tools are narrower than the spec's seven.** `get_board_state`, `get_pan_state` and
+`get_safety_status` describe subsystems entry 12 already voided. What exists is what there is
+state for: read the session, read the target, set the target, set the ticket, set intensity,
+reset. `fetch_recipe` is local against `recipes.ts` rather than MongoDB vector search, for the
+reason that file's own header gives.
+
+**Two guards that are not in the spec and are not optional.**
+
+A wake phrase is *required* by default. An always-listening chef in a hall with 1500 people in
+it will act on a sentence somebody else said, and the failure is loud and in front of a judge.
+`parseIntent` returns `null` — distinct from `unknown` — for anything unaddressed.
+
+A spoken target outside 1–30mm is refused and said aloud rather than applied. A misheard "fifty"
+silently rescores the entire session against a target nobody asked for, and nothing on screen
+would say it had been misheard. This is the same species of failure as entry 7: it fails
+quietly, and in the direction nobody questions.
+
+## 17. Speech input is a provider, because Quest Browser has no Web Speech API
+
+**Spec section:** none. §9 assumes ElevenLabs owns both directions of the conversation.
+
+**Reality:** measured against the platforms, not assumed. **Quest Browser does not implement
+`SpeechRecognition`.** Meta never shipped the Web Speech API there, so the one-line path that
+works on desktop Chrome is simply absent on the headset — the same shape of finding as the
+master spec's §3 gate, and worth knowing before anyone budgets hours against it.
+
+Two further facts that matter more than they look:
+
+`webkitSpeechRecognition` in Chrome is **not** local recognition. It streams audio to Google and
+returns text, so the claim "the voice works offline" is true of the intent layer and false of
+the transcription. Stating it the other way round would be the kind of thing a judge catches in
+one question.
+
+Chrome **ends a recognition session on its own** after a few seconds of silence, firing `onend`
+with no error. Without an explicit restart the chef listens for about ten seconds after load and
+is then deaf for the rest of the demo, silently, with nothing in the console.
+
+**Decision:** `src/voice/stt.ts` puts speech behind a `SpeechProvider` interface mirroring the
+`VisionProvider` shape already used for detection, with `typed` as the floor. Typed input is not
+a debug affordance — it is the tier that works in Quest Browser, the tier that works when venue
+wifi collapses, and the accessible route for anyone who would rather not shout "hey chef" across
+a judging table. It feeds the identical intent path, so what the tests prove is what runs.
+
+Selection is by feature detection, never by user-agent string: Quest Browser reports a
+Chrome-shaped UA and lacks the constructor, so sniffing gets the answer exactly backwards.
+
+## 18. There is a second build, in Unity, and this log did not say so
 
 **Spec section:** rule #15 — "Log every deviation from this spec in `DECISIONS.md` with the
 reason." This entry exists because that rule was breached.
@@ -451,7 +519,7 @@ and a stale constructor signature — but "it balances" is not "it compiles". Ex
 first build, most likely `PassthroughCameraUtils`, `EnvironmentRaycastHit.normalConfidence` and
 the `OVRInput` button constants.
 
-## 17. Four bugs an audit found in the Unity build, and what they have in common
+## 19. Four bugs an audit found in the Unity build, and what they have in common
 
 **Reality:** the Unity code was reviewed file by file after it was written. Four defects, and
 all four share a shape: **they work in the place you would test them and fail in the place they
