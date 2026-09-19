@@ -13,6 +13,8 @@ Assets/Scripts/Perception/
 ├── DetectionRaycaster.cs       2D pixel → world ray → Depth/MRUK hit → placement
 ├── DocumentRectifier.cs        4 corners -> flat page, the OCR input
 ├── DetectionVisualizer.cs      runtime wireframe box, so no prefab authoring needed
+├── IVisionProvider.cs          identify-what-it-is seam, + offline fallback
+├── OpenAiVisionProvider.cs     GPT vision, via a key-holding relay
 ├── PerceptionTunables.cs       every threshold, one registry, persisted
 ├── PerceptionDebugUI.cs        in-headset tuning panel + live edge view
 └── MRPerceptionManager.cs      threading, tracking, prefab lifecycle
@@ -342,3 +344,90 @@ under one lighting condition give you a solid white edge map or an empty one in 
    the desk texture mostly gone.
 3. **Edge dilate**, if borders still come out broken. This is the step that decides whether a
    page is one closed contour or three disconnected arcs.
+
+
+---
+
+## Identifying food with GPT
+
+COCO-80 knows ten foods, all prepared dishes, and no raw ingredients at all — no onion, no
+pepper, no cucumber, no cheese of any kind. Fixing that by training means a labelled *detection*
+dataset and a GPU. An open-vocabulary model needs neither.
+
+So the split is:
+
+```
+YOLO + contours   →  WHERE something is   →  local, 5Hz, milliseconds
+GPT vision        →  WHAT it is           →  cloud, once per object, ~1s
+```
+
+### Once per object, not once per frame
+
+This is the whole reason a one-second round trip is affordable. A jar on a table does not become
+a different jar. The local detector holds the track at 5 Hz, and `RequestIdentification` fills in
+the name a second later, after which it sticks.
+
+Five objects in a session is **five calls**. Calling per frame at 5 Hz for an hour would be
+eighteen thousand — the difference between a fraction of a cent and a real bill, and between
+"the app feels laggy" and no perceptible latency at all.
+
+Until the answer arrives the object shows the local label, so nothing is ever blank.
+
+### Setup
+
+**1. Run the relay** (repo root, needs nothing installed):
+
+```bash
+OPENAI_API_KEY=sk-... node server/vision-relay.mjs
+```
+
+**2. Point the provider at it.** Add `OpenAiVisionProvider` to the scene, set `relayUrl` to
+`http://<your-laptop-lan-ip>:8787/vision`, and drag it into `MRPerceptionManager`'s
+**Vision Provider Behaviour** field.
+
+Leave that field empty and it falls back to `LocalHintProvider` — COCO labels, fully offline.
+That is the configuration to rehearse the demo in.
+
+### The key does not go in the build
+
+`directApiKey` exists for desk testing and logs a warning every time it is used. Do not ship it.
+
+An APK is a zip file. A key compiled into one is extracted in minutes, and it is your key, your
+billing, your rate limit. No obfuscation changes this — the request has to carry the key in
+plaintext eventually, so anyone with the build and a proxy has it. The only real fix is that the
+device never holds the key.
+
+The relay is ~120 lines, dependency-free, and caps body size and allowed models so it is not an
+open proxy. On a hackathon LAN the exposure is the room you are standing in; put it behind a
+tunnel with real auth for anything public.
+
+### Settings that matter
+
+| Setting | Default | Why |
+|---|---|---|
+| `model` | `gpt-4o-mini` | Fast, cheap, easily good enough to name a vegetable |
+| `lowDetail` | on | Flat token cost, 512px. For an object filling the crop, plenty — and several times cheaper and faster than `high` |
+| `maxEdgePx` | 512 | Uploading larger just to have it downsized server-side wastes the upload, which is the slowest part of the round trip on venue wifi |
+| `jpegQuality` | 70 | Visually fine here, a third the size of 95 |
+| `timeoutSeconds` | 8 | A timeout is the expected outcome on saturated wifi, not an error. The local label survives |
+
+Structured output (`json_schema`) is on, so the reply is parseable JSON rather than prose that
+happens to contain a name. Without it the model sometimes answers "This appears to be a
+cucumber!" and every parser downstream has to cope with sentences.
+
+### On cheese specifically
+
+Set expectations. Telling cheddar from gouda visually is hard for *people* without packaging
+context, and GPT will usually give you "hard cheese" or "yellow cheese" rather than a variety —
+which is the correct answer, and the prompt explicitly asks for it rather than a confident wrong
+guess.
+
+If cheese *identity* is load-bearing for the demo, read the label with the OCR path instead of
+recognising the cheese.
+
+### Prize-track note
+
+`CLAUDE.md` §13 says to skip the OpenAI track unless somebody genuinely uses Codex, because it
+requires documenting how Codex helped you build and judges check. Using the API for vision is a
+technical choice and is fine — just do not claim the track without the Codex work. It does mean
+dropping the Gemini track if GPT replaces Gemini entirely.

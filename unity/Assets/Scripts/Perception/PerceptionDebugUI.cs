@@ -272,6 +272,16 @@ namespace MRPerception
             }
             _sb.Append('\n');
 
+            if (manager != null)
+            {
+                _sb.Append("vision: ").Append(manager.VisionProviderName);
+                if (manager.LastVisionMs > 0f)
+                {
+                    _sb.Append("  ").Append(Mathf.RoundToInt(manager.LastVisionMs)).Append("ms");
+                }
+                _sb.Append('\n');
+            }
+
             string camera = feed == null ? "no feed" : feed.IsReady ? "camera ok" : "camera WAITING";
             string perm = permissions == null
                 ? ""

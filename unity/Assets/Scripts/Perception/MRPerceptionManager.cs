@@ -33,6 +33,11 @@ namespace MRPerception
         [SerializeField] private PassthroughCameraFeed feed;
         [SerializeField] private DetectionRaycaster raycaster;
 
+        [Tooltip(
+            "Anything implementing IVisionProvider -- OpenAiVisionProvider, or leave empty to " +
+            "fall back to the local detector's own label and run fully offline.")]
+        [SerializeField] private MonoBehaviour visionProviderBehaviour;
+
         [Header("Prefabs")]
         [SerializeField] private GameObject foodBoundsPrefab;
         [SerializeField] private GameObject documentBoundsPrefab;
@@ -76,6 +81,7 @@ namespace MRPerception
         private YoloFoodDetector _foodDetector;
         private DocumentContourDetector _documentDetector;
         private DocumentRectifier _rectifier;
+        private IVisionProvider _vision;
 
         private Mat _workerMat;
         private volatile bool _busy;
@@ -93,6 +99,11 @@ namespace MRPerception
         public float LastDetectMs { get; private set; }
 
         public int TrackedCount => _tracked.Count;
+
+        /// <summary>Round trip of the last identification. Sets the whole feel; show it.</summary>
+        public float LastVisionMs { get; private set; }
+
+        public string VisionProviderName => _vision?.Name ?? "none";
 
         /// <summary>
         /// The frame the detectors last ran on, and the edge map they produced, for the debug
@@ -114,6 +125,12 @@ namespace MRPerception
             public bool Seen;
             public GameObject Instance;
             public DetectionVisualizer Visualizer;
+
+            /// <summary>What to show. The vision provider's answer once it arrives, else the
+            /// local detector's class name.</summary>
+            public string DisplayLabel;
+            public bool IdentifyPending;
+            public bool Identified;
         }
 
         private void Start()
@@ -129,6 +146,20 @@ namespace MRPerception
             _foodDetector = new YoloFoodDetector(path, inputSize);
             _documentDetector = new DocumentContourDetector();
             _rectifier = new DocumentRectifier();
+
+            _vision = visionProviderBehaviour as IVisionProvider;
+            if (_vision == null)
+            {
+                // Offline by default rather than broken by default. Master spec 5.2.3 wants the
+                // whole demo runnable with no network, and rehearsed that way at least once.
+                _vision = new LocalHintProvider();
+                if (visionProviderBehaviour != null)
+                {
+                    Debug.LogWarning(
+                        $"[Perception] {visionProviderBehaviour.GetType().Name} does not " +
+                        "implement IVisionProvider; using local labels.");
+                }
+            }
 
             feed.FrameReady += OnFrameReady;
         }
@@ -226,6 +257,72 @@ namespace MRPerception
             }
 
             Retire();
+            RequestIdentification(results);
+        }
+
+        /// <summary>
+        /// Asks the vision provider to name ONE unidentified object per capture.
+        ///
+        /// Once per object, not once per frame, and that is the whole reason a one-second cloud
+        /// round trip is affordable here. A jar on a table does not become a different jar: the
+        /// local detector holds the track at 5Hz and this fills in the name a second later,
+        /// after which it sticks. Five objects in a session means five calls -- rather than one
+        /// per frame, which at 5Hz for an hour would be eighteen thousand.
+        ///
+        /// One at a time, newest first. Newest because the object the user just put down is the
+        /// one they are waiting to see named.
+        /// </summary>
+        private void RequestIdentification(List<Detection2D> results)
+        {
+            if (_vision == null || _vision.Busy || _workerMat == null) return;
+
+            for (int i = _tracked.Count - 1; i >= 0; i--)
+            {
+                TrackedObject t = _tracked[i];
+                if (t.Identified || t.IdentifyPending) continue;
+                if (t.Hits < confirmFrames) continue;
+
+                // Find the 2D box this track came from in THIS frame, so the crop matches what
+                // was actually seen. A stale box crops the wrong pixels.
+                int best = -1;
+                float bestScore = float.MaxValue;
+                for (int r = 0; r < results.Count; r++)
+                {
+                    if (results[r].Label != t.Label) continue;
+                    float score = Mathf.Abs(results[r].PixelRect.width * results[r].PixelRect.height);
+                    if (score < bestScore) { bestScore = score; best = r; }
+                }
+                if (best < 0) continue;
+
+                Texture2D crop = CropToTexture(_workerMat, results[best].PixelRect);
+                if (crop == null) continue;
+
+                t.IdentifyPending = true;
+                TrackedObject captured = t;
+                _vision.Identify(crop, t.Label, result =>
+                {
+                    Destroy(crop);
+                    captured.IdentifyPending = false;
+                    if (!result.Ok) return;      // keep the local label; try again next capture
+                    captured.Identified = true;
+                    captured.DisplayLabel = result.Label;
+                    LastVisionMs = result.LatencyMs;
+                });
+                return;   // one per capture
+            }
+        }
+
+        /// <summary>Lifts a pixel rect out of a Mat as a Texture2D. Caller destroys it.</summary>
+        private static Texture2D CropToTexture(Mat frame, UnityEngine.Rect rect)
+        {
+            int x = Mathf.Clamp(Mathf.FloorToInt(rect.x), 0, frame.cols() - 1);
+            int y = Mathf.Clamp(Mathf.FloorToInt(rect.y), 0, frame.rows() - 1);
+            int w = Mathf.Clamp(Mathf.CeilToInt(rect.width), 1, frame.cols() - x);
+            int h = Mathf.Clamp(Mathf.CeilToInt(rect.height), 1, frame.rows() - y);
+            if (w < 8 || h < 8) return null;
+
+            using var roi = new Mat(frame, new OpenCVForUnity.CoreModule.Rect(x, y, w, h));
+            return DocumentRectifier.ToTexture(roi);
         }
 
         private void Integrate(in Detection3D placed)
@@ -250,6 +347,7 @@ namespace MRPerception
                 _tracked.Add(new TrackedObject
                 {
                     Label = placed.Source.Label,
+                    DisplayLabel = placed.Source.Label,
                     Kind = placed.Source.Kind,
                     Position = placed.Position,
                     Rotation = placed.Rotation,
@@ -301,7 +399,7 @@ namespace MRPerception
             }
             else if (match.Visualizer != null)
             {
-                match.Visualizer.Apply(match.Position, match.Rotation, scale, match.Label);
+                match.Visualizer.Apply(match.Position, match.Rotation, scale, match.DisplayLabel);
             }
         }
 
