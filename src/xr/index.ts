@@ -142,7 +142,9 @@ export interface XrCapabilities {
  * every one of these being false has a different cause and a different fix. `immersiveAr: false`
  * on a Quest almost always means an insecure origin rather than a missing feature.
  */
-export async function capabilities(): Promise<XrCapabilities> {
+export async function capabilities(
+  probe?: { ok: boolean; detail: string },
+): Promise<XrCapabilities> {
   const xr = navigator.xr;
   const supports = async (mode: SessionMode): Promise<boolean> => {
     try {
@@ -152,7 +154,7 @@ export async function capabilities(): Promise<XrCapabilities> {
     }
   };
 
-  const camera = await probeCameras();
+  const camera = probe ?? (await probeCameras());
   return {
     hasWebXR: xr !== undefined,
     immersiveAr: await supports(SessionMode.ImmersiveAR),
@@ -178,10 +180,11 @@ export interface BootResult {
 export async function boot(container: HTMLElement): Promise<BootResult> {
   useOpenCv(cv);
 
-  const caps = await capabilities();
-  log('capabilities', caps);
-
+  // Probed once and reused. Calling it twice means two permission prompts on a headset, and a
+  // second prompt after the user has already answered reads as the app being broken.
   const probe = await probeCameras();
+  const caps = await capabilities(probe);
+  log('capabilities', caps);
   log(probe.ok ? `cameras: ${probe.detail}` : `NO USABLE CAMERA -- ${probe.detail}`);
 
   // World.create failing is close to invisible: a rejected promise here leaves a blank canvas

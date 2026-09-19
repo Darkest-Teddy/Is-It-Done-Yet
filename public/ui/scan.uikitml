@@ -30,7 +30,7 @@
     background-color: #1b2027; border-radius: 14px;
     border-width: 1px; border-color: #2b323d;
   }
-  /* Amber rim = the model was unsure and wants a human answer. */
+  
   .itemUnsure { border-color: #e0b86a; }
   .itemIcon { font-size: 28px; width: 40px; }
   .itemName { font-size: 20px; color: #e8ecf1; flex-grow: 1; }

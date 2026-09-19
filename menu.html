@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Menu preview</title>
+    <!--
+      Design preview for the headset panels, in plain DOM.
+
+      The panels normally render as UIKitML inside a WebGL scene, which needs World.create, a
+      foregrounded window (a backgrounded tab freezes rAF and the world never finishes loading --
+      DECISIONS.md #11) and ideally a headset. That is a punishing loop for checking whether a
+      button is the right size.
+
+      So this page fetches the SAME .uikitml files, lifts their <style> and markup straight into
+      the document, and drives them with the SAME core functions. There is no second copy of the
+      layout to drift out of sync: edit a .uikitml file and this page shows the change on reload.
+
+      What it is NOT: a renderer. UIKit resolves a few properties differently from CSS, so treat
+      this as a faithful preview of content and proportion, not a pixel-exact simulation.
+    -->
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; min-height: 100vh; padding: 28px;
+        background: #0a0c10; color: #e8ecf1;
+        font: 400 14px/1.5 ui-sans-serif, system-ui, -apple-system, sans-serif;
+        display: flex; flex-direction: column; gap: 20px; align-items: center;
+      }
+      header { width: 100%; max-width: 960px; display: flex; gap: 14px; align-items: baseline; }
+      h1 { margin: 0; font-size: 16px; font-weight: 600; }
+      .hint { font-size: 12px; color: #8b95a1; }
+      nav { display: flex; gap: 8px; margin-left: auto; }
+      nav button {
+        padding: 8px 14px; font: 600 13px/1 inherit; cursor: pointer;
+        color: #e8ecf1; background: #161a20;
+        border: 1px solid #262c35; border-radius: 8px;
+      }
+      nav button[aria-pressed='true'] { background: #8ee06a; color: #0a0c10; border-color: #8ee06a; }
+      #stage { width: 100%; max-width: 960px; display: grid; gap: 20px; }
+      /* Each panel keeps its own authored width; scale it down to fit the page. */
+      .panel { transform-origin: top left; }
+      #err {
+        max-width: 960px; width: 100%; color: #e06a6a;
+        font: 400 12px ui-monospace, Menlo, monospace; white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Menu preview</h1>
+      <span class="hint">same .uikitml files, same core logic, plain DOM — no WebGL, no headset</span>
+      <nav>
+        <button data-panel="scan" aria-pressed="true">Scan</button>
+        <button data-panel="library" aria-pressed="false">Library</button>
+        <button data-panel="preview" aria-pressed="false">Preview</button>
+      </nav>
+    </header>
+    <div id="stage"></div>
+    <pre id="err"></pre>
+
+    <script type="module">
+      import { RECIPES } from '/src/core/recipe.ts';
+      import {
+        iconFor, matchRecipe, pantryFromScan, rankRecipes,
+      } from '/src/core/pantry.ts';
+
+      const stage = document.getElementById('stage');
+      const err = document.getElementById('err');
+
+      /** A pantry as a scan would produce it: mostly confident, one line deliberately not. */
+      const PANTRY = pantryFromScan([
+        { ingredient: 'tomato', count: 3, category: 'vegetable', confidence: 0.96 },
+        { ingredient: 'mozzarella', count: 1, category: 'dairy', confidence: 0.88 },
+        { ingredient: 'olive oil', count: 1, category: 'pantry', confidence: 0.93 },
+        { ingredient: 'salt', count: 1, category: 'pantry', confidence: 0.99 },
+        { ingredient: 'cucumber', count: 2, category: 'vegetable', confidence: 0.62 },
+        { ingredient: 'basil', count: 2, category: 'herb', confidence: 0.41 },
+      ], 0);
+
+      /** Lifts the <style> and markup out of a .uikitml file into this document. */
+      async function mount(name) {
+        const src = await fetch(`/ui/${name}.uikitml`).then((r) => {
+          if (!r.ok) throw new Error(`${name}.uikitml -> HTTP ${r.status}`);
+          return r.text();
+        });
+
+        const css = src.match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? '';
+        const body = src.replace(/<!--[\s\S]*?-->/g, '').replace(/<style>[\s\S]*?<\/style>/, '');
+
+        // Scope the panel's classes so three panels with a .root each do not collide.
+        const scope = `p-${name}`;
+        const scoped = css
+          .replace(/(^|\})\s*([.#][\w-]+)/g, (_m, brace, sel) => `${brace} .${scope} ${sel}`)
+          // UIKit has no border-style: a borderWidth plus a borderColor is a visible border.
+          // CSS needs the style or it draws nothing, which silently hid the amber "unsure"
+          // rims here while they render correctly in the headset.
+          .replace(/border-width:/g, 'border-style: solid; border-width:');
+
+        const wrap = document.createElement('div');
+        wrap.className = `panel ${scope}`;
+        wrap.dataset.panel = name;
+        wrap.innerHTML = `<style>${scoped}</style>${body}`;
+        stage.append(wrap);
+        return wrap;
+      }
+
+      const $ = (id) => document.getElementById(id);
+      const text = (id, v) => { const el = $(id); if (el) el.textContent = v; };
+      const showEl = (id, on) => { const el = $(id); if (el) el.style.display = on ? 'flex' : 'none'; };
+
+      function fillScan() {
+        const items = PANTRY.items;
+        text('scan-status', `Found ${items.length} ingredients — 2 I am unsure about. Please check the amber rows.`);
+        text('scan-notes', 'Some items were overlapping and hard to separate.');
+        for (let i = 0; i < 8; i += 1) {
+          const it = items[i];
+          const row = $(`scan-${i}`);
+          if (!row) continue;
+          if (!it) { row.style.display = 'none'; continue; }
+          row.style.display = 'flex';
+          text(`scan-${i}-icon`, iconFor(it.ingredient));
+          text(`scan-${i}-name`, it.ingredient);
+          text(`scan-${i}-count`, String(it.count));
+          text(`scan-${i}-conf`, `${Math.round(it.confidence * 100)}% sure`);
+          row.style.borderColor = it.confidence >= 0.75 ? '#2b323d' : '#e0b86a';
+        }
+        const done = $('scan-done');
+        if (done) { done.textContent = 'Accept all — show recipes'; done.style.background = '#8ee06a'; done.style.color = '#12151a'; }
+      }
+
+      function fillLibrary() {
+        const ranked = rankRecipes(PANTRY, RECIPES);
+        const makeable = ranked.filter((m) => m.makeable).length;
+        text('library-count', `${makeable} of ${ranked.length} ready to cook`);
+        showEl('library-empty', false);
+        for (let i = 0; i < 6; i += 1) {
+          const m = ranked[i];
+          const row = $(`row-${i}`);
+          if (!row) continue;
+          if (!m) { row.style.display = 'none'; continue; }
+          row.style.display = 'flex';
+          text(`row-${i}-icon`, m.recipe.icon);
+          text(`row-${i}-name`, m.recipe.name);
+          text(`row-${i}-meta`, `${m.recipe.difficulty} · ${m.recipe.averageMinutes} min`);
+          const status = m.makeable
+            ? 'Ready to cook'
+            : `Missing ${m.missing.length}: ${m.missing.map((x) => x.icon).join(' ')}`;
+          text(`row-${i}-status`, status);
+          const el = $(`row-${i}-status`);
+          if (el) el.style.color = m.makeable ? '#8ee06a' : '#e0b86a';
+        }
+      }
+
+      function fillPreview() {
+        const m = matchRecipe(PANTRY, RECIPES[0]);
+        const r = m.recipe;
+        text('preview-icon', r.icon);
+        text('preview-name', r.name);
+        text('preview-description', r.description);
+        text('preview-time', `${r.averageMinutes} min`);
+        text('preview-difficulty', r.difficulty);
+        text('preview-match', m.makeable ? 'all ingredients ready' : `${m.missing.length} missing`);
+
+        const chips = (prefix, list, fmt) => {
+          for (let i = 0; i < 6; i += 1) {
+            const entry = list[i];
+            const chip = $(`${prefix}-${i}`);
+            if (!chip) continue;
+            if (!entry) { chip.style.display = 'none'; continue; }
+            chip.style.display = 'flex';
+            text(`${prefix}-${i}-icon`, entry.icon);
+            text(`${prefix}-${i}-text`, fmt(entry));
+          }
+        };
+        chips('have', m.matched, (e) => `${e.have} ${e.ingredient}`);
+        chips('miss', m.missing, (e) => `need ${e.needed} ${e.ingredient}`);
+        showEl('preview-missing-title', m.missing.length > 0);
+      }
+
+      function select(name) {
+        for (const p of stage.children) p.style.display = p.dataset.panel === name ? 'block' : 'none';
+        for (const b of document.querySelectorAll('nav button')) {
+          b.setAttribute('aria-pressed', String(b.dataset.panel === name));
+        }
+      }
+
+      try {
+        await mount('scan');
+        await mount('library');
+        await mount('preview');
+        fillScan();
+        fillLibrary();
+        fillPreview();
+        select('scan');
+        for (const b of document.querySelectorAll('nav button')) {
+          b.addEventListener('click', () => select(b.dataset.panel));
+        }
+      } catch (e) {
+        err.textContent = `preview failed: ${e?.stack ?? e}`;
+      }
+    </script>
+  </body>
+</html>
