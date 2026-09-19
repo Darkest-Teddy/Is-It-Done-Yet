@@ -38,18 +38,33 @@
         color: var(--accent); word-break: break-word;
       }
       #boot .bad { color: var(--bad); }
+      #enter-xr {
+        margin-top: 10px; width: 100%; padding: 14px 18px; font: 600 16px/1 inherit;
+        color: #0d0f12; background: var(--accent); border: 0; border-radius: 10px;
+        cursor: pointer;
+      }
+      #enter-xr[disabled] { background: #3a3f47; color: var(--dim); cursor: not-allowed; }
+      #caps {
+        margin-top: 12px; display: grid; gap: 3px;
+        font: 400 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      #caps div { display: flex; justify-content: space-between; gap: 12px; }
+      #caps .ok { color: var(--accent); }
+      #caps .no { color: var(--bad); }
     </style>
   </head>
   <body>
     <div id="scene"></div>
     <div id="boot">
-      <h1>is it done yet · headset</h1>
+      <h1>Is It Done Yet</h1>
       <p id="boot-status">starting…</p>
-      <p>
-        Camera findings print to the console as <code>[mise:xr]</code>. This build exists to
-        answer whether Quest Browser exposes any camera to <code>getUserMedia</code> — IWSDK has
-        no passthrough-specific API.
-      </p>
+      <!--
+        A real button, because WebXR refuses requestSession outside a user gesture and the
+        rejection reads as a generic security error rather than saying so. IWSDK also calls
+        navigator.xr.offerSession(), but that is a suggestion the browser may ignore.
+      -->
+      <button id="enter-xr" disabled>Checking device…</button>
+      <div id="caps"></div>
     </div>
     <script type="module">
       import { boot } from '/src/xr/index.ts';
@@ -71,13 +86,42 @@
 
       // Surfaced on the page as well as the console: reading a headset console means plugging
       // into adb, and the whole point of this build is a finding you can get to in one look.
+      const capsEl = document.getElementById('caps');
+      const enter = document.getElementById('enter-xr');
+
+      const row = (label, value, good) => {
+        const d = document.createElement('div');
+        d.innerHTML = `<span>${label}</span><span class="${good ? 'ok' : 'no'}">${value}</span>`;
+        capsEl.append(d);
+      };
+
       boot(scene)
-        .then(() => { status.textContent = 'booted — see console for camera findings'; })
+        .then(({ caps, enterXR }) => {
+          row('WebXR', caps.hasWebXR ? 'yes' : 'no', caps.hasWebXR);
+          row('immersive-ar', caps.immersiveAr ? 'supported' : 'no', caps.immersiveAr);
+          row('secure context', caps.secureContext ? 'yes' : 'NO (needs https)', caps.secureContext);
+          row('camera', caps.camera, !caps.camera.startsWith('none'));
+
+          if (caps.immersiveAr) {
+            enter.disabled = false;
+            enter.textContent = 'Enter AR';
+            enter.addEventListener('click', enterXR);
+            status.textContent = 'ready — press Enter AR';
+          } else {
+            enter.textContent = caps.hasWebXR ? 'immersive-ar unavailable' : 'WebXR unavailable';
+            status.textContent = caps.secureContext
+              ? 'this device cannot run immersive AR'
+              : 'insecure origin — WebXR needs https';
+            status.className = 'bad';
+          }
+        })
         .catch((err) => {
           status.textContent = `boot failed: ${err?.message ?? err}`;
           status.className = 'bad';
+          enter.textContent = 'boot failed';
           console.error('[mise:xr] boot threw', err);
         });
+
     </script>
   </body>
 </html>

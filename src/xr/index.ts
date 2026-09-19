@@ -17,14 +17,17 @@ import cv from '@techstark/opencv-js';
 import {
   CameraSource,
   CameraUtils,
+  launchXR,
   SessionMode,
   World,
   type Entity,
 } from '@iwsdk/core';
 
+import { emptyPantry, type Pantry } from '../core/pantry.js';
 import { RECIPES } from '../core/recipe.js';
 import { CoachSession } from '../app/session.js';
 import { DEFAULT_SEGMENT_OPTIONS, segment, useOpenCv } from '../vision/segment.js';
+import { RecipePanels } from './panels.js';
 
 /** How often the board is analysed. Not tied to the render loop; see the file docstring. */
 const ANALYSE_INTERVAL_MS = 1000;
@@ -123,8 +126,59 @@ function startAnalysisLoop(cameraEntity: Entity, session: CoachSession): () => v
   return () => clearInterval(handle);
 }
 
-export async function boot(container: HTMLElement): Promise<void> {
+export interface XrCapabilities {
+  readonly hasWebXR: boolean;
+  readonly immersiveAr: boolean;
+  readonly immersiveVr: boolean;
+  readonly secureContext: boolean;
+  readonly camera: string;
+}
+
+/**
+ * What this device can actually do, checked rather than assumed.
+ *
+ * Reported on the page as well as the console because reading a headset console needs adb, and
+ * every one of these being false has a different cause and a different fix. `immersiveAr: false`
+ * on a Quest almost always means an insecure origin rather than a missing feature.
+ */
+export async function capabilities(): Promise<XrCapabilities> {
+  const xr = navigator.xr;
+  const supports = async (mode: SessionMode): Promise<boolean> => {
+    try {
+      return (await xr?.isSessionSupported(mode)) === true;
+    } catch {
+      return false;
+    }
+  };
+
+  const camera = await probeCameras();
+  return {
+    hasWebXR: xr !== undefined,
+    immersiveAr: await supports(SessionMode.ImmersiveAR),
+    immersiveVr: await supports(SessionMode.ImmersiveVR),
+    secureContext: window.isSecureContext,
+    camera: camera.ok ? camera.detail : `none (${camera.detail})`,
+  };
+}
+
+export interface BootResult {
+  readonly caps: XrCapabilities;
+  /**
+   * Enters immersive AR. MUST be called from a user gesture.
+   *
+   * WebXR refuses `requestSession` outside a click or trigger press, and the rejection reads as
+   * a generic security error rather than saying so. IWSDK offers a session via
+   * `navigator.xr.offerSession()` where the browser supports it, but that is a suggestion the
+   * browser may ignore -- an explicit button is the only entry path that always works.
+   */
+  readonly enterXR: () => void;
+}
+
+export async function boot(container: HTMLElement): Promise<BootResult> {
   useOpenCv(cv);
+
+  const caps = await capabilities();
+  log('capabilities', caps);
 
   const probe = await probeCameras();
   log(probe.ok ? `cameras: ${probe.detail}` : `NO USABLE CAMERA -- ${probe.detail}`);
@@ -148,7 +202,9 @@ export async function boot(container: HTMLElement): Promise<void> {
     return null;
   });
 
-  if (world === null) return;
+  if (world === null) {
+    return { caps, enterXR: () => warn('cannot enter XR: the world failed to create') };
+  }
 
   const recipe = RECIPES[0];
   if (recipe === undefined) throw new Error('no recipes defined');
@@ -161,10 +217,58 @@ export async function boot(container: HTMLElement): Promise<void> {
   // keeps returning null -- which the loop treats as "not ready" rather than as an error.
   cameraEntity.addComponent(CameraSource, { facing: 'back', width: 1280, height: 720 });
 
+  await mountPanels(world, session);
+
   if (probe.ok) {
     startAnalysisLoop(cameraEntity, session);
     log(`coaching "${recipe.name}" -- analysing every ${ANALYSE_INTERVAL_MS}ms`);
   } else {
-    warn('analysis loop NOT started: no usable camera. The world will render, but nothing is being coached.');
+    warn('analysis loop NOT started: no usable camera. The world renders and the menus work, but nothing is being coached.');
+  }
+
+  return {
+    caps,
+    enterXR: () => {
+      launchXR(world, {
+        sessionMode: SessionMode.ImmersiveAR,
+        features: { handTracking: true, planeDetection: true, anchors: true },
+      });
+    },
+  };
+}
+
+/**
+ * Places the recipe library and preview in front of the player.
+ *
+ * Panels are parented to plain transform entities rather than anchored to a detected plane: a
+ * menu should be where you are looking when the app starts, not wherever the room's geometry
+ * happened to resolve. Anchoring belongs to the cooking surface, not to the menu.
+ */
+async function mountPanels(
+  world: World,
+  session: CoachSession,
+  pantry: Pantry = emptyPantry(),
+): Promise<RecipePanels | null> {
+  try {
+    const panels = await RecipePanels.load(pantry, RECIPES, {
+      onStart: (recipe) => {
+        log(`starting "${recipe.name}"`);
+      },
+    });
+
+    // 1.6m out and slightly below eye level -- the distance UI stays readable at without
+    // forcing the player to converge uncomfortably.
+    for (const asset of [panels.library, panels.preview]) {
+      const entity = world.createTransformEntity(asset);
+      entity.object3D?.position.set(0, 1.3, -1.6);
+    }
+
+    log('panels mounted');
+    return panels;
+  } catch (err) {
+    // A failed panel load must not take the world down with it: a running scene with no menu
+    // is debuggable, a blank canvas is not.
+    warn('panels failed to load', err);
+    return null;
   }
 }
