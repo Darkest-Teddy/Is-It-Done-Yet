@@ -279,7 +279,12 @@ namespace MRPerception
                 {
                     _sb.Append("  ").Append(Mathf.RoundToInt(manager.LastVisionMs)).Append("ms");
                 }
-                _sb.Append('\n');
+                _sb.Append("   rejected ").Append(manager.RejectedCount).Append('\n');
+
+                if (!string.IsNullOrEmpty(manager.LastRejection))
+                {
+                    _sb.Append("last drop: ").Append(manager.LastRejection).Append('\n');
+                }
             }
 
             string camera = feed == null ? "no feed" : feed.IsReady ? "camera ok" : "camera WAITING";

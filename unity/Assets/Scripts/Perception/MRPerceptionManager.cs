@@ -106,6 +106,19 @@ namespace MRPerception
         public string VisionProviderName => _vision?.Name ?? "none";
 
         /// <summary>
+        /// Why the last detection was thrown away, and how many have been.
+        ///
+        /// On the debug panel because a detection that silently fails to appear is undiagnosable,
+        /// and the natural reaction is to start lowering the confidence threshold -- which makes
+        /// everything worse. "rejected: carrot at 0.78m" is readable in one glance.
+        /// </summary>
+        public string LastRejection { get; private set; } = "";
+
+        public int RejectedCount => _rejected;
+
+        private int _rejected;
+
+        /// <summary>
         /// The frame the detectors last ran on, and the edge map they produced, for the debug
         /// panel. Both are live buffers owned by other objects -- read only, never dispose.
         /// </summary>
@@ -131,6 +144,8 @@ namespace MRPerception
             public string DisplayLabel;
             public bool IdentifyPending;
             public bool Identified;
+            /// <summary>The vision provider looked and said there is nothing here.</summary>
+            public bool Vetoed;
         }
 
         private void Start()
@@ -242,6 +257,22 @@ namespace MRPerception
             foreach (Detection2D d in results)
             {
                 if (!raycaster.TryPlace(d, _workerFrame, feed, out Detection3D placed)) continue;
+
+                // The filter a 2D pipeline cannot have. A "banana" 90cm long is a worktop, and
+                // no confidence score will ever say so -- but the depth raycast just told us
+                // how big it actually is, and that is decisive. Utensils are dropped here too:
+                // a knife is useful context, never a subject.
+                if (d.Kind == DetectionKind.Food)
+                {
+                    if (FoodPlausibility.RoleOf(d.Label) == FoodPlausibility.Role.Ignore) continue;
+                    if (!FoodPlausibility.PlausibleSize(d.Label, placed.SizeMeters))
+                    {
+                        LastRejection = FoodPlausibility.Explain(d.Label, placed.SizeMeters);
+                        _rejected++;
+                        continue;
+                    }
+                }
+
                 Integrate(placed);
 
                 // Rectification reads from the worker Mat, which is only valid until the next
@@ -297,16 +328,38 @@ namespace MRPerception
                 Texture2D crop = CropToTexture(_workerMat, results[best].PixelRect);
                 if (crop == null) continue;
 
+                // A bowl is interesting for what is in it. This is the whole route to everything
+                // COCO cannot see -- shredded cheese, chopped onion, flour, spices. None of them
+                // has a shape a detector can localise; all of them sit in something that does.
+                bool isContainer =
+                    FoodPlausibility.RoleOf(t.Label) == FoodPlausibility.Role.Container;
+                VisionSubject subject = isContainer ? VisionSubject.Contents : VisionSubject.Object;
+
                 t.IdentifyPending = true;
                 TrackedObject captured = t;
-                _vision.Identify(crop, t.Label, result =>
+                _vision.Identify(crop, t.Label, subject, result =>
                 {
                     Destroy(crop);
                     captured.IdentifyPending = false;
-                    if (!result.Ok) return;      // keep the local label; try again next capture
+                    LastVisionMs = result.LatencyMs > 0f ? result.LatencyMs : LastVisionMs;
+
+                    if (result.Rejected)
+                    {
+                        // An open-vocabulary veto. The local detector said broccoli, the model
+                        // looked and said worktop. Believe the one that can see everything.
+                        captured.Vetoed = true;
+                        LastRejection = captured.Label + ": " +
+                            (string.IsNullOrEmpty(result.Note) ? "not a subject" : result.Note);
+                        _rejected++;
+                        return;
+                    }
+
+                    if (!result.Ok) return;      // failure, not a verdict -- retry next capture
+
                     captured.Identified = true;
-                    captured.DisplayLabel = result.Label;
-                    LastVisionMs = result.LatencyMs;
+                    captured.DisplayLabel = isContainer
+                        ? result.Label + " (in " + captured.Label + ")"
+                        : result.Label;
                 });
                 return;   // one per capture
             }
@@ -408,6 +461,18 @@ namespace MRPerception
             for (int i = _tracked.Count - 1; i >= 0; i--)
             {
                 TrackedObject t = _tracked[i];
+
+                // A veto retires the track immediately rather than waiting out forgetFrames.
+                // The local detector will keep re-finding the same wood grain every capture, so
+                // letting it age out normally means it simply respawns.
+                if (t.Vetoed)
+                {
+                    if (t.Instance != null) Destroy(t.Instance);
+                    if (t.Visualizer != null) Destroy(t.Visualizer.gameObject);
+                    _tracked.RemoveAt(i);
+                    continue;
+                }
+
                 if (t.Seen) continue;
 
                 t.Misses++;

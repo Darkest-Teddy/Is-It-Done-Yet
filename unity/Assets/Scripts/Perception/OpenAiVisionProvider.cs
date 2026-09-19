@@ -63,22 +63,29 @@ namespace MRPerception
 
         private const string SystemPrompt =
             "You identify a single food item, ingredient, or document in a cropped photo taken " +
-            "by a mixed-reality headset. Reply with the most specific common name you are " +
-            "confident in. Prefer an ingredient name over a dish name. If you cannot tell, say " +
-            "so in the note and give a broader label rather than guessing a specific one: " +
-            "'hard cheese' is a useful answer, a wrong 'gruyere' is not. Be terse.";
+            "by a mixed-reality headset in a kitchen. Reply with the most specific common name " +
+            "you are confident in. Prefer an ingredient name over a dish name. If you cannot " +
+            "tell, say so in the note and give a broader label rather than guessing a specific " +
+            "one: 'hard cheese' is a useful answer, a wrong 'gruyere' is not.\n" +
+            "If the crop contains NO food, ingredient or document -- it is worktop, a cabinet, " +
+            "a hand, an appliance, wood grain, or nothing identifiable -- set label to exactly " +
+            "'none'. This matters: the local detector produces false positives on kitchen " +
+            "surfaces, and saying 'none' is how they get discarded. Never invent a plausible " +
+            "food to fill the gap. Be terse.";
 
-        public void Identify(Texture2D crop, string hint, Action<VisionResult> onComplete)
+        public void Identify(Texture2D crop, string hint, VisionSubject subject,
+            Action<VisionResult> onComplete)
         {
             if (crop == null || Busy)
             {
                 onComplete?.Invoke(VisionResult.None);
                 return;
             }
-            StartCoroutine(Run(crop, hint, onComplete));
+            StartCoroutine(Run(crop, hint, subject, onComplete));
         }
 
-        private IEnumerator Run(Texture2D crop, string hint, Action<VisionResult> onComplete)
+        private IEnumerator Run(Texture2D crop, string hint, VisionSubject subject,
+            Action<VisionResult> onComplete)
         {
             Busy = true;
             float started = Time.realtimeSinceStartup;
@@ -86,7 +93,7 @@ namespace MRPerception
             string body;
             try
             {
-                body = BuildRequest(crop, hint);
+                body = BuildRequest(crop, hint, subject);
             }
             catch (Exception e)
             {
@@ -137,17 +144,31 @@ namespace MRPerception
             onComplete?.Invoke(Parse(request.downloadHandler.text, latency));
         }
 
-        private string BuildRequest(Texture2D crop, string hint)
+        private string BuildRequest(Texture2D crop, string hint, VisionSubject subject)
         {
             Texture2D sized = Downscale(crop, maxEdgePx);
             byte[] jpeg = sized.EncodeToJPG(jpegQuality);
             if (sized != crop) Destroy(sized);
             string b64 = Convert.ToBase64String(jpeg);
 
-            string user = string.IsNullOrEmpty(hint)
-                ? "What is this? Reply as JSON."
-                : $"What is this? A local detector guessed '{hint}', which may be wrong or too " +
-                  "general. Reply as JSON.";
+            string user;
+            if (subject == VisionSubject.Contents)
+            {
+                // Name the contents, not the container. Without this instruction the model very
+                // reasonably answers "a bowl", which is the one thing already known.
+                user =
+                    $"This is a {(string.IsNullOrEmpty(hint) ? "container" : hint)}. Name what " +
+                    "is INSIDE it, not the container itself. If it is empty, label 'none'. " +
+                    "Reply as JSON.";
+            }
+            else
+            {
+                user = string.IsNullOrEmpty(hint)
+                    ? "What is this? Reply as JSON."
+                    : $"What is this? A local detector guessed '{hint}', which may be wrong or " +
+                      "too general -- it is a COCO model and it is often wrong on kitchen " +
+                      "surfaces. Reply as JSON.";
+            }
 
             var sb = new StringBuilder(jpeg.Length * 2);
             sb.Append("{\"model\":\"").Append(Esc(model)).Append("\",");
@@ -222,6 +243,13 @@ namespace MRPerception
                 // The content is itself a JSON document, as a string. Two parses, not one.
                 var parsed = JsonUtility.FromJson<Identification>(content);
                 if (parsed == null || string.IsNullOrEmpty(parsed.label)) return VisionResult.None;
+
+                // An explicit 'none' is the model rejecting a false positive, which is different
+                // from a network failure and has to reach the caller as a definite verdict.
+                if (parsed.label.Trim().Equals("none", StringComparison.OrdinalIgnoreCase))
+                {
+                    return VisionResult.NoSubject(parsed.note, latencyMs);
+                }
 
                 return new VisionResult(
                     parsed.label.Trim(),

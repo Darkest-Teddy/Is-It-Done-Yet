@@ -14,6 +14,7 @@ Assets/Scripts/Perception/
 ├── DocumentRectifier.cs        4 corners -> flat page, the OCR input
 ├── DetectionVisualizer.cs      runtime wireframe box, so no prefab authoring needed
 ├── IVisionProvider.cs          identify-what-it-is seam, + offline fallback
+├── FoodPlausibility.cs         real-world size gating, food/container/ignore roles
 ├── OpenAiVisionProvider.cs     GPT vision, via a key-holding relay
 ├── PerceptionTunables.cs       every threshold, one registry, persisted
 ├── PerceptionDebugUI.cs        in-headset tuning panel + live edge view
@@ -431,3 +432,84 @@ recognising the cheese.
 requires documenting how Codex helped you build and judges check. Using the API for vision is a
 technical choice and is fine — just do not claim the track without the Codex work. It does mean
 dropping the Gemini track if GPT replaces Gemini entirely.
+
+
+---
+
+## False positives, and the bowl-contents path
+
+Two related problems with one shared answer.
+
+### You cannot fix this with training data
+
+A COCO detector on a kitchen counter produces a steady trickle of nonsense: wood grain called
+broccoli, a cabinet handle called a knife, a reflection called a bowl. The instinct is to get
+better training data — but that needs a labelled **detection** dataset (Food-101 is
+classification, so it cannot help), a GPU, and hours you do not have.
+
+Raising the confidence threshold does not work either. A false positive at 0.55 and a real
+carrot at 0.55 are indistinguishable *to the model*. You trade noise for misses.
+
+The fix is to ask questions the model cannot.
+
+### Filter 1: real-world size
+
+`FoodPlausibility` rejects detections that cannot be what the model says they are. A "banana"
+90cm long is a worktop. A "carrot" 2cm long is a scratch in the wood.
+
+**This only works because there is depth.** A 2D pipeline has no idea whether a box is a carrot
+at 30cm or a carrot-coloured cabinet at 3m — identical pixels. The depth raycast gives distance,
+distance plus the box gives metres, and metres are decisive. It is nearly free, because
+`EstimateSize` was already computing the number.
+
+Ranges are TUNED, not sourced, and deliberately generous: the job is to reject the absurd, not
+to adjudicate a large carrot.
+
+### Filter 2: let the model that can see everything veto
+
+The crop already goes to GPT. The prompt now says: if this is worktop, a cabinet, a hand, an
+appliance or wood grain, answer `none`.
+
+That is an open-vocabulary false-positive filter for free. The local detector says broccoli, GPT
+looks and says worktop, the track is retired immediately — not aged out over `forgetFrames`,
+because the detector will keep re-finding the same wood grain every capture and it would simply
+respawn.
+
+A veto is distinct from a timeout: a timeout means try again, a veto means stop.
+
+### Filter 3: utensils are context, never subjects
+
+`fork`, `knife` and `spoon` are `Role.Ignore`. They are useful for knowing a cutting step is
+happening; they are not things to put a hologram on.
+
+### The bowl-contents path
+
+COCO has `bowl` (45), `cup` (41), `bottle` (39), `wine glass` (40). These are `Role.Container`,
+and a container is interesting for **what is in it**.
+
+This is the whole route to everything COCO cannot see. Shredded cheese, chopped onion, flour,
+spices — none has a shape a detector can localise, and all of them sit in something that does.
+So the container gets found locally, and GPT is asked about its contents rather than about the
+bowl. The label reads `shredded cheddar (in bowl)`.
+
+Without the `VisionSubject.Contents` distinction the model very reasonably answers "a bowl",
+which is the one thing already known.
+
+### Everything that gets dropped says so
+
+`LastRejection` and `RejectedCount` are on the debug panel — `rejected: carrot at 0.78m` is
+diagnosable in one glance. A detection that silently fails to appear is not, and the reflex is
+to start lowering the confidence threshold, which makes everything worse.
+
+### A note on the reference UX
+
+The Vision Pro cooking concept this is modelled on **does not box the food**. It boxes the hob
+("you need" + checklist), the hob again ("put the pan on"), and the pan ("add salt"). The peppers
+on the board get no box at all — identity comes from the recipe step, not from detection, and a
+left-hand rail tracks state (`ingredients → cutting → pouring → salting → cracking → waiting →
+done`).
+
+That is worth copying, because boxing a pan and a hob is easy and stable while boxing every
+pepper slice is neither. A recipe state machine that knows it is on the "cutting" step does not
+need a detector to tell it there is a pepper — it needs one to tell it *when the pepper has been
+cut*, which is a much easier question.
