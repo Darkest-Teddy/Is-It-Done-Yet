@@ -76,7 +76,9 @@ export interface SegmentOptions {
 
 export const DEFAULT_SEGMENT_OPTIONS: SegmentOptions = {
   minSaturation: 0.22,
-  minAreaPx: 900,
+  // 300, not 900. A slice seen edge-on is a thin sliver: 42mm x 6mm at 0.52mm/px is ~930px2 and
+  // a 4mm one is 620px2, so the old floor silently discarded the very thing being measured.
+  minAreaPx: 300,
   morphKernelPx: 5,
 };
 
@@ -89,15 +91,81 @@ export const DEFAULT_SEGMENT_OPTIONS: SegmentOptions = {
  */
 const CV_HUE_TO_DEGREES = 2;
 
+interface CvMatLike { delete(): void; data: Uint8Array; roi(r: unknown): CvMatLike;
+  setTo(s: unknown): void }
+
+/**
+ * Per-frame working buffers, kept between frames.
+ *
+ * Measured at 1920x1080: allocating these inside the frame cost ~250ms REGARDLESS of how many
+ * blobs were found -- 4fps, and a pipeline far too sluggish to detect a cut against. Almost
+ * none of it was pixel work. The two bound Mats alone are 6MB each, allocated and filled with a
+ * constant on every frame, purely because the JS binding of inRange takes Mats where the C++
+ * API takes Scalars.
+ *
+ * These are deliberately NOT in the per-frame owned list. They are freed when the frame size,
+ * the kernel or the saturation floor changes, and they are the one place in this file where a
+ * Mat legitimately outlives the call that created it.
+ */
+interface Scratch {
+  readonly width: number;
+  readonly height: number;
+  readonly kernelPx: number;
+  readonly satFloor: number;
+  readonly rgba: CvMatLike;
+  readonly rgb: CvMatLike;
+  readonly hsv: CvMatLike;
+  readonly mask: CvMatLike;
+  readonly low: CvMatLike;
+  readonly high: CvMatLike;
+  readonly kernel: CvMatLike;
+  readonly blobMask: CvMatLike;
+}
+
+let scratch: Scratch | null = null;
+
+/** Frees the cached buffers. Exported so a teardown or a test can prove nothing is retained. */
+export function releaseScratch(): void {
+  if (scratch === null) return;
+  const s = scratch;
+  scratch = null;
+  for (const m of [s.rgba, s.rgb, s.hsv, s.mask, s.low, s.high, s.kernel, s.blobMask]) {
+    try { m.delete(); } catch { /* already gone; a double delete must not mask a real error */ }
+  }
+}
+
+function getScratch(
+  c: Cv, width: number, height: number, kernelPx: number, satFloor: number,
+): Scratch {
+  if (scratch !== null && scratch.width === width && scratch.height === height
+    && scratch.kernelPx === kernelPx && scratch.satFloor === satFloor) {
+    return scratch;
+  }
+  releaseScratch();
+  scratch = {
+    width, height, kernelPx, satFloor,
+    rgba: new c.Mat(height, width, c.CV_8UC4) as CvMatLike,
+    rgb: new c.Mat(height, width, c.CV_8UC3) as CvMatLike,
+    hsv: new c.Mat(height, width, c.CV_8UC3) as CvMatLike,
+    mask: new c.Mat(height, width, c.CV_8UC1) as CvMatLike,
+    low: new c.Mat(height, width, c.CV_8UC3, [0, satFloor, 40, 0]) as CvMatLike,
+    high: new c.Mat(height, width, c.CV_8UC3, [179, 255, 255, 0]) as CvMatLike,
+    kernel: c.getStructuringElement(c.MORPH_ELLIPSE, new c.Size(kernelPx, kernelPx)) as CvMatLike,
+    blobMask: c.Mat.zeros(height, width, c.CV_8UC1) as CvMatLike,
+  };
+  return scratch;
+}
+
 export function segment(
   frame: ImageData,
   opts: SegmentOptions = DEFAULT_SEGMENT_OPTIONS,
 ): Blob[] {
   const c = requireCv();
 
-  // Every Mat below lives in the WASM heap and is NOT garbage collected. At 30fps a single
-  // missed delete() exhausts the heap in well under a minute, and the failure looks like the
-  // camera dying rather than like a leak. Hence one tracked list and one finally.
+  // Every Mat created HERE lives in the WASM heap and is NOT garbage collected. At 30fps a
+  // single missed delete() exhausts the heap in well under a minute, and the failure looks like
+  // the camera dying rather than like a leak. Hence one tracked list and one finally. The
+  // cached scratch buffers above are the deliberate exception, freed on a size change.
   const owned: { delete(): void }[] = [];
   const own = <T extends { delete(): void }>(m: T): T => {
     owned.push(m);
@@ -105,20 +173,16 @@ export function segment(
   };
 
   try {
-    const rgba = own(c.matFromImageData(frame));
-    const hsv = own(new c.Mat());
-    const rgb = own(new c.Mat());
+    const satFloor = Math.round(Math.max(0, Math.min(1, opts.minSaturation)) * 255);
+    const k = Math.max(1, opts.morphKernelPx | 1);
+    const buf = getScratch(c, frame.width, frame.height, k, satFloor);
+    const { rgba, rgb, hsv, mask, low, high, kernel, blobMask } = buf;
+
+    rgba.data.set(frame.data);
     c.cvtColor(rgba, rgb, c.COLOR_RGBA2RGB);
     c.cvtColor(rgb, hsv, c.COLOR_RGB2HSV);
-
-    const satFloor = Math.round(Math.max(0, Math.min(1, opts.minSaturation)) * 255);
-    const low = own(new c.Mat(frame.height, frame.width, c.CV_8UC3, [0, satFloor, 40, 0]));
-    const high = own(new c.Mat(frame.height, frame.width, c.CV_8UC3, [179, 255, 255, 0]));
-    const mask = own(new c.Mat());
     c.inRange(hsv, low, high, mask);
 
-    const k = Math.max(1, opts.morphKernelPx | 1);
-    const kernel = own(c.getStructuringElement(c.MORPH_ELLIPSE, new c.Size(k, k)));
     // Open first to kill speckle, then close to fill the pinholes that specular highlights
     // punch through the middle of a glossy tomato. The other order fills the speckle in.
     c.morphologyEx(mask, mask, c.MORPH_OPEN, kernel);
@@ -130,8 +194,6 @@ export function segment(
 
     const blobs: Blob[] = [];
 
-    // Reused across every contour in this frame; see the note at the mean-colour call below.
-    const blobMask = own(c.Mat.zeros(frame.height, frame.width, c.CV_8UC1));
     const one = own(new c.MatVector());
     one.push_back(own(new c.Mat()));
     const ZERO = new c.Scalar(0);
@@ -157,14 +219,20 @@ export function segment(
       // Mean colour over THIS blob only. Averaging the whole frame would blend the board in
       // and desaturate every reading toward grey.
       //
-      // The mask and the one-element vector are allocated once for the whole frame and reset
-      // per contour. Allocating a full-frame Mat inside the loop costs an extra
-      // width*height byte wipe per blob, which at 1280x720 with five blobs was the single
-      // largest cost in the pipeline.
-      blobMask.setTo(ZERO);
+      // Everything here is bounded by the blob's own bounding box. The mask is shared across
+      // the frame, but a filled contour only dirties pixels inside its own bounds, so both the
+      // average and the clear stay proportional to the blob rather than to the frame. Doing it
+      // full-frame -- a 2MP masked mean plus a 2MP wipe per blob -- cost more at 1080p than the
+      // rest of this loop put together.
+      const bb = c.boundingRect(contour);
       one.set(0, contour);
       c.drawContours(blobMask, one, 0, WHITE, -1);
-      const mean = c.mean(hsv, blobMask);
+      const maskRoi = blobMask.roi(bb);
+      const hsvRoi = hsv.roi(bb);
+      const mean = c.mean(hsvRoi, maskRoi);
+      maskRoi.setTo(ZERO);
+      maskRoi.delete();
+      hsvRoi.delete();
 
       blobs.push({
         areaPx,

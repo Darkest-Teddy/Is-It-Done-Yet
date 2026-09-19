@@ -5,150 +5,203 @@ export interface TunableDef {
   readonly max: number;
   readonly step: number;
   readonly unit: string;
+  /** Groups the debug panel. Purely presentational. */
+  readonly group: 'vision' | 'measurement' | 'scoring' | 'feedback';
 }
 
 /**
- * Every magic number in the simulation. Master spec rule #11.
+ * Every magic number, one typed registry with bounds. Master spec rule #11.
  *
- * The debug panel is generated from this table, and `harness/runScript.ts` builds its option
- * objects from the same defaults, so tests exercise the real values rather than a parallel set
- * that drifts.
+ * The debug panel is generated from this table, which is the entire point of it: rebuilding at
+ * the venue to retune a saturation threshold is how you lose a Saturday. Hall lighting is
+ * usually a green-heavy fluorescent that shifts every hue window a few degrees, and the only
+ * number that helps is the one you can drag while watching the overlay.
  *
- * That second sentence used to be false. The harness kept hand-copied literals, nothing outside
- * this file's own test imported the registry at all, and the drift it warned about had already
- * happened: `LATHE_RADIAL_SEGMENTS` said 32 while the harness and every test ran at 64. The
- * harness now reads `TUNABLE_DEFS[...].default` directly, so a divergence is no longer
- * expressible.
- *
- * Why `.default` rather than `tunable()`: a debug-panel override must not be able to change the
- * numbers a recorded cut script replays against. The harness wants the declared value, not the
- * live one.
+ * This table used to describe a different program. It carried blade geometry, lathe
+ * tessellation, sweep planarity residuals and hand-safety distances for an analytic cut-plane
+ * simulation against a virtual solid -- the build recorded in DECISIONS entries 1 through 11,
+ * which is not the build in this repository. Those keys were pinned by tests and cited in
+ * PHYSICS.md, so they read to anyone opening the file as live configuration. They configured
+ * nothing at all. They are gone; see DECISIONS entry 12.
  */
 export const TUNABLE_DEFS = {
-  // --- cut plane -------------------------------------------------------------
-  MIN_SWEEP_M: {
-    label: 'Minimum sweep', default: 0.004, min: 0.0005, max: 0.05, step: 0.0005, unit: 'm',
+  // --- vision ----------------------------------------------------------------
+  /**
+   * TUNED, not sourced. Produce against a light board separates on SATURATION rather than on
+   * hue or brightness -- a white board stays near-achromatic however bright the hall is, while
+   * a cucumber is strongly coloured. First slider to touch on arrival.
+   */
+  MIN_SATURATION: {
+    label: 'Saturation floor', default: 0.22, min: 0.02, max: 0.7, step: 0.01, unit: '',
+    group: 'vision',
   },
-  MIN_CROSS_SIN: {
-    label: 'Minimum blade/sweep angle (sin)', default: 0.17, min: 0.01, max: 0.7, step: 0.01, unit: '',
+  MIN_AREA_PX: {
+    label: 'Minimum blob area', default: 300, min: 50, max: 8000, step: 50, unit: 'px2',
+    group: 'vision',
   },
-  MAX_PLANARITY_RESIDUAL_M: {
-    label: 'Max planarity residual', default: 0.002, min: 0.0001, max: 0.02, step: 0.0001, unit: 'm',
-  },
-  MAX_SWEEP_SUBDIVISIONS: {
-    label: 'Max sweep subdivisions', default: 8, min: 1, max: 32, step: 1, unit: '',
-  },
-  MIN_AXIS_DOT: {
-    label: 'Min |normal . axis| before a cut counts as lengthwise',
-    default: 0.26, min: 0.05, max: 0.95, step: 0.01, unit: '',
-  },
-
-  // --- cucumber --------------------------------------------------------------
-  CUCUMBER_LENGTH_M: {
-    label: 'Cucumber length', default: 0.18, min: 0.05, max: 0.4, step: 0.005, unit: 'm',
-  },
-  CUCUMBER_RADIUS_M: {
-    label: 'Cucumber radius', default: 0.021, min: 0.005, max: 0.06, step: 0.001, unit: 'm',
+  MORPH_KERNEL_PX: {
+    label: 'Morphology kernel', default: 5, min: 1, max: 15, step: 2, unit: 'px',
+    group: 'vision',
   },
   /**
-   * 64, not master spec §7.6's 32, and the divergence is deliberate.
+   * The hue window that decides what counts as food at all.
    *
-   * §7.6's "32 radial segments. More is draw-call budget you need elsewhere" is a statement
-   * about `new THREE.LatheGeometry(...)` -- a GPU cost, for the visual mesh. The same spec
-   * raises that mesh to 48 segments in its materials pass, so 32 was never a correctness
-   * figure and the spec does not treat it as fixed. This key feeds the simulation, where the
-   * count sets the cap-ring resolution and the outer quadrature, costs microseconds in a
-   * headless module, and has no draw calls at all.
-   *
-   * Measured, on a 0.021 m cylinder cut at 30 degrees with the normal rotated out of the x-y
-   * plane so the ring's extremes do not land on sample points: wedge error 1.57e-3 relative at
-   * 32 segments against 8.85e-4 at 64, or 0.038 mm against 0.021 mm. Both sit well inside the
-   * 0.5 mm scoring tolerance, so this is not the decisive argument -- but the improvement is
-   * free. Volume is indifferent either way: the theta sum is spectrally accurate for a periodic
-   * integrand, and 32, 64 and 512 segments agree to 2e-13 relative.
-   *
-   * The decisive argument is that 64 is what the harness, every test and every accuracy figure
-   * in PHYSICS.md are already stated at ("clamped 23 of 64 ring entries", the wedge figures).
-   * Moving the harness to 32 would invalidate those figures to match a number chosen for a
-   * draw-call budget this module does not pay.
-   *
-   * When a renderer exists it should get its own key for mesh tessellation rather than reusing
-   * this one. The two are only coupled because `volumeOf` requires a cap ring to be indexed at
-   * the same segment count it was built at.
+   * Tracking takes the longest blob in frame as the stub, so anything longer than the cucumber
+   * that survives segmentation becomes the measurement. A bare forearm under warm hall light
+   * sits near hue 25, clears the saturation floor, and is both elongated and highly convex --
+   * everything the stub test looks for. Gating on hue first is what stops the app confidently
+   * measuring somebody's arm.
    */
-  LATHE_RADIAL_SEGMENTS: {
-    label: 'Lathe radial segments', default: 64, min: 8, max: 96, step: 1, unit: '',
+  PRODUCE_HUE_DEG: {
+    label: 'Produce hue centre', default: 95, min: 0, max: 359, step: 1, unit: 'deg',
+    group: 'vision',
   },
-  LATHE_PROFILE_SEGMENTS: {
-    label: 'Lathe profile segments', default: 24, min: 4, max: 64, step: 1, unit: '',
+  PRODUCE_HUE_TOLERANCE_DEG: {
+    label: 'Produce hue tolerance', default: 35, min: 5, max: 180, step: 1, unit: 'deg',
+    group: 'vision',
+  },
+
+  // --- measurement -----------------------------------------------------------
+  /**
+   * The in-scene ruler. Measure the actual cucumber once and type it in.
+   *
+   * Everything downstream is a ratio against this, so it is the only absolute length in the
+   * program, and the only number where a mistake cannot be caught by any internal check.
+   */
+  CUCUMBER_DIAMETER_MM: {
+    label: 'Cucumber diameter', default: 42, min: 10, max: 120, step: 0.5, unit: 'mm',
+    group: 'measurement',
+  },
+  SETTLE_FRAMES: {
+    label: 'Settle window', default: 5, min: 2, max: 30, step: 1, unit: 'frames',
+    group: 'measurement',
+  },
+  SETTLE_BAND_MM: {
+    label: 'Settle band', default: 0.5, min: 0.05, max: 5, step: 0.05, unit: 'mm',
+    group: 'measurement',
+  },
+  MIN_CUT_MM: {
+    label: 'Smallest cut worth recording', default: 1, min: 0.2, max: 10, step: 0.1, unit: 'mm',
+    group: 'measurement',
+  },
+  MAX_CUT_MM: {
+    label: 'Largest plausible cut', default: 25, min: 5, max: 100, step: 1, unit: 'mm',
+    group: 'measurement',
+  },
+  MAX_SCALE_RESIDUAL: {
+    label: 'Diameter drift before a change is a shove', default: 0.03,
+    min: 0.005, max: 0.2, step: 0.005, unit: '',
+    group: 'measurement',
+  },
+  SLICE_MAJOR_TOLERANCE: {
+    label: 'Slice long side vs stub diameter', default: 0.15,
+    min: 0.02, max: 0.5, step: 0.01, unit: '',
+    group: 'measurement',
+  },
+  MAX_SLICE_ASPECT: {
+    label: 'Squarest a blob may be and still be edge-on', default: 0.6,
+    min: 0.1, max: 0.95, step: 0.05, unit: '',
+    group: 'measurement',
+  },
+  /**
+   * Counted in frames, so it has to be read against the frame rate the pipeline actually
+   * achieves -- about 8fps at 720p. Five frames is therefore ~600ms, which is the interval
+   * intended: nobody cuts twice that fast with a bench scraper, and the slice still has to be
+   * moved clear. At the 15 this started at the camera would have ignored nearly two seconds.
+   */
+  REFRACTORY_FRAMES: {
+    label: 'Ignore after a cut', default: 5, min: 0, max: 120, step: 1, unit: 'frames',
+    group: 'measurement',
+  },
+  BUDGET_SLACK: {
+    label: 'Recorded plus remaining, over original', default: 1.05,
+    min: 1, max: 1.5, step: 0.01, unit: '',
+    group: 'measurement',
+  },
+  /**
+   * DECISIONS entry 4: the two methods measure genuinely different quantities -- side-profile is
+   * perpendicular, stub-delta is axial, and on a slanted cut they differ by cos(angle). So this
+   * is a reporting threshold and never a gate. A disagreement is information, not a reason to
+   * discard a record.
+   */
+  CROSSCHECK_TOLERANCE_MM: {
+    label: 'Cross-check agreement', default: 1.5, min: 0.1, max: 10, step: 0.1, unit: 'mm',
+    group: 'measurement',
   },
 
   // --- scoring ---------------------------------------------------------------
+  /**
+   * 6mm, not master spec 7.4's 3mm, and the tolerance is 2mm rather than 0.5mm.
+   * DECISIONS entry 14 carries the argument; the short version is arithmetic.
+   *
+   * accuracy = exp(-|mean - target| / tolerance). Against a 3mm target at 0.5mm tolerance a
+   * 6mm mean scores 0.0025 and an 8mm mean scores 0.000045. A person cutting a cucumber with a
+   * blunt bench scraper produces 5-10mm rounds, so every score on the board would have read
+   * zero all night -- not because the measurement failed, but because the target was set for a
+   * knife skill nobody in the room has.
+   *
+   * The spec's own demo beat expects "6.1mm average, +/-3.2mm" improving to "+/-1.4mm". That
+   * beat is carried by SIGMA, which is what actually improves in ninety seconds. Targeting 6mm
+   * keeps the accuracy term on a live gradient too (0.61 at 5mm, 1.0 at 6mm, 0.37 at 8mm) so
+   * both halves of the score move. The slider still reaches 0.5mm for anyone who wants it.
+   */
   TARGET_THICKNESS_MM: {
-    label: 'Target thickness', default: 3, min: 0.5, max: 30, step: 0.1, unit: 'mm',
+    label: 'Target thickness', default: 6, min: 0.5, max: 30, step: 0.1, unit: 'mm',
+    group: 'scoring',
   },
   TOLERANCE_MM: {
-    label: 'Thickness tolerance', default: 0.5, min: 0.1, max: 5, step: 0.1, unit: 'mm',
+    label: 'Thickness tolerance', default: 2, min: 0.1, max: 5, step: 0.1, unit: 'mm',
+    group: 'scoring',
   },
   TARGET_SIGMA_MM: {
-    label: 'Target sigma', default: 0.5, min: 0.1, max: 5, step: 0.1, unit: 'mm',
+    label: 'Target sigma', default: 2, min: 0.1, max: 5, step: 0.1, unit: 'mm',
+    group: 'scoring',
   },
+  /**
+   * Retained although nothing measures an angle yet. One fixed camera cannot resolve cut slant,
+   * so every record leaves angleDeviationDeg undefined and scoreSession renormalises the two
+   * surviving weights rather than defaulting the angle to zero. Kept because this is the key a
+   * second camera would populate, and scoring.ts already reads it when one does.
+   */
   ANGLE_TOLERANCE_DEG: {
     label: 'Angle tolerance', default: 5, min: 0.5, max: 45, step: 0.5, unit: 'deg',
-  },
-
-  // --- fragments and ribbon --------------------------------------------------
-  MAX_FRAGMENTS: {
-    label: 'Max fragments', default: 40, min: 4, max: 120, step: 1, unit: '',
-  },
-  FRAGMENT_SLEEP_S: {
-    label: 'Fragment sleep delay', default: 2, min: 0.2, max: 10, step: 0.1, unit: 's',
-  },
-  FRAGMENT_DESPAWN_S: {
-    label: 'Fragment despawn delay', default: 8, min: 1, max: 60, step: 0.5, unit: 's',
-  },
-  RIBBON_LIFETIME_S: {
-    label: 'Ribbon lifetime', default: 2, min: 0.2, max: 10, step: 0.1, unit: 's',
-  },
-
-  // --- hand safety -----------------------------------------------------------
-  CLAW_THRESHOLD: {
-    label: 'Claw extension threshold', default: 1.3, min: 1, max: 2, step: 0.01, unit: '',
-  },
-  DANGER_MM: {
-    label: 'Danger distance', default: 20, min: 2, max: 100, step: 1, unit: 'mm',
-  },
-  WARN_MM: {
-    label: 'Warning distance', default: 45, min: 5, max: 200, step: 1, unit: 'mm',
-  },
-  SAFETY_DEBOUNCE_FRAMES: {
-    label: 'Safety de-escalation frames', default: 4, min: 1, max: 30, step: 1, unit: '',
+    group: 'scoring',
   },
 
   // --- feedback --------------------------------------------------------------
-  HAPTIC_SCALE: {
-    label: 'Haptic intensity scale', default: 1, min: 0, max: 2, step: 0.05, unit: '',
+  /**
+   * Master spec 9.5: Gentle Nonna at 0, Full Service at 1.
+   *
+   * Listed there as the funniest control in the game AND as an accessibility feature, and it is
+   * genuinely both. A theatrical chef shouting at somebody already nervous about a knife is a
+   * bad first thirty seconds, and a judge who wants to be shouted at should be able to ask.
+   */
+  CHEF_INTENSITY: {
+    label: 'Chef intensity (nonna to full service)', default: 1,
+    min: 0, max: 1, step: 0.1, unit: '',
+    group: 'feedback',
+  },
+  MAX_THICKNESS_MM: {
+    label: 'Thickness reading as full intensity', default: 15,
+    min: 2, max: 60, step: 0.5, unit: 'mm',
+    group: 'feedback',
   },
   AUDIO_BASE_HZ: {
     label: 'Chop base frequency', default: 320, min: 60, max: 1200, step: 10, unit: 'Hz',
+    group: 'feedback',
   },
   AUDIO_PITCH_RANGE_HZ: {
-    label: 'Chop pitch range across accuracy', default: 480, min: 0, max: 2000, step: 10, unit: 'Hz',
+    label: 'Chop pitch range across accuracy', default: 480,
+    min: 0, max: 2000, step: 10, unit: 'Hz',
+    group: 'feedback',
   },
   AUDIO_BURST_MS: {
     label: 'Chop burst duration', default: 90, min: 10, max: 500, step: 5, unit: 'ms',
+    group: 'feedback',
   },
   AUDIO_BANDPASS_Q: {
     label: 'Chop bandpass Q', default: 6, min: 0.5, max: 30, step: 0.5, unit: '',
-  },
-
-  // --- blade geometry (consumed by BladeSystem in a later milestone) ---------
-  BLADE_LENGTH_M: {
-    label: 'Blade heel-to-tip length', default: 0.15, min: 0.04, max: 0.4, step: 0.005, unit: 'm',
-  },
-  BLADE_HEEL_OFFSET_M: {
-    label: 'Heel offset ahead of the controller grip',
-    default: 0.03, min: -0.1, max: 0.3, step: 0.005, unit: 'm',
+    group: 'feedback',
   },
 } as const satisfies Record<string, TunableDef>;
 
