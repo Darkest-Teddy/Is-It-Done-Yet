@@ -15,6 +15,9 @@ Assets/Scripts/Perception/
 ├── DetectionVisualizer.cs      runtime wireframe box, so no prefab authoring needed
 ├── IVisionProvider.cs          identify-what-it-is seam, + offline fallback
 ├── FoodPlausibility.cs         real-world size gating, food/container/ignore roles
+├── Recipe.cs                   steps, ingredients, triggers
+├── RecipeRunner.cs             the state machine. Pure C#, unit-testable
+├── RecipeRailUI.cs             left rail + you-need checklist
 ├── OpenAiVisionProvider.cs     GPT vision, via a key-holding relay
 ├── PerceptionTunables.cs       every threshold, one registry, persisted
 ├── PerceptionDebugUI.cs        in-headset tuning panel + live edge view
@@ -513,3 +516,84 @@ That is worth copying, because boxing a pan and a hob is easy and stable while b
 pepper slice is neither. A recipe state machine that knows it is on the "cutting" step does not
 need a detector to tell it there is a pepper — it needs one to tell it *when the pepper has been
 cut*, which is a much easier question.
+
+
+---
+
+## The recipe rail
+
+The piece that makes this look like the reference concept — and, more usefully, the piece that
+makes the detector's job easy.
+
+```
+Recipe.cs        steps, ingredients, triggers, and a built-in Shakshuka
+RecipeRunner.cs  the state machine. Pure C#, no UnityEngine, unit-testable
+RecipeRailUI.cs  the left rail and the "you need" checklist
+```
+
+### It inverts what perception is for
+
+Without a recipe, perception answers **"what is on this counter"** — an open question, against a
+model that knows ten foods, on a wooden surface that generates false positives all day.
+
+With a recipe, it answers **"has the pan arrived yet"** — closed, expected, easy. A step knows
+what it is waiting for, so anything that is not that simply does not matter. The false-positive
+problem does not get solved so much as become irrelevant.
+
+### Most steps are timers, and that is fine
+
+The reference says so out loud: its instruction reads **"add salt (2 sec)"**. That is a timer,
+not a detector.
+
+Detection earns its place on the steps where something *appears* or *leaves* — a pan arriving on
+the hob, the last ingredient reaching the counter. Those are easy, robust and visible. Building
+six fragile gesture detectors for steps a countdown covers better is how you lose a night.
+
+| Trigger | Use for |
+|---|---|
+| `Manual` | Anything hard to see. The safe default |
+| `Appears` / `Disappears` | A pan on the hob, a board cleared |
+| `CountAtLeast` | Cut something into pieces and count them |
+| `Seconds` | Salting, pouring, waiting — most of a recipe |
+
+### Every step is manually skippable
+
+`ManualOverride` defaults true and should stay true. Master spec rule #12: pick what survives a
+live demo. If the pan is not detected — bad light, wrong angle, somebody's arm in the way — the
+demo must not be stranded on step four in front of a judge.
+
+Right index trigger advances, left goes back. An automatic trigger that works is a nice touch; a
+manual override that always works is the difference between a demo and an apology.
+
+### The anchored instruction reuses the box that already exists
+
+The current step names an `AnchorLabel`, and whichever tracked object carries that label shows
+the instruction **instead of** its own name. The box around the pan says "add salt" while that
+step is live, then goes back to saying "pan".
+
+No new rendering, no second anchoring system. This is exactly what the reference does: it boxes
+the hob, then the hob again, then the pan — all large, stable, trivially detected objects. It
+never boxes the food.
+
+### Lazy follow, not rigid lock
+
+The rail wants to be ambient, which argues for head-locking it. But rigidly head-locked UI in a
+headset is genuinely nauseating — it never moves relative to your eye, so the vestibular system
+gets no parallax and concludes something is wrong.
+
+So there is a dead zone. The panel stays world-fixed while you look around normally, and only
+catches up once you have turned far enough that it would otherwise leave view. You can look at
+the board without it chasing you, and it is still there when you look back.
+
+`followDeadZoneDeg` defaults to 22. Below about 12 it feels glued to your face; above about 35
+it is gone when you look back for it.
+
+### Checklist polarity
+
+Bright means **still needed**, dim means found — the same polarity as the reference, where the
+two un-struck lines are the two things not yet on the counter. It reads as a shopping list,
+because that is what it is.
+
+Ingredients vision will never see (cumin, paprika) are marked `Optional` and strike through on
+progress rather than on detection. More honest than a checklist stuck forever on "1 teaspoon
+cumin", and it avoids having to explain why.

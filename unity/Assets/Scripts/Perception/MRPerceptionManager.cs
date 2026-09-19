@@ -82,6 +82,14 @@ namespace MRPerception
         private DocumentContourDetector _documentDetector;
         private DocumentRectifier _rectifier;
         private IVisionProvider _vision;
+        private RecipeRunner _recipe;
+        private readonly List<string> _visibleLabels = new();
+
+        /// <summary>
+        /// The running recipe. Read by RecipeRailUI; there is exactly one, and the manager owns
+        /// it because it is the thing holding the label stream that drives it.
+        /// </summary>
+        public RecipeRunner Recipe => _recipe;
 
         private Mat _workerMat;
         private volatile bool _busy;
@@ -161,6 +169,7 @@ namespace MRPerception
             _foodDetector = new YoloFoodDetector(path, inputSize);
             _documentDetector = new DocumentContourDetector();
             _rectifier = new DocumentRectifier();
+            _recipe = new RecipeRunner(MRPerception.Recipe.Shakshuka());
 
             _vision = visionProviderBehaviour as IVisionProvider;
             if (_vision == null)
@@ -289,6 +298,33 @@ namespace MRPerception
 
             Retire();
             RequestIdentification(results);
+            DriveRecipe();
+        }
+
+        /// <summary>
+        /// Hands the current label set to the recipe.
+        ///
+        /// This is the inversion that makes the whole thing robust. Without a recipe, perception
+        /// has to answer "what is on this counter" -- an open question, against a model that
+        /// knows ten foods, on a wooden surface that generates false positives all day. With
+        /// one, it answers "has the pan arrived yet": closed, expected, and easy. Anything that
+        /// is not what the step is waiting for simply does not matter.
+        /// </summary>
+        private void DriveRecipe()
+        {
+            if (_recipe == null) return;
+
+            _visibleLabels.Clear();
+            foreach (TrackedObject t in _tracked)
+            {
+                if (t.Vetoed || t.Hits < confirmFrames) continue;
+                // The identified name where there is one -- "pepper" beats "broccoli" for
+                // matching a recipe, and the whole point of the vision provider is that it
+                // knows words COCO does not.
+                _visibleLabels.Add(string.IsNullOrEmpty(t.DisplayLabel) ? t.Label : t.DisplayLabel);
+            }
+
+            _recipe.Observe(_visibleLabels, Time.realtimeSinceStartup);
         }
 
         /// <summary>
@@ -452,7 +488,11 @@ namespace MRPerception
             }
             else if (match.Visualizer != null)
             {
-                match.Visualizer.Apply(match.Position, match.Rotation, scale, match.DisplayLabel);
+                string shown = match.DisplayLabel;
+                string instruction = _recipe?.InstructionFor(shown)
+                                     ?? _recipe?.InstructionFor(match.Label);
+                if (!string.IsNullOrEmpty(instruction)) shown = instruction;
+                match.Visualizer.Apply(match.Position, match.Rotation, scale, shown);
             }
         }
 
