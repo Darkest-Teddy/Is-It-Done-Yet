@@ -1,0 +1,26 @@
+{
+  "name": "mise",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0 <23.0.0-0 || >=24.0.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test:core": "vitest run src/core",
+    "check:purity": "node scripts/check-purity.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run check:purity && npm run typecheck && vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.1",
+    "typescript": "~5.9.3",
+    "vite": "^7.1.4",
+    "vitest": "^5.0.1"
+  },
+  "dependencies": {
+    "@techstark/opencv-js": "^5.0.0-release.1"
+  }
+}
