@@ -1,5 +1,5 @@
 {
-  "name": "mise",
+  "name": "is-it-done-yet",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -12,15 +12,19 @@
     "test:core": "vitest run src/core",
     "check:purity": "node scripts/check-purity.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "npm run check:purity && npm run typecheck && vitest run"
+    "test": "npm run check:purity && npm run typecheck && vitest run",
+    "dev:usb": "node -e \"process.env.VITE_HTTPS='0';require('child_process').spawn(process.platform==='win32'?'npx.cmd':'npx',['vite'],{stdio:'inherit',env:process.env})\"",
+    "adb:reverse": "adb reverse tcp:8081 tcp:8081"
   },
   "devDependencies": {
     "@types/node": "^26.6.1",
+    "@vitejs/plugin-basic-ssl": "^2.3.0",
     "typescript": "~5.9.3",
     "vite": "^7.1.4",
     "vitest": "^5.0.1"
   },
   "dependencies": {
+    "@iwsdk/core": "^0.5.3",
     "@techstark/opencv-js": "^5.0.0-release.1"
   }
 }

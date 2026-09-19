@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Is It Done Yet</title>
+    <!--
+      PWA wiring. Quest shows "Install" only when all three are present: a linked manifest with
+      reachable icons, a service worker with a fetch handler, and a secure origin. Any one
+      missing and the option simply never appears, with nothing said about why.
+    -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#8ee06a" />
+    <link rel="icon" href="/icons/icon-192.png" />
+    <style>
+      :root {
+        --bg: #0d0f12; --panel: #161a20; --line: #262c35;
+        --ink: #e8ecf1; --dim: #8b95a1; --accent: #8ee06a; --bad: #e06a6a;
+        color-scheme: dark;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0; background: var(--bg); color: var(--ink);
+        font: 400 14px/1.5 ui-sans-serif, system-ui, -apple-system, sans-serif;
+      }
+      /* IWSDK mounts its canvas here and sizes to the container, so it needs real height. */
+      #scene { position: fixed; inset: 0; }
+      #boot {
+        position: fixed; left: 16px; top: 16px; z-index: 10; max-width: min(560px, calc(100vw - 32px));
+        padding: 14px 16px; background: var(--panel); border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+      #boot h1 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
+      #boot p { margin: 0 0 6px; font-size: 12px; color: var(--dim); }
+      #boot code {
+        font: 400 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+        color: var(--accent); word-break: break-word;
+      }
+      #boot .bad { color: var(--bad); }
+    </style>
+  </head>
+  <body>
+    <div id="scene"></div>
+    <div id="boot">
+      <h1>is it done yet · headset</h1>
+      <p id="boot-status">starting…</p>
+      <p>
+        Camera findings print to the console as <code>[mise:xr]</code>. This build exists to
+        answer whether Quest Browser exposes any camera to <code>getUserMedia</code> — IWSDK has
+        no passthrough-specific API.
+      </p>
+    </div>
+    <script type="module">
+      import { boot } from '/src/xr/index.ts';
+
+      const status = document.getElementById('boot-status');
+      const scene = document.getElementById('scene');
+
+      // Registered but never awaited: a failed registration must not stop the app booting, and
+      // on an insecure origin it always fails. The app works fine without it — only the
+      // Install option and offline launch depend on it.
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').catch((err) => {
+          console.info('[mise:xr] service worker not registered (needs HTTPS or localhost)', err);
+        });
+      }
+
+      // Surfaced on the page as well as the console: reading a headset console means plugging
+      // into adb, and the whole point of this build is a finding you can get to in one look.
+      boot(scene)
+        .then(() => { status.textContent = 'booted — see console for camera findings'; })
+        .catch((err) => {
+          status.textContent = `boot failed: ${err?.message ?? err}`;
+          status.className = 'bad';
+          console.error('[mise:xr] boot threw', err);
+        });
+    </script>
+  </body>
+</html>

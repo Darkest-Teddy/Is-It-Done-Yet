@@ -141,6 +141,50 @@ async function cameraSource(): Promise<Source | null> {
 }
 
 /**
+ * A screen or browser tab, captured live.
+ *
+ * This is how the Quest's passthrough reaches the pipeline without solving the harder problem.
+ * Cast the headset to `meta.com/casting`, then pick that tab here: the laptop does the seeing,
+ * the headset only supplies the view. It sidesteps the open question of whether Quest Browser
+ * exposes any camera to `getUserMedia` -- which IWSDK cannot answer either, since its
+ * `CameraUtils` is a `getUserMedia` wrapper with no passthrough-specific API behind it.
+ *
+ * The cost is honest and worth stating: a cast stream is re-encoded and carries the headset's
+ * UI overlays, so colours are less faithful than a direct camera. Since `identify` separates
+ * carrot from orange on about four degrees of hue, expect the profile tolerances to need
+ * widening against a cast feed compared with a webcam.
+ */
+async function screenSource(): Promise<Source | null> {
+  try {
+    const video = document.createElement('video');
+    video.playsInline = true;
+    video.muted = true;
+
+    // 15fps: the analysis is far slower than the stream anyway, and asking for 60 just makes
+    // the encoder work harder for frames that are dropped on the floor.
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+      video: { frameRate: 15 },
+      audio: false,
+    });
+    video.srcObject = stream;
+    await video.play();
+    const grabber = new FrameGrabber(video);
+
+    // Stopping the share from Chrome's own "stop sharing" bar ends the track without telling
+    // the page. Without this the canvas freezes on the last frame and looks like a hang.
+    const [track] = stream.getVideoTracks();
+    track?.addEventListener('ended', () => {
+      status('screen share ended -- pick a source again');
+    });
+
+    return () => grabber.grab();
+  } catch (error) {
+    console.warn('[mise] screen capture unavailable or cancelled:', error);
+    return null;
+  }
+}
+
+/**
  * Still images, fed by drop, paste or the file picker.
  *
  * Returns null until something has been loaded, which the render loop already treats as "this
@@ -214,9 +258,26 @@ async function start(): Promise<void> {
     source = images.source;
   });
 
+  // Screen capture is requested lazily: the browser shows a picker dialog, and popping that on
+  // page load would be hostile when most sessions want the camera.
+  let screen: Source | null = null;
+  const requestScreen = (): void => {
+    status('pick the window or tab to capture…');
+    void screenSource().then((ready) => {
+      if (ready === null) {
+        status('screen capture cancelled');
+        modes.value = 'test';
+        source = synthetic;
+        return;
+      }
+      screen = ready;
+      if (modes.value === 'screen') source = ready;
+    });
+  };
+
   const modes = dropdown('source');
   for (const [value, text] of [
-    ['camera', 'camera'], ['image', 'image'], ['test', 'test pattern'],
+    ['camera', 'camera'], ['screen', 'screen / cast'], ['image', 'image'], ['test', 'test pattern'],
   ] as const) {
     const option = document.createElement('option');
     option.value = value;
@@ -229,6 +290,13 @@ async function start(): Promise<void> {
   modes.addEventListener('change', () => {
     if (modes.value === 'image') {
       source = images.source;
+      return;
+    }
+    if (modes.value === 'screen') {
+      // Always re-prompt rather than reusing a stopped share: a screen track the user ended
+      // still returns frames from the grabber, frozen on its last one.
+      if (screen !== null) source = screen;
+      requestScreen();
       return;
     }
     if (modes.value !== 'camera') {

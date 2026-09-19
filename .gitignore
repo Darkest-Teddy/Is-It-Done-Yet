@@ -1,5 +1,10 @@
 node_modules/
 dist/
 .vite/
-.iwsdk/
 *.local
+
+# Secrets. `*.local` already covers Vite's .env.local, but NOT a plain .env -- and this repo
+# has a public remote, so a Gemini key committed here is a key published to the internet.
+.env
+.env.*
+!.env.example
