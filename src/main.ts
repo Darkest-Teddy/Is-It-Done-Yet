@@ -19,6 +19,9 @@ import {
   DEFAULT_TRACK_OPTIONS, emptyTrack, observe,
   type TrackBlob, type TrackOptions, type TrackState,
 } from './core/track.js';
+import type { Effect, GameState } from './core/voice/tools.js';
+import { createAssistant, heardHandler } from './voice/assistant.js';
+import { bestProvider, type SpeechProvider } from './voice/stt.js';
 import { DEFAULT_CAMERA_OPTIONS, FrameGrabber, listCameras, open } from './vision/camera.js';
 import { type Blob, segment, type SegmentOptions, useOpenCv } from './vision/segment.js';
 import { decodeToImageData, firstImage } from './vision/imageSource.js';
@@ -134,6 +137,16 @@ function saveBoard(entries: readonly Entry[]): void {
   try { localStorage.setItem(BOARD_STORE, JSON.stringify(entries)); } catch { /* ignore */ }
 }
 
+/**
+ * Pulls each slider back into agreement with its tunable.
+ *
+ * Needed because the sliders are no longer the only thing that writes a tunable -- the chef
+ * can be told "make it four millimetres" and will set one directly. A slider still showing 6
+ * while the session is scored against 4 is worse than having no slider at all, because rule
+ * #11 has trained everyone to believe it.
+ */
+const resyncSliders = new Map<TunableKey, () => void>();
+
 function slider(view: { key: TunableKey; label: string; unit: string;
   min: number; max: number; step: number; value: number; }): void {
   const wrap = document.createElement('label');
@@ -153,8 +166,18 @@ function slider(view: { key: TunableKey; label: string; unit: string;
     show(input.value);
     saveTunables();
   });
+  resyncSliders.set(view.key, () => {
+    input.value = String(tunable(view.key));
+    show(input.value);
+  });
   wrap.append(name, out, input);
   controls.append(wrap);
+}
+
+/** Call after anything but a slider drag changes a tunable. */
+function resync(key: TunableKey): void {
+  resyncSliders.get(key)?.();
+  saveTunables();
 }
 
 function dropdown(label: string): HTMLSelectElement {
@@ -502,6 +525,134 @@ async function start(): Promise<void> {
     renderBoard();
   });
   controls.append(reset, save);
+
+  // ---- The chef's ears -------------------------------------------------------------------
+  //
+  // Master spec 9.2: the agent reads live game state and changes the game. Everything it
+  // decides lives in src/core/voice, which is pure and tested; this block is only the wiring.
+  //
+  // Nothing here is on the render path. Speech arrives on its own events, and the answer is
+  // computed from a state snapshot, so a slow or absent recogniser cannot cost a frame.
+
+  /** Free practice is not in the recipe table, so it is described as one on demand. */
+  const freePractice = (): Recipe => ({
+    id: 'free', name: 'free practice', ingredient: 'cucumber',
+    targetThicknessMm: tunable('TARGET_THICKNESS_MM'),
+    toleranceMm: tunable('TOLERANCE_MM'),
+    targetSigmaMm: tunable('TARGET_SIGMA_MM'),
+    sliceCount: 8,
+    note: 'Targets come from the sliders.',
+  });
+
+  const voiceState = (): GameState => ({
+    score: scoreSession(session.records, scoringOptions()),
+    recipe: activeRecipe ?? freePractice(),
+    intensity: tunable('CHEF_INTENSITY'),
+    // Owned by the assistant, which overwrites this before use.
+    lastLine: null,
+  });
+
+  const applyEffect = (effect: Effect): void => {
+    switch (effect.kind) {
+      case 'setTarget':
+        // A spoken thickness is an explicit instruction, so it drops the ticket rather than
+        // fighting it -- a ticket's target is part of the ticket, and silently disagreeing
+        // with the panel is how the score stops matching what is on screen.
+        activeRecipe = null;
+        tickets.value = '';
+        setTunable('TARGET_THICKNESS_MM', effect.mm);
+        resync('TARGET_THICKNESS_MM');
+        renderTicket();
+        break;
+      case 'setRecipe':
+        activeRecipe = RECIPES.find((r) => r.id === effect.id) ?? null;
+        tickets.value = effect.id;
+        resetSession();
+        break;
+      case 'setIntensity':
+        setTunable('CHEF_INTENSITY', effect.intensity);
+        resync('CHEF_INTENSITY');
+        break;
+      case 'reset':
+        resetSession();
+        break;
+      case 'stop':
+        // The assistant has already stopped the provider; reflect it in the button.
+        break;
+    }
+    voiceButton.textContent = listenLabel();
+  };
+
+  let speech: SpeechProvider | null = null;
+  const assistant = createAssistant({
+    // Built lazily so the recogniser is only constructed once the player asks for it, and the
+    // provider reference stays available to the effect handler above.
+    provider: {
+      name: 'typed', available: true,
+      start: () => speech?.start(), stop: () => speech?.stop(),
+      listening: () => speech?.listening() ?? false,
+    },
+    state: voiceState,
+    apply: applyEffect,
+    speak: (bark) => chef.say(bark),
+    onReply: (reply) => { heardEl.textContent = reply.line; },
+    onError: (message) => status(message),
+  });
+
+  const onHeard = heardHandler(assistant, (heard) => {
+    // Interim text included: seeing the transcript form is what tells a player the microphone
+    // is working, and it is the difference between "it is not listening" and "it misheard me".
+    transcriptEl.textContent = heard.text;
+    transcriptEl.classList.toggle('interim', !heard.final);
+  });
+
+  speech = bestProvider({ onHeard, onError: (message) => status(message) });
+
+  const listenLabel = (): string =>
+    speech?.listening() === true ? 'Stop listening' : `Listen (${speech?.name ?? 'none'})`;
+
+  const voiceButton = document.createElement('button');
+  voiceButton.id = 'listen';
+  voiceButton.addEventListener('click', () => {
+    // Doubles as the audio-unblocking gesture, same as "New cucumber".
+    void chop?.resume();
+    if (speech?.listening() === true) assistant.stop(); else assistant.start();
+    voiceButton.textContent = listenLabel();
+  });
+  voiceButton.textContent = listenLabel();
+
+  /**
+   * The typed path, always present.
+   *
+   * Quest Browser does not implement the Web Speech API and venue wifi will not cooperate, so
+   * this is not a debug affordance -- it is the tier that still works, and the one to demo
+   * from if the room is loud.
+   */
+  const typeIn = document.createElement('input');
+  typeIn.type = 'text';
+  typeIn.id = 'ask';
+  typeIn.placeholder = 'hey chef, is it done yet?';
+  typeIn.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' || typeIn.value.trim() === '') return;
+    void chop?.resume();
+    assistant.hear(typeIn.value);
+    transcriptEl.textContent = typeIn.value;
+    transcriptEl.classList.remove('interim');
+    typeIn.value = '';
+  });
+
+  const voiceWrap = document.createElement('div');
+  voiceWrap.id = 'voice';
+  const transcriptEl = document.createElement('div');
+  transcriptEl.id = 'transcript';
+  const heardEl = document.createElement('div');
+  heardEl.id = 'chefline';
+  voiceWrap.append(voiceButton, typeIn, transcriptEl, heardEl);
+  controls.append(voiceWrap);
+
+  if (speech.name === 'typed') {
+    status('speech recognition unavailable in this browser -- type to the chef instead');
+  }
 
   const drop = document.createElement('div');
   drop.id = 'drop';

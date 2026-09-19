@@ -19,3 +19,4 @@ unity/*.sln
 unity/*.user
 # The ONNX weights are ~6MB of binary that regenerates from one ultralytics command.
 unity/Assets/StreamingAssets/*.onnx
+results/
