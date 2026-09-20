@@ -9,9 +9,11 @@ and tells you how thick your slices actually were — in millimetres you can che
 
 No headset. One camera. Everything on this page runs in the browser, locally, with no network.
 
-**This repo holds two builds.** This README covers the browser app in `src/`. There is also a
-Quest 3/3S MR perception app in `unity/` — see `unity/README.md`. Neither is the Quest/IWSDK
-cooking simulation that `CLAUDE.md` describes; that code is not in this repository.
+**This repo holds three builds.** This README covers the browser app in `src/`. There is also a
+Quest 3/3S MR perception slice in `unity/Assets/Scripts/Perception/` (see `unity/README.md`),
+and a full Quest 3S mixed-reality cooking coach — **[docs/MR-COACH.md](docs/MR-COACH.md)** —
+which is now what `unity/` actually opens as. None of them is the Quest/IWSDK cooking
+simulation that `CLAUDE.md` describes; that code is not in this repository.
 
 ---
 

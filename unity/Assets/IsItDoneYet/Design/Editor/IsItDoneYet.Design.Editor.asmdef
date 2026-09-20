@@ -1,0 +1,21 @@
+{
+    "name": "IsItDoneYet.Design.Editor",
+    "rootNamespace": "IsItDoneYet.Design.Editor",
+    "references": [
+        "IsItDoneYet.Core",
+        "IsItDoneYet.Design",
+        "Unity.TextMeshPro",
+        "Unity.TextMeshPro.Editor"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

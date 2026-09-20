@@ -1,0 +1,15 @@
+{
+  "name": "design-extract",
+  "private": true,
+  "type": "module",
+  "description": "Scratch tooling. Renders design/design-reference.html, screenshots every screen, dumps computed styles, and rasterises the bundled icons. Nothing here ships.",
+  "scripts": {
+    "render": "node render.mjs",
+    "icons": "node icons.mjs",
+    "fonts": "node fonts.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.58.0",
+    "sharp": "^0.34.4"
+  }
+}

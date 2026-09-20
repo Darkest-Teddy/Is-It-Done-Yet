@@ -1,0 +1,133 @@
+{
+  "png": [
+    {
+      "name": "patty",
+      "uuid": "b130c870-60f4-41f3-96c9-d48a683bae69",
+      "nativeSize": "160x160",
+      "exported": "256x256"
+    },
+    {
+      "name": "onion",
+      "uuid": "a156d2df-7bfa-47ee-a685-7edc3c1a12f5",
+      "nativeSize": "160x160",
+      "exported": "256x256"
+    },
+    {
+      "name": "egg",
+      "uuid": "e66f31d7-06f8-418e-967f-93e1efba1b76",
+      "nativeSize": "160x160",
+      "exported": "256x256"
+    },
+    {
+      "name": "cheese",
+      "uuid": "29260903-14e4-4882-aff6-157d2c9d3e61",
+      "nativeSize": "160x160",
+      "exported": "256x256"
+    },
+    {
+      "name": "lettuce",
+      "uuid": "7f6501c9-d82f-4ac8-a1e2-0135defe2352",
+      "nativeSize": "160x160",
+      "exported": "256x256"
+    },
+    {
+      "name": "sauce",
+      "uuid": "1ac244c7-b4b0-4ffa-abab-dca466a2bcb0",
+      "nativeSize": "160x160",
+      "exported": "256x256"
+    },
+    {
+      "name": "mushroom",
+      "uuid": "f6566c6f-c922-482a-8381-d7f71d33006b",
+      "nativeSize": "160x160",
+      "exported": "256x256"
+    },
+    {
+      "name": "tomato",
+      "uuid": "98319357-8f96-4bc5-8968-3aee426fb2a9",
+      "nativeSize": "160x160",
+      "exported": "256x256"
+    },
+    {
+      "name": "chili",
+      "uuid": "d806e086-f15c-45e2-8c43-c45736e2c683",
+      "nativeSize": "160x160",
+      "exported": "256x256"
+    },
+    {
+      "name": "bun",
+      "uuid": "2902219d-14de-47da-8eac-00669ceb2a33",
+      "nativeSize": "160x160",
+      "exported": "256x256"
+    },
+    {
+      "name": "carrot",
+      "uuid": "57871935-b12b-4205-a6ec-ec9492b12104",
+      "nativeSize": "160x160",
+      "exported": "256x256"
+    }
+  ],
+  "svg": [
+    {
+      "name": "mark-00",
+      "source": "design/icons/svg/mark-00.svg"
+    },
+    {
+      "name": "mark-01",
+      "source": "design/icons/svg/mark-01.svg"
+    },
+    {
+      "name": "mark-02",
+      "source": "design/icons/svg/mark-02.svg"
+    },
+    {
+      "name": "bun-bottom",
+      "source": "design/icons/svg/bun-bottom.svg"
+    },
+    {
+      "name": "patty-layer",
+      "source": "design/icons/svg/patty-layer.svg"
+    },
+    {
+      "name": "cheese-layer",
+      "source": "design/icons/svg/cheese-layer.svg"
+    },
+    {
+      "name": "tomato-layer",
+      "source": "design/icons/svg/tomato-layer.svg"
+    },
+    {
+      "name": "lettuce-layer",
+      "source": "design/icons/svg/lettuce-layer.svg"
+    },
+    {
+      "name": "bun-top",
+      "source": "design/icons/svg/bun-top.svg"
+    },
+    {
+      "name": "status-ok",
+      "source": "design/icons/svg/status-ok.svg",
+      "authored": true
+    },
+    {
+      "name": "status-warn",
+      "source": "design/icons/svg/status-warn.svg",
+      "authored": true
+    },
+    {
+      "name": "status-bad",
+      "source": "design/icons/svg/status-bad.svg",
+      "authored": true
+    },
+    {
+      "name": "status-unsure",
+      "source": "design/icons/svg/status-unsure.svg",
+      "authored": true
+    },
+    {
+      "name": "camera-active",
+      "source": "design/icons/svg/camera-active.svg",
+      "authored": true
+    }
+  ]
+}

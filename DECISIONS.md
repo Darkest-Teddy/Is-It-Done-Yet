@@ -828,3 +828,76 @@ having built the switch rather than picking one.
 **Not done:** `VISION_MODELS` is the escape hatch for the next time an ID drifts, and it was
 used to run these tests before the allowlist was edited — so it is exercised, but no test pins
 it. If a model ID silently disappears again, nothing fails until someone tries it.
+
+---
+
+## 25. The Unity project is a project now, and the design comes from one JSON file
+
+`unity/` held eighteen loose C# files and a README. No `ProjectSettings/`, no
+`Packages/manifest.json`, no scene, and no `.meta` file anywhere — so every asset reference in
+it pointed at nothing and the folder could not be opened, compiled or built. Entry 22 said
+there was a second build; it did not say that the second build was not openable.
+
+It is now the real project: Unity 6000.6.2f1, URP 17.6.0 in **Linear** colour space, OpenXR
+1.18.0 with Meta XR All-in-One 205.0.0, the new Input System.
+
+The teammates' Perception scripts are untouched and gated behind an `.asmdef` with
+`defineConstraints: ["OPENCV_FOR_UNITY"]`. They need OpenCV for Unity, which nobody here has,
+plus a `PassthroughCameraSamples` namespace from an unimported sample — and an assembly that
+cannot compile takes the whole project's compilation down with it. Unity skips an assembly whose
+constraint is unmet, so the folder is inert until somebody turns it on.
+
+### The design system is generated, not written
+
+`design/design-reference.html` is the source of truth, and it is a 726KB self-extracting
+bundle: base64 assets in inline script tags, a loader that rebuilds the document, a React
+component mounted over it. There is no CSS file to read and no class name to select. So it is
+run in headless Chromium and captured — seven screens at 1x and 2x, computed styles for 154
+distinct components — and the extraction is hand-distilled once into `design/tokens.json`,
+which is then the only input to both the Unity importer and the web tooling.
+
+One file rather than two copies, because two hand-maintained palettes diverge inside a day.
+
+The importer **fails** rather than filling gaps. A colour in the JSON with no matching
+`ColorRole`, a role with no colour, a malformed hex, an easing without four control points:
+each stops the import with a message naming the key. The alternative is one magenta panel
+somebody finds in a headset three hours later.
+
+### Measuring changed a decision
+
+Every contrast ratio in `tokens.json` is computed, by a script that fails if a recorded value
+drifts, and the C# implementation of the same curve is pinned to the JavaScript one by a test.
+
+The PRACTICE theme needed an accent the reference does not have — its only cool pair is a pale
+fill with dark ink, and neither half carries light text. A second invented colour was going to
+be its text. Measuring showed the existing `#FFF3E4` scored better (4.95:1 against 4.34:1), so
+this system has one invented colour instead of two.
+
+Three of the reference's own fills measure below AA for body text. They are listed in
+`largeTextOnly` and the `Label` component refuses a too-small label on them — but the check is
+against **angular** size, not point size, because WCAG's large-text threshold is about the angle
+subtended and Meta's 24 dmm floor already exceeds it. That is why the reference gets away with
+an 11px chip label on a 3.97:1 fill, and why the first version of the guard was wrong.
+
+### Deviations from §17 of the master spec
+
+- **#11 (every magic number on a live slider)** — honoured. `DebugMenu` carries the scoring and
+  layout constants; `design/tokens.json` carries the rest and regenerates the asset.
+- **#9 (timeout and fallback on every network call)** — honoured. The three coach routes answer
+  `200` with `offline: true` rather than an error status, because the scoring engine is local
+  and an error status would make a talkative feature look broken.
+- **#10 (never block the render loop)** — honoured. One vision request in flight, frames
+  dropped rather than queued, `AsyncGPUReadback` rather than `ReadPixels`.
+- **#4 (confirmation and hysteresis before anything cosmetic)** — honoured, and leaning the
+  same way `src/core/track.ts` does: three-frame vote, two must agree, slow to confirm, because
+  a confirmed warning costs points permanently.
+- **#13 (do not fabricate sponsor integrations)** — the Groq model was chosen by reading
+  <https://console.groq.com/docs/vision> rather than from memory, which is the mistake entry 24
+  had to correct twice.
+
+### What this entry cannot claim
+
+**Nothing here has run on a headset.** It compiles in batchmode, 142 EditMode tests and 192
+server tests pass, and an Android development APK builds. No frame time, no legibility over
+passthrough, no real model call, no simulator run. Every one of those is listed as unverified
+in `docs/MR-COACH.md` rather than left to be assumed.

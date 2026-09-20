@@ -1,0 +1,30 @@
+[
+  {
+    "label": "Counter tally",
+    "file": "counter-tally@1x.png"
+  },
+  {
+    "label": "Chefs pick",
+    "file": "chefs-pick@1x.png"
+  },
+  {
+    "label": "Recipe library",
+    "file": "recipe-library@1x.png"
+  },
+  {
+    "label": "Dish card",
+    "file": "dish-card@1x.png"
+  },
+  {
+    "label": "Competitive cutting",
+    "file": "competitive-cutting@1x.png"
+  },
+  {
+    "label": "Title screen",
+    "file": "title-screen@1x.png"
+  },
+  {
+    "label": "Loading",
+    "file": "loading@1x.png"
+  }
+]

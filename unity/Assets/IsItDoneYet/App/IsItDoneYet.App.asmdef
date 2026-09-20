@@ -1,0 +1,21 @@
+{
+    "name": "IsItDoneYet.App",
+    "rootNamespace": "IsItDoneYet.App",
+    "references": [
+        "IsItDoneYet.Core",
+        "IsItDoneYet.Design",
+        "IsItDoneYet.Audio",
+        "Unity.TextMeshPro",
+        "meta.xr.mrutilitykit",
+        "Oculus.VR"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

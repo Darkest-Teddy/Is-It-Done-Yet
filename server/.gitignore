@@ -1,0 +1,4 @@
+node_modules/
+.env
+# The embedded development database. Real data, machine-local, regenerates from `npm run seed`.
+.data/
