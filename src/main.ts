@@ -6,7 +6,7 @@ import {
   add as addEntry, type Entry, entryFrom, parseEntries, positionOf, rank,
 } from './core/leaderboard.js';
 import { progressOf, type Recipe, RECIPES } from './core/recipes.js';
-import { createChef } from './audio/chef.js';
+import { createChef, speechRelayFromEnv } from './audio/chef.js';
 import { createChop } from './audio/chop.js';
 import { feedbackForCut, type FeedbackOptions } from './core/feedback.js';
 import {
@@ -388,11 +388,18 @@ async function start(): Promise<void> {
     bandpassQ: tunable('AUDIO_BANDPASS_Q'),
   }));
 
-  // Keys come from the environment, never from source. With none present the chef falls
-  // through to the browser voice, which is the tier that survives saturated venue wifi anyway.
+  // THROUGH THE RELAY, NEVER A BROWSER KEY. This used to read `VITE_ELEVENLABS_KEY` and
+  // `VITE_ELEVENLABS_VOICE`, which DECISIONS.md entry 32 measured as absent from `.env`
+  // entirely -- they were renamed to the server-side `ELEVENLABS_*` names precisely so a
+  // metered key stops being inlined into a published bundle, and nothing updated this line, so
+  // the bank had been silently unconfigured ever since. `speechRelayFromEnv` is opt-in on
+  // `VITE_SPEECH_RELAY`, so with nothing set this is exactly as it was: no requests, browser
+  // voice, and on the headset subtitles.
   const chef = createChef(chop?.context ?? null, {
-    apiKey: import.meta.env.VITE_ELEVENLABS_KEY as string | undefined,
-    voiceId: import.meta.env.VITE_ELEVENLABS_VOICE as string | undefined,
+    speechRelay: speechRelayFromEnv() ?? undefined,
+    // This app reacts to every cut, which is the one place a round trip per line is too slow
+    // (master spec 9.3). So it asks for the bank -- 32 lines, ~1000 characters, once at load.
+    preloadBank: true,
   });
 
   const renderBoard = (): void => {

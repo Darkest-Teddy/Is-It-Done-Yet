@@ -96,6 +96,20 @@ const LAYERS: readonly {
  */
 const CAMERA_WAIT_MS = 4000;
 
+/**
+ * How long the loading screen waits on the vision engine before moving on without it.
+ *
+ * The chunk is about 15MB and it is the only thing on this screen that can take real time. The
+ * number is a wifi budget rather than a preference: 15MB in 25s is about 5 Mbit/s, which is a
+ * pessimistic-but-real share of a saturated hall network, so a link that would have finished
+ * usually has. Past that the honest thing is to hand the cook a counter they can type into
+ * rather than a burger that never fills.
+ *
+ * The load is not cancelled when this expires -- see `loadVision`. It keeps going, and the
+ * counter screen's Scan button picks it up when it lands. TUNED, not sourced.
+ */
+const VISION_WAIT_MS = 25_000;
+
 /** Steps in the order they are started, bottom of the stack upward. */
 const STEP_ORDER = ['fonts', 'recipes', 'art', 'vision', 'camera', 'ready'] as const;
 
@@ -201,9 +215,13 @@ export function loadingPanel(ctx: AppContext, params: RouteParams): Panel {
     );
     complete('art');
 
-    // The expensive one. It resolves false rather than throwing when the WASM cannot be had,
-    // and the app stays usable -- every ingredient can still be entered by hand.
-    await loadVision();
+    // The expensive one, and the only step on this screen with a ceiling worth arguing about.
+    // It resolves false rather than throwing when the WASM cannot be had, and the app stays
+    // usable -- every ingredient can still be entered by hand. The ceiling is there because
+    // neither of its two slow paths ever rejects: a stalled 15MB fetch and a runtime that
+    // never announces itself both look exactly like a screen that has stopped. This panel has
+    // no rail and no Escape, so without the ceiling the only exit was the headset.
+    await loadVision(VISION_WAIT_MS);
     complete('vision');
 
     // Raced against a timeout, and that race is load-bearing rather than defensive. A camera

@@ -21,10 +21,28 @@
   overflow: hidden;
 }
 
+/*
+  Positioned out of flow, and pinned to the stage's top-left corner, because centring the board
+  through layout is what broke it.
+
+  The board is built at 1600x900. In any window narrower than that -- which is most Quest
+  Browser windows -- a `place-items: center` grid cannot centre an item larger than its
+  container: it clamps the item to the start edge rather than overflowing equally, so the
+  layout box sits at 0 instead of at -(1600 - vw)/2. Scaling about the item's own centre then
+  pushes the *visual* box right by 800(1 - scale) and down by 450(1 - scale). At 1280x720 that
+  is 160px and 90px: the design sat in blank ground on its left and top and had its right edge
+  and its entire bottom rail clipped off the window, with `overflow: hidden` making the loss
+  silent. It read as a cropped design rather than as a mispositioned one.
+
+  So the centring is arithmetic now, in `stage.ts`, where the scale already lives. The origin
+  is the top-left corner so `translate` and `scale` compose in window pixels with nothing
+  implicit in between.
+*/
 .stage__board {
-  position: relative;
-  flex: 0 0 auto;
-  transform-origin: center center;
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
 }
 
 /* The screen that hosts a stage has no header or rail of its own to make room for. */

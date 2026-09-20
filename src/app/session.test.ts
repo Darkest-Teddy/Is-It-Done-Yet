@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { Piece } from '../core/board.js';
 import type { Recipe } from '../core/recipe.js';
 import { observationConfidence } from '../core/voice/guidance.js';
-import { FULL_SERVICE_POLICY, mutedPolicy } from '../core/voice/nag.js';
+import { FULL_SERVICE_POLICY, mutedPolicy, type NagPolicy } from '../core/voice/nag.js';
 import { CoachSession } from './session.js';
 
 /**
@@ -138,5 +138,91 @@ describe('CoachSession.ingestPieces', () => {
     expect(state.board.pieceCount).toBe(3);
     expect(state.deficits.some((d) => d.ingredient === 'cucumber')).toBe(true);
     expect(state.servable).toBe(false);
+  });
+});
+
+
+/**
+ * The other half of the autonomous watch: the chef noticing something went right.
+ *
+ * Driven exactly as `src/menu/guidance.ts` drives it -- ingest every frame, ask for a
+ * correction first, ask for praise only when there is none -- because the bug this feature is
+ * most likely to have is not in either function but in the order and the cadence they are
+ * called at, and a test that calls `praise` once by hand would not see it.
+ */
+describe('CoachSession.praise', () => {
+  interface Spoken { readonly atMs: number; readonly what: string }
+
+  /** Tomato only until 5.5s, then the cucumber arrives and the dish is correct. */
+  function runRound(opts: {
+    readonly policy: NagPolicy;
+    readonly confidence: number;
+    /** False models a chef that never corrected anything -- SILENT, or simply lucky. */
+    readonly complain: boolean;
+  }): { readonly spoken: readonly Spoken[]; readonly session: CoachSession } {
+    const session = new CoachSession(RECIPE);
+    const spoken: Spoken[] = [];
+
+    for (let t = 0; t <= 30_000; t += 500) {
+      const pieces = t < 5500 ? TOMATO_ONLY : [...TOMATO_ONLY, piece('cucumber', 0)];
+      session.ingestPieces(pieces, t);
+
+      if (opts.complain) {
+        const hit = session.interruption(t, opts.confidence, opts.policy);
+        if (hit !== null) {
+          spoken.push({ atMs: t, what: `correction:${hit.key}` });
+          continue;
+        }
+      }
+      const well = session.praise(t, opts.confidence, null, opts.policy);
+      if (well !== null) spoken.push({ atMs: t, what: `praise:${well.kind}` });
+    }
+    return { spoken, session };
+  }
+
+  const FULL = { policy: FULL_SERVICE_POLICY, confidence: SURE, complain: true };
+
+  it('corrects, then is pleased once the cook has fixed it', () => {
+    const { spoken } = runRound(FULL);
+    expect(spoken.map((s) => s.what)).toEqual([
+      'correction:ingredient-missing:cucumber',
+      'praise:resolved',
+    ]);
+  });
+
+  it('waits out the chef\'s own cooldown rather than replying to itself', () => {
+    const { spoken } = runRound(FULL);
+    const correction = spoken[0]!;
+    const praise = spoken[1]!;
+    expect(praise.atMs - correction.atMs).toBeGreaterThanOrEqual(FULL_SERVICE_POLICY.cooldownMs);
+  });
+
+  it('says one thing and then stops, however much went right', () => {
+    const { spoken, session } = runRound(FULL);
+    // The steps also completed cleanly in this round. That is a second piece of good news and
+    // it is deliberately never spoken: it goes stale inside the cooldown that follows the
+    // first, which is the whole of the rate limit doing its job.
+    expect(spoken.filter((s) => s.what.startsWith('praise'))).toHaveLength(1);
+    expect(session.praiseCount).toBe(1);
+  });
+
+  it('SAYS NOTHING about a fault it never mentioned, which is the occlusion guard', () => {
+    // A hand across the lens opens every requirement as missing and closes them all when it
+    // moves. Read naively that is a cook heroically fixing four things at once.
+    const { spoken } = runRound({ ...FULL, complain: false });
+    expect(spoken.map((s) => s.what)).not.toContain('praise:resolved');
+  });
+
+  it('congratulates nobody while it cannot see the board', () => {
+    const blind = observationConfidence({
+      cameraLive: true, pieceCount: 0, meanPieceConfidence: 0.9, ageMs: 0,
+    });
+    expect(runRound({ ...FULL, confidence: blind }).spoken).toEqual([]);
+  });
+
+  it('is silent when the chef is, because SILENT has to mean silent', () => {
+    const { spoken, session } = runRound({ ...FULL, policy: mutedPolicy() });
+    expect(spoken).toEqual([]);
+    expect(session.praiseCount).toBe(0);
   });
 });

@@ -75,7 +75,19 @@ export function createStage(options: StageOptions): Stage {
 
     const raw = Math.min(box.width / width, box.height / height);
     const scale = allowUpscale ? raw : Math.min(1, raw);
-    board.style.transform = `scale(${scale})`;
+
+    // Centred here rather than by the parent's `place-items: center`, and the difference is not
+    // cosmetic. A grid clamps an item wider than its container to the start edge instead of
+    // overflowing it equally, so on any window narrower than the artboard -- most Quest Browser
+    // windows -- the board's layout box began at 0, and scaling about its own centre then
+    // shifted the drawn result right and down by half the slack. The right edge and the whole
+    // bottom rail went off the window, silently, because the stage clips. See `title.css`.
+    //
+    // With `transform-origin: 0 0` the translate is in window pixels and the two compose
+    // exactly: offset first, then scale about the corner that the offset just placed.
+    const offsetX = (box.width - width * scale) / 2;
+    const offsetY = (box.height - height * scale) / 2;
+    board.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
     return true;
   }
 

@@ -11,6 +11,7 @@ import {
   nextInterruption,
   policyForIntensity,
   recordInterruption,
+  recordSpoke,
   type NagState,
   type OpenFault,
 } from './nag.js';
@@ -199,5 +200,24 @@ describe('faultKey', () => {
 
   it('handles a whole-board fault with no ingredient', () => {
     expect(faultKey(fault({ ingredient: null }))).toBe('ingredient-missing:');
+  });
+});
+
+describe('recordSpoke -- the clock praise and correction share', () => {
+  it('moves the clock without spending the correction budget', () => {
+    const state: NagState = { spokenAtMs: { 'a:b': 10 }, lastAtMs: 10, count: 1 };
+    const after = recordSpoke(state, 5000);
+    expect(after.lastAtMs).toBe(5000);
+    expect(after.count).toBe(1);
+    expect(after.spokenAtMs).toEqual({ 'a:b': 10 });
+  });
+
+  it('makes the next correction wait, which is the whole point of sharing it', () => {
+    const open = fault({ firstSeenMs: 0 });
+    const state = recordSpoke(emptyNag(), 5000);
+    expect(nextInterruption([open], state, 6000, 0.9, FULL_SERVICE_POLICY)).toBeNull();
+    expect(
+      nextInterruption([open], state, 5000 + FULL_SERVICE_POLICY.cooldownMs, 0.9, FULL_SERVICE_POLICY),
+    ).not.toBeNull();
   });
 });

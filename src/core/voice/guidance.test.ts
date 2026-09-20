@@ -218,9 +218,9 @@ describe('localGuidance -- the answer with no model in it', () => {
     expect(g.speech).toMatch(/nothing is wrong/i);
   });
 
-  it('marks an unprompted answer as unprompted', () => {
-    expect(localGuidance(ctx(), false).prompted).toBe(false);
-    expect(localGuidance(ctx()).prompted).toBe(true);
+  it('marks an unprompted answer as a correction, and an asked-for one as an answer', () => {
+    expect(localGuidance(ctx(), false).tone).toBe('correction');
+    expect(localGuidance(ctx()).tone).toBe('answer');
   });
 });
 
@@ -276,7 +276,7 @@ describe('parseModelGuidance -- fallback selection', () => {
       overlay: 'Slice thinner',
       text: 'Thick rounds will not sit flat.',
       source: 'model',
-      prompted: true,
+      tone: 'answer',
     });
   });
 
@@ -322,9 +322,9 @@ describe('parseModelGuidance -- fallback selection', () => {
     expect(g.overlay.split(' ')).toHaveLength(OVERLAY_MAX_WORDS);
   });
 
-  it('keeps the prompted flag from the answer it is replacing', () => {
+  it('keeps the tone of the answer it is replacing', () => {
     const unprompted = localGuidance(ctx(), false);
-    expect(parseModelGuidance('{"speech":"go"}', unprompted).prompted).toBe(false);
+    expect(parseModelGuidance('{"speech":"go"}', unprompted).tone).toBe('correction');
   });
 });
 

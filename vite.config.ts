@@ -1,6 +1,78 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import basicSsl from '@vitejs/plugin-basic-ssl';
 import { defineConfig, type Plugin } from 'vite';
+
+/**
+ * Stamps the built service worker with a build id derived from what the build emitted.
+ *
+ * `public/sw.js` is copied verbatim -- it is a service worker, not a module, so it never goes
+ * through the bundler and cannot read `import.meta.env`. It therefore carried a hand-maintained
+ * `'iidy-v1'` that nobody bumped, which meant a worker registered by an earlier build kept
+ * serving its cached copies and a new deploy did not appear. That was observed, not predicted:
+ * the same worker was seen serving a cached production bundle over the dev server on localhost.
+ * On a headset the consequence is worse, because the headset is the client most likely to have
+ * opened the site before and is the one the demo runs on.
+ *
+ * THE ID IS DERIVED, NOT A TIMESTAMP, and that is the load-bearing choice. A timestamp changes
+ * on every build whether or not anything did, and `sw.js`'s `activate` drops every cache that
+ * is not current -- so a timestamp would re-download the 15.5MB OpenCV chunk on every deploy,
+ * which is the exact cost that cache exists to avoid. Hashing the emitted file names and sizes
+ * means two builds of the same tree produce the same worker, and a worker that did not change
+ * is one the browser does not act on at all.
+ */
+function serviceWorkerVersion(): Plugin {
+  return {
+    name: 'service-worker-version',
+    apply: 'build',
+    // `closeBundle`, not `generateBundle`: files in `public/` are copied straight to the output
+    // directory and never appear in the bundle object, so there is nothing to rewrite until the
+    // copy has happened.
+    closeBundle() {
+      const out = 'dist';
+      const worker = join(out, 'sw.js');
+
+      // Both failures below are `this.error`, which throws and fails the build. A warning
+      // would be worse than nothing: an unstamped worker keeps the previous build's shell
+      // cache key, so `activate` never purges it and the old `app.html` survives the deploy --
+      // and the symptom is a headset showing the old UI after a push that reported success.
+      // That is invisible from the build log, so the build is where it has to stop.
+      let source: string;
+      try {
+        source = readFileSync(worker, 'utf8');
+      } catch {
+        this.error(`${worker} is missing -- the service worker cache cannot be busted`);
+        return;
+      }
+
+      const parts: string[] = [];
+      const walk = (dir: string): void => {
+        for (const entry of readdirSync(dir).sort()) {
+          const full = join(dir, entry);
+          const info = statSync(full);
+          if (info.isDirectory()) { walk(full); continue; }
+          if (full === worker) continue; // the worker cannot hash itself
+          parts.push(`${relative(out, full).replace(/\\/g, '/')}:${info.size}`);
+        }
+      };
+      walk(out);
+
+      const id = createHash('sha256').update(parts.join('\n')).digest('hex').slice(0, 12);
+      const stamped = source.replace(/const BUILD_ID = '[^']*';/, `const BUILD_ID = '${id}';`);
+      if (stamped === source) {
+        this.error(
+          "public/sw.js has no `const BUILD_ID = '...';` line to stamp -- the deployed worker "
+          + 'would keep the previous build\'s shell cache and serve the old UI',
+        );
+        return;
+      }
+      writeFileSync(worker, stamped);
+      // eslint-disable-next-line no-console
+      console.log(`[sw] build id ${id}`);
+    },
+  };
+}
 
 /**
  * Catches results POSTed by `public/quest-check.html` and writes them to `results/`.
@@ -160,8 +232,9 @@ const useHttps = process.env['VITE_HTTPS'] !== '0';
 
 export default defineConfig({
   plugins: useHttps
-    ? [questResults(), guidanceRelay(), speechRelay(), visionRelay(), basicSsl()]
-    : [questResults(), guidanceRelay(), speechRelay(), visionRelay()],
+    ? [questResults(), guidanceRelay(), speechRelay(), visionRelay(), serviceWorkerVersion(),
+      basicSsl()]
+    : [questResults(), guidanceRelay(), speechRelay(), visionRelay(), serviceWorkerVersion()],
 
   // 0.0.0.0 so the headset, a phone, or the Beam Pro on the same LAN can open it.
   server: { host: '0.0.0.0', port: 8081, open: false },

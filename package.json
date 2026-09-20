@@ -22,8 +22,8 @@
     "dev:usb": "node -e \"process.env.VITE_HTTPS='0';require('child_process').spawn('npx',['vite'],{stdio:'inherit',env:process.env,shell:true})\"",
     "adb:reverse": "adb reverse tcp:8081 tcp:8081",
     "build:pages": "node -e \"process.env.VITE_BASE='/Is-It-Done-Yet/';require('child_process').spawn('npx',['vite','build'],{stdio:'inherit',env:process.env,shell:true})\"",
-    "start": "node server/static.mjs",
-    "build:deploy": "node -e \"process.env.VITE_SOURCEMAP='0';require('child_process').spawn('npx',['vite','build'],{stdio:'inherit',env:process.env,shell:true})\"",
+    "start": "node --env-file-if-exists=.env server/static.mjs",
+    "build:deploy": "node scripts/build-deploy.mjs",
     "serve:dist": "npm run build:deploy && node server/static.mjs"
   },
   "devDependencies": {

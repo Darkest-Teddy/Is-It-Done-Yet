@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allLines, type BarkOptions, pickBark } from './barks.js';
+import { allLines, barkFor, type BarkOptions, pickBark } from './barks.js';
 import type { CutFeedback } from './feedback.js';
 import type { CutRecord } from './metrics.js';
 import type { Score } from './scoring.js';
@@ -85,5 +85,25 @@ describe('allLines', () => {
     expect(lines.length).toBeGreaterThan(20);
     expect(new Set(lines).size).toBe(lines.length);
     for (const line of lines) expect(line.trim()).toBe(line);
+  });
+});
+
+describe('barkFor -- a line of a named kind, with no cut to judge', () => {
+  it('returns a line the bank actually holds, which is what lets a headset speak it', () => {
+    for (const kind of ['perfect', 'close', 'improving'] as const) {
+      const bark = barkFor(kind, 1, () => 0);
+      expect(bark.kind).toBe(kind);
+      expect(allLines()).toContain(bark.line);
+    }
+  });
+
+  it('follows the intensity slider the same way pickBark does', () => {
+    expect(barkFor('perfect', 0, () => 0).line).not.toBe(barkFor('perfect', 1, () => 0).line);
+  });
+
+  it('never indexes past the end of a line set, whatever the generator returns', () => {
+    for (const r of [-1, 0, 0.999, 1, 7]) {
+      expect(barkFor('improving', 1, () => r).line).not.toBeUndefined();
+    }
   });
 });

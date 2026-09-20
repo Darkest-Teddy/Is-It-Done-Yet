@@ -38,11 +38,20 @@ import {
  * `speechSynthesis` is *absent* there, not unreliable, so the headset falls from tier 1 straight
  * to tier 4 and every model-written answer was a subtitle. Tier 2 exists for that device.
  *
- * TIER 2 GOES THROUGH A RELAY AND TIER 1 DOES NOT, deliberately. `.env.example` warns that a
- * `VITE_`-prefixed key is inlined into the client bundle and readable by anyone who opens the
- * page, and this repo publishes a built app. The bank predates that concern and keeps its
- * browser-side key because it runs once, at load, on a booth laptop we own; the on-demand tier
- * runs on whatever device opens the deployed URL, so its key lives in `server/speech.mjs`.
+ * BOTH TIERS NOW GO THROUGH THE RELAY. This changed in DECISIONS.md entry 34 and the reason is
+ * a measurement rather than a preference. `.env.example` has always warned that a `VITE_`-
+ * prefixed key is inlined into the client bundle and readable by anyone who opens the page,
+ * and this repo publishes a built app; entry 28 nevertheless left the bank on a browser key on
+ * the argument that it runs once, at load, on a booth laptop we own. Entry 32 then measured
+ * what that actually meant: `VITE_ELEVENLABS_KEY` and `VITE_ELEVENLABS_VOICE` do not exist in
+ * `.env` at all, so the bank was unconfigured everywhere, and the menu app never passed them
+ * in the first place -- so tier 1 had never once fired outside a test. Generating the bank
+ * through `server/speech.mjs` costs one extra hop at load and makes the pre-generated tier
+ * real on the headset, where it is the only tier that arrives with the cut.
+ *
+ * The browser-key path is still accepted, because a laptop at a booth with no server running
+ * is a real situation and it is thirty lines to keep. It is the fallback, not the default, and
+ * nothing in this repo configures it.
  */
 
 export type AudioSource = AudioContext | null | (() => AudioContext | null);
@@ -60,6 +69,17 @@ export interface ChefOptions {
   readonly speechRelay?: string;
   /** Per-request ceiling for one on-demand line. Shorter than the bank's -- see below. */
   readonly speechTimeoutMs?: number;
+  /**
+   * Generate the whole bark bank through the relay at load. Tier 1, without a browser key.
+   *
+   * OFF BY DEFAULT, and the default is the interesting half. A relay-configured chef that
+   * pre-generated on its own would fire thirty-two requests the moment the page mounted, and
+   * would have to build an `AudioContext` to decode them into -- both of which entry 28
+   * deliberately avoided, and both of which it verified by counting requests rather than by
+   * assuming. The menu app therefore keeps its on-demand-only posture and nothing about it
+   * changes; `main.ts`, the laptop app that reacts to every cut, asks for the bank explicitly.
+   */
+  readonly preloadBank?: boolean;
 }
 
 export interface Chef {
@@ -209,9 +229,39 @@ export function createChef(audio: AudioSource, options: ChefOptions = {}): Chef 
 
   // -------------------------------------------------------------------------------- tier 1
 
+  /**
+   * One line of the bank, from whichever door is configured.
+   *
+   * The relay is preferred: it holds the key server-side and it is the same handler the
+   * on-demand tier uses, so the two tiers are two renderings of one voice rather than two
+   * configurations that have to be kept in step. A browser key is only reached when no relay
+   * is set, which is the booth-laptop case and nothing this repo configures.
+   */
+  const fetchBankLine = async (line: string, timeoutMs: number): Promise<ArrayBuffer | null> => {
+    const { apiKey, voiceId } = options;
+    const response = relayPath !== undefined && options.preloadBank === true
+      ? await withTimeout(fetch(relayPath, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ text: line }),
+      }), timeoutMs)
+      : apiKey === undefined || voiceId === undefined
+        ? null
+        : await withTimeout(fetch(`${ENDPOINT}/${voiceId}`, {
+          method: 'POST',
+          headers: { 'xi-api-key': apiKey, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: line, model_id: 'eleven_turbo_v2_5' }),
+        }), timeoutMs);
+
+    if (response === null || !response.ok) return null;
+    return response.arrayBuffer();
+  };
+
   const generate = async (): Promise<void> => {
     const { apiKey, voiceId, timeoutMs = 4000 } = options;
-    if (apiKey === undefined || voiceId === undefined) return;
+    const viaRelay = relayPath !== undefined && options.preloadBank === true;
+    const viaKey = apiKey !== undefined && voiceId !== undefined;
+    if (!viaRelay && !viaKey) return;
     const ctx = ctxOf();
     if (ctx === null) return;
 
@@ -220,13 +270,9 @@ export function createChef(audio: AudioSource, options: ChefOptions = {}): Chef 
     // needed first.
     for (const line of allLines()) {
       try {
-        const response = await withTimeout(fetch(`${ENDPOINT}/${voiceId}`, {
-          method: 'POST',
-          headers: { 'xi-api-key': apiKey, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: line, model_id: 'eleven_turbo_v2_5' }),
-        }), timeoutMs);
-        if (!response.ok) return;
-        bank.set(line, await ctx.decodeAudioData(await response.arrayBuffer()));
+        const audio = await fetchBankLine(line, timeoutMs);
+        if (audio === null) return;
+        bank.set(line, await ctx.decodeAudioData(audio));
       } catch {
         // One failure means the network is not going to cooperate. Stop asking and let the
         // browser voice carry the session rather than stalling load behind thirty timeouts.

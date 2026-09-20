@@ -57,7 +57,7 @@ let cvReady: Promise<boolean> | null = null;
  * ingredient can be added by hand), and a rejected promise here would take a whole screen down
  * with it over an optional capability.
  */
-export function loadVision(): Promise<boolean> {
+export function loadVision(timeoutMs?: number): Promise<boolean> {
   cvReady ??= (async () => {
     try {
       const module = await import('@techstark/opencv-js');
@@ -79,7 +79,36 @@ export function loadVision(): Promise<boolean> {
       return false;
     }
   })();
-  return cvReady;
+
+  const work = cvReady;
+  if (timeoutMs === undefined || !Number.isFinite(timeoutMs) || timeoutMs <= 0) return work;
+
+  // The caller is released on a timer; the load is not cancelled. That asymmetry is the point.
+  //
+  // Two things here can wait forever and neither of them rejects. The chunk is ~15MB, and a
+  // stalled fetch on venue wifi produces no error at all -- it simply does not arrive. Worse,
+  // the `onRuntimeInitialized` promise above has no rejection path and no timer: a build that
+  // never announces its runtime leaves that `await` unsettled for the life of the page. The
+  // loading screen awaited this with no ceiling, had no rail and no Escape handler, so the
+  // only way out of either failure was to take the headset off. That is the worst shape a
+  // failure can have in a demo -- it is indistinguishable from the app having crashed, and it
+  // happens on exactly the network the venue will have.
+  //
+  // Releasing the caller rather than cancelling the work means a slow load still lands: the
+  // memoised promise keeps going, `useOpenCv` still runs when it arrives, and the next caller
+  // -- the counter screen's Scan button -- gets `true` from the same promise. A cancelled load
+  // would have to be started again, and the second `onRuntimeInitialized` assignment would
+  // never fire because the first one already consumed the callback.
+  return new Promise<boolean>((resolve) => {
+    const timer = setTimeout(() => {
+      console.warn(`[menu] OpenCV still loading after ${timeoutMs}ms, continuing without it`);
+      resolve(false);
+    }, timeoutMs);
+    void work.then(
+      (ok) => { clearTimeout(timer); resolve(ok); },
+      () => { clearTimeout(timer); resolve(false); },
+    );
+  });
 }
 
 export const isVisionLoaded = (): boolean => cvReady !== null;

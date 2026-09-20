@@ -73,6 +73,9 @@
 /* An unprompted correction is a different event from an answer, and must not look identical. */
 .g-badge.is-alert { background: #f9c7be; color: #9a4e44; }
 
+/* And being congratulated is a third event. Green, because the chef is pleased, not alarmed. */
+.g-badge.is-praise { background: #cde6c7; color: #2f5a26; }
+
 .g-line {
   font-family: var(--display);
   font-size: 22px;
@@ -182,6 +185,15 @@
 
 /* Unprompted corrections are red. Being interrupted should not look like being answered. */
 .g-pin.is-alert { background: #f5230e; color: #fff3e4; }
+
+/*
+  Praise is green, and the colour is doing real work rather than decorating.
+
+  The pin is read peripherally, over a board, by somebody mid-cut -- the colour lands a beat
+  before the words do. A congratulation painted in the correction's red is an accusation for
+  that beat, which is the one thing praise was added to stop happening.
+*/
+.g-pin.is-praise { background: #cde6c7; color: #2f5a26; }
 
 /* Empty means nothing is live. Hidden rather than an empty yellow box floating over the board. */
 .g-pin:empty { display: none; }

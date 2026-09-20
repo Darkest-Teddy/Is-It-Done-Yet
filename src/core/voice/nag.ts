@@ -215,6 +215,20 @@ export function nextInterruption(
   return null;
 }
 
+/**
+ * Marks that the chef spoke unprompted, whatever it said.
+ *
+ * `core/voice/praise.ts` is the second thing allowed to interrupt, and it must not get its own
+ * clock. A cook corrected two seconds ago and congratulated two seconds later has been
+ * interrupted twice, however differently the two sentences read, and the intensity slider would
+ * be governing half the chef. So praise reads `lastAtMs` from here and writes it back through
+ * this -- which bumps the shared clock WITHOUT touching `count` or `spokenAtMs`, because the
+ * correction budget and the correction repeat-rule are not praise's to spend.
+ */
+export function recordSpoke(state: NagState, nowMs: number): NagState {
+  return { ...state, lastAtMs: nowMs };
+}
+
 /** Folds a spoken interruption into the state. Pure; returns a new state. */
 export function recordInterruption(
   state: NagState,

@@ -6,6 +6,7 @@
  *   `core/voice/intent.ts`    does this utterance mean "I am stuck"
  *   `core/voice/guidance.ts`  what the answer is, and how it degrades with no model
  *   `core/voice/nag.ts`       whether an unprompted correction is worth making
+ *   `core/voice/praise.ts`    whether an unprompted compliment has been earned
  *   `core/deficit.ts`         what is actually wrong with the board
  *   `core/timeline.ts`        whether it has persisted long enough to be real
  *   `app/session.ts`          holds those two together across a session
@@ -27,6 +28,12 @@
  * measurement rather than from a model's reading of a scene description. A model that decides
  * unprompted that somebody has made a mistake is the single most expensive failure available
  * to this feature, and the cheapest way not to have it is not to ask.
+ *
+ * THE SAME HOLDS FOR THE OTHER DIRECTION. The chef can now also speak up to say something went
+ * right, and that path is deterministic for the identical reason: a model handed a scene
+ * description will invent something to be pleased about exactly as readily as it invents a
+ * mistake, and praise for nothing spends the signal that makes real praise mean anything.
+ * Triggered by a measurement, worded from `core/barks.ts`. See DECISIONS.md entry 31.
  *
  * NOTHING HERE AWAITS INSIDE A FRAME. `observe` is called from the existing analysis loop,
  * which is already self-throttling, and does only synchronous folding. Every network call and
@@ -51,7 +58,10 @@ import {
   type CountedItem,
   type Guidance,
 } from '../core/voice/guidance.js';
+import { groundGuidance, screenContext, violationNote } from '../core/voice/grounding.js';
 import { mutedPolicy, policyForIntensity, type NagPolicy } from '../core/voice/nag.js';
+import { praiseGuidance } from '../core/voice/praise.js';
+import type { BarkKind } from '../core/barks.js';
 import type { Recipe } from '../core/recipe.js';
 import { processState } from '../core/steps.js';
 import { button, fill, h } from './dom.js';
@@ -152,6 +162,9 @@ const POLICY: Readonly<Record<Intensity, () => NagPolicy>> = {
   full: () => policyForIntensity(1),
 };
 
+/** The same slider as a number, for choosing Gentle Nonna's words or Full Service's. */
+const REGISTER: Readonly<Record<Intensity, number>> = { off: 0, gentle: 0, full: 1 };
+
 export function mountGuidance(options: GuidanceOptions): Guide {
   const anchor = options.anchor ?? DEFAULT_ANCHOR;
   const model: QwenConfig | null = configFromEnv();
@@ -239,7 +252,30 @@ export function mountGuidance(options: GuidanceOptions): Guide {
 
   // ---------------------------------------------------------------- context
 
+  /**
+   * Which untrusted fields the last `buildContext` had to remove. For the status line.
+   *
+   * Not shown as an accusation -- a cook who typed a strange dish name is not an attacker --
+   * but the panel says the answer is local and why, because a silent substitution is how you
+   * end up debugging the wrong thing at a table.
+   */
+  let injected: readonly string[] = [];
+
+  /**
+   * The context, SCREENED.
+   *
+   * `describeContext` screens again on its way into the prompt and that is the guarantee; this
+   * is here so that the local answer, the validator and the prompt all reason over the same
+   * facts. Without it the fallback would read an injected string back to the cook as though it
+   * were the name of their dish.
+   */
   function buildContext(nowMs: number): CookContext {
+    const screened = screenContext(rawContext(nowMs));
+    injected = screened.injected;
+    return screened.ctx;
+  }
+
+  function rawContext(nowMs: number): CookContext {
     const round = options.round();
     const cameraLive = options.cameraLive();
     const state = session?.current ?? null;
@@ -285,11 +321,23 @@ export function mountGuidance(options: GuidanceOptions): Guide {
 
   // ---------------------------------------------------------------- channels
 
-  /** The ONLY writer of the three channels. See the header. */
-  function present(next: Guidance, speak: string | null, nowMs: number): void {
+  /**
+   * The ONLY writer of the three channels. See the header.
+   *
+   * `bark` names which set of pre-generated audio the line belongs to. It matters for exactly
+   * one caller: praise speaks lines that came OUT of `core/barks.ts`, so the bank -- keyed by
+   * exact line text (DECISIONS.md entry 28) -- can actually serve them. Every other line this
+   * panel produces is novel and reaches the on-demand tier or nothing at all.
+   */
+  function present(
+    next: Guidance,
+    speak: string | null,
+    nowMs: number,
+    bark: BarkKind = 'improving',
+  ): void {
     current = next;
     shownAtMs = nowMs;
-    if (speak !== null && speak !== '') chef.say({ kind: 'improving', line: speak });
+    if (speak !== null && speak !== '') chef.say({ kind: bark, line: speak });
     changed();
   }
 
@@ -298,6 +346,7 @@ export function mountGuidance(options: GuidanceOptions): Guide {
   function ask(question: string | null = null): void {
     const nowMs = Date.now();
     const ctx = buildContext(nowMs);
+    const screened = injected;
     const move = openingMove(model !== null, ctx);
     const token = ++askToken;
 
@@ -305,10 +354,16 @@ export function mountGuidance(options: GuidanceOptions): Guide {
     present(move.shown, move.spoken, nowMs);
     if (!move.awaitingModel || model === null) return;
 
+    // The EXACT string the model is handed, kept so the grounding check runs against what it
+    // was actually told rather than against a second render of the context. The two drift the
+    // moment anybody adds a line to the prompt, and a check against facts the model never saw
+    // is not a check.
+    const facts = describeContext(ctx, question);
+
     // Fire and forget. Rule #10: nothing on the path that answers a human may await a network
     // call, and rule #9: this already has a timeout and a fallback -- `move.shown` is the
     // fallback and it is already on screen.
-    void askQwen(model, GUIDANCE_SYSTEM, describeContext(ctx, question))
+    void askQwen(model, GUIDANCE_SYSTEM, facts)
       .then((raw) => {
         // A reply for a question the cook has already moved on from is noise. Drop it.
         if (token !== askToken) return;
@@ -322,9 +377,21 @@ export function mountGuidance(options: GuidanceOptions): Guide {
           present(move.shown, move.shown.speech, Date.now());
           return;
         }
-        const answer = parseModelGuidance(raw, move.shown);
-        status = answer.source === 'model' ? '' : 'The model reply was unusable — local answer stands';
-        present(answer, answer.speech, Date.now());
+        // NOTHING REACHES A CHANNEL UNCHECKED. `parseModelGuidance` decides whether the reply
+        // was well-FORMED; entry 32 measured that the format holds and the content is what
+        // fails, so form was never the problem. `groundGuidance` decides whether it is TRUE of
+        // the facts it was given, and hands back the local answer whole when it is not.
+        const parsed = parseModelGuidance(raw, move.shown);
+        const checked = groundGuidance(parsed, facts, ctx, move.shown, screened);
+        status = checked.violations.length > 0
+          ? violationNote(checked.violations)
+          : parsed.source === 'model'
+            ? ''
+            : 'The model reply was unusable — local answer stands';
+        if (checked.violations.length > 0) {
+          console.warn('[chef] ungrounded model reply rejected', checked.violations, parsed);
+        }
+        present(checked.guidance, checked.guidance.speech, Date.now());
       })
       .catch(() => {
         if (token !== askToken) return;
@@ -337,12 +404,19 @@ export function mountGuidance(options: GuidanceOptions): Guide {
   // ---------------------------------------------------------------- the unprompted path
 
   /**
-   * The autonomous watch.
+   * The autonomous watch. Two things it may say, and one of them is that you did well.
    *
    * Runs off the analysis loop's own cadence rather than a timer of its own, throttled to at
-   * most once a second, and does nothing but read two pure functions. All four refusals --
-   * persistence, severity, cooldown, confidence -- are in `nag.ts`; none of them are repeated
-   * here, so there is one place to look when the chef talks too much.
+   * most once a second, and does nothing but read pure functions. Every refusal --
+   * persistence, severity, cooldown, confidence, and for praise the extra bar that the chef
+   * must have mentioned the fault before it can be pleased it is gone -- lives in `nag.ts` and
+   * `praise.ts`. None of them are repeated here, so there is one place to look when the chef
+   * talks too much.
+   *
+   * CORRECTION IS ASKED FIRST AND PRAISE ONLY WHEN IT DECLINES. If something is wrong right
+   * now, the useful sentence is the correction; "much steadier" while the tomato is still
+   * missing teaches a cook that the chef is not really watching. They also share one clock, so
+   * asking in this order is what makes the pair obey a single rate rather than two.
    */
   function watch(nowMs: number): void {
     if (session === null || intensity === 'off') return;
@@ -350,13 +424,23 @@ export function mountGuidance(options: GuidanceOptions): Guide {
     lastWatchMs = nowMs;
 
     const ctx = buildContext(nowMs);
-    const hit = session.interruption(nowMs, ctx.confidence, POLICY[intensity]());
-    if (hit === null) return;
+    const policy = POLICY[intensity]();
 
-    // Built from the deficit's own instruction, which is a complete sentence written for the
-    // cook and derived from a measurement. No model is asked -- see the header.
-    const unprompted = localGuidance({ ...ctx, faults: [hit.instruction] }, false);
-    present(unprompted, unprompted.speech, nowMs);
+    const hit = session.interruption(nowMs, ctx.confidence, policy);
+    if (hit !== null) {
+      // Built from the deficit's own instruction, which is a complete sentence written for the
+      // cook and derived from a measurement. No model is asked -- see the header.
+      const unprompted = localGuidance({ ...ctx, faults: [hit.instruction] }, false);
+      present(unprompted, unprompted.speech, nowMs);
+      return;
+    }
+
+    const well = session.praise(
+      nowMs, ctx.confidence, ctx.evenness, policy, REGISTER[intensity],
+    );
+    if (well === null) return;
+    // Words from the bark bank, trigger from a measurement, no model on this path either.
+    present(praiseGuidance(well), well.line, nowMs, well.bark);
   }
 
   function observe(analysis: Analysis, nowMs = Date.now()): void {
@@ -444,23 +528,34 @@ export function mountGuidance(options: GuidanceOptions): Guide {
 
       ocr ??= createOcrReader({
         lang: 'eng',
-        // A card is a block of lines, not one label. SINGLE_LINE -- the default this repo uses
-        // for price tags -- would read the first line and discard the rest.
+        // A card is a block of lines, not one label, and SPARSE_TEXT is LOAD-BEARING rather
+        // than a refinement. DECISIONS.md entry 32 measured `SINGLE_LINE` on a multi-line card
+        // at 98.7% character error -- it does not read the first line and discard the rest, as
+        // the comment that used to sit here claimed; it returns literal garbage, outputs like
+        // `"| E ="` and `"= - |"`. The same entry measured SPARSE_TEXT on a six-line card at
+        // arm's length at 0.0% CER, so distance was never the problem either.
         psm: PSM.SPARSE_TEXT,
         charWhitelist: '',
       });
       if (!(await ocr.ready)) throw new Error('OCR engine unavailable');
 
       // Three reads a beat apart, so a hand tremor or a reflection does not decide it alone.
-      let state = vote.emptyVote();
+      //
+      // ONE BALLOT PER LINE, not one ballot per card. Casting every line into a single
+      // `VoteState` made the lines compete as though they were rival readings of each other:
+      // six lines gave six buckets of near-equal weight, `verdict()` computed a margin of
+      // about 1.00 against a `minMargin` of 1.5, and entry 32 measured the result as **none of
+      // sixteen cards accepted, including character-perfect reads**. See `castPage` for why
+      // that got worse the more legible the card was.
+      let page = vote.emptyPage();
       for (let i = 0; i < 3; i++) {
         ctx2d.drawImage(video, 0, 0, canvas.width, canvas.height);
         const regions = await ocr.read(canvas);
-        for (const region of regions) state = vote.castVote(state, region.text, region.confidence);
+        page = vote.castPage(page, regions);
         await new Promise((resolve) => setTimeout(resolve, 250));
       }
 
-      const agreed = vote.verdict(state);
+      const agreed = vote.pageVerdict(page);
       if (agreed === null) {
         cardText = null;
         // Null is a real answer here and is rendered as one. Reporting a best guess the reads
@@ -468,7 +563,10 @@ export function mountGuidance(options: GuidanceOptions): Guide {
         cardStatus = 'Nothing legible. Hold the card closer and flatter.';
       } else {
         cardText = agreed.text;
-        cardStatus = `Read: “${agreed.text}”`;
+        const oneLine = agreed.text.replace(/\n+/g, ' · ');
+        cardStatus = agreed.lines.length === 1
+          ? `Read: “${oneLine}”`
+          : `Read ${agreed.lines.length} lines: “${oneLine}”`;
       }
     } catch (error) {
       cardText = null;
@@ -533,17 +631,24 @@ export function mountGuidance(options: GuidanceOptions): Guide {
       : answer.speech;
     body.textContent = answer === null
       ? 'I will tell you where you are in the recipe, what the camera can see, and the one thing '
-        + 'worth doing next. I will also speak up on my own if something has been wrong for a while.'
+        + 'worth doing next. I will also speak up on my own — when something has been wrong for '
+        + 'a while, and when something you fixed stops being wrong.'
       : answer.text;
 
+    // Three tones, three labels, three colours -- `tone` is the only thing consulted, so a
+    // praise pin can never inherit the correction's alert red.
+    const tone = answer?.tone ?? null;
     badge.textContent = pending
       ? 'thinking…'
       : answer === null
         ? model === null ? 'local' : 'ready'
-        : answer.prompted
-          ? answer.source === 'model' ? 'chef · model' : 'chef · local'
-          : 'unprompted';
-    badge.className = `g-badge${answer !== null && !answer.prompted ? ' is-alert' : ''}`
+        : tone === 'praise'
+          ? 'well done'
+          : tone === 'correction'
+            ? 'unprompted'
+            : answer.source === 'model' ? 'chef · model' : 'chef · local';
+    badge.className = 'g-badge'
+      + (tone === 'correction' ? ' is-alert' : tone === 'praise' ? ' is-praise' : '')
       + (pending ? ' is-pending' : '');
 
     note.textContent = status;
@@ -555,7 +660,8 @@ export function mountGuidance(options: GuidanceOptions): Guide {
     typed.style.display = speech.name === 'typed' || listenFault !== '' ? '' : 'none';
 
     pin.textContent = answer === null || stale ? '' : answer.overlay;
-    pin.className = `g-pin${answer !== null && !answer.prompted ? ' is-alert' : ''}`;
+    pin.className = 'g-pin'
+      + (tone === 'correction' ? ' is-alert' : tone === 'praise' ? ' is-praise' : '');
 
     paintModes();
   }

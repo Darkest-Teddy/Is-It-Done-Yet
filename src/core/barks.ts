@@ -97,11 +97,30 @@ export function pickBark(
   opts: BarkOptions,
   random: () => number = Math.random,
 ): Bark {
-  const kind = chooseKind(record, score, feedback, opts);
-  const pair = LINES[kind];
+  return barkFor(chooseKind(record, score, feedback, opts), opts.intensity, random);
+}
+
+/**
+ * One line of a named kind, with no cut to judge.
+ *
+ * `pickBark` answers "what should the chef say about THIS slice"; this answers "give me a line
+ * of this kind". The second question exists because `core/voice/praise.ts` already knows which
+ * kind it wants -- it got there from a measured improvement rather than from a `CutRecord` --
+ * and had no way to reach the bank without inventing a fake record to ask through.
+ *
+ * Going through the same `LINES` table is the whole point rather than an implementation
+ * detail. `src/audio/chef.ts` keys its pre-generated ElevenLabs bank by EXACT line text
+ * (DECISIONS.md entry 28), so a line assembled anywhere else is a line the headset cannot
+ * speak. Praise reaches the bank only because its words come from here.
+ */
+export function barkFor(
+  kind: BarkKind,
+  intensity: number,
+  random: () => number = Math.random,
+): Bark {
   // Anything at or above the midpoint gets Full Service. A slider with a dead zone in the
   // middle would feel broken; a hard switch at the middle is legible.
-  const set = pair[opts.intensity >= 0.5 ? 1 : 0];
+  const set = LINES[kind][intensity >= 0.5 ? 1 : 0];
   const index = Math.min(set.length - 1, Math.max(0, Math.floor(random() * set.length)));
   return { kind, line: set[index]! };
 }

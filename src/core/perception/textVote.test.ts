@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  castVote, DEFAULT_VOTE_OPTIONS, emptyVote, fold, tidy, verdict, type VoteState,
+  castPage, castVote, DEFAULT_VOTE_OPTIONS, emptyPage, emptyVote, fold, pageVerdict, tidy,
+  verdict, type PageVoteState, type ReadLine, type VoteState,
 } from './textVote.js';
 
 const vote = (reads: readonly (readonly [string, number])[]): VoteState => {
@@ -108,5 +109,119 @@ describe('verdict', () => {
   it('breaks a spelling tie toward the longer string, which dropped fewer characters', () => {
     const v = verdict(vote([['MILK 2%', 0.9], ['MILK 2', 0.9], ['MILK 2%', 0.01]]))!;
     expect(v.text).toBe('MILK 2%');
+  });
+});
+
+// -----------------------------------------------------------------------------------------
+// A page, which is a different question from a line
+// -----------------------------------------------------------------------------------------
+
+const CARD = [
+  'TONIGHT',
+  'Tomato Mozzarella Salad',
+  '4 tomatoes',
+  '1 ball mozzarella',
+  'basil',
+  'olive oil',
+];
+
+const readOf = (lines: readonly string[], confidence = 0.85): ReadLine[] =>
+  lines.map((text) => ({ text, confidence }));
+
+const threeReads = (reads: readonly (readonly string[])[]): PageVoteState =>
+  reads.reduce<PageVoteState>((state, lines) => castPage(state, readOf(lines)), emptyPage());
+
+describe('pageVerdict', () => {
+  /**
+   * The regression that this whole half of the file exists for.
+   *
+   * DECISIONS.md entry 32: casting every line of a card into ONE `VoteState` gave six buckets
+   * of near-equal weight, a margin of about 1.00 against a `minMargin` of 1.5, and **none of
+   * sixteen cards accepted, including character-perfect reads**. The old shape is asserted here
+   * alongside the new one, because the fix is only interesting next to what it replaced.
+   */
+  it('accepts a card three perfect reads agree on, which the one-ballot vote could not', () => {
+    const pooled = CARD.concat(CARD, CARD)
+      .reduce((state, text) => castVote(state, text, 0.85), emptyVote());
+    expect(verdict(pooled), 'the old shape: six lines competing as rival readings').toBeNull();
+
+    const page = pageVerdict(threeReads([CARD, CARD, CARD]));
+    expect(page).not.toBeNull();
+    expect(page!.text.split('\n')).toEqual([...CARD]);
+    expect(page!.expected).toBe(6);
+    expect(page!.reads).toBe(3);
+  });
+
+  it('still votes WITHIN a line, so OCR noise is outvoted rather than shown', () => {
+    const page = pageVerdict(threeReads([
+      ['4 tomatoes', 'basil'],
+      ['4 tomatuea', 'basil'],
+      ['4 tomatoes', 'basil'],
+    ]));
+    // "tomatoes" and "tomatuea" fold to the same key, so they reinforce rather than split, and
+    // the better-supported raw spelling is the one shown.
+    expect(page!.text.split('\n')[0]).toBe('4 tomatoes');
+  });
+
+  it('refuses the whole card when an expected line never settles', () => {
+    // Three genuinely different readings of line two, each seen once: no margin, no verdict.
+    const page = pageVerdict(threeReads([
+      ['4 tomatoes', 'olive oil'],
+      ['4 tomatoes', 'WHAT EVEN'],
+      ['4 tomatoes', 'zzz qqq xx'],
+    ]));
+    expect(page).toBeNull();
+  });
+
+  it('does not let a line one read invented veto a card the others agreed on', () => {
+    const page = pageVerdict(threeReads([
+      ['4 tomatoes', 'basil'],
+      ['4 tomatoes', 'basil', 'a shadow on the fold'],
+      ['4 tomatoes', 'basil'],
+    ]));
+    expect(page).not.toBeNull();
+    expect(page!.text.split('\n')).toEqual(['4 tomatoes', 'basil']);
+  });
+
+  it('pairs lines by fold key, so a dropped line does not shift every line below it', () => {
+    const page = pageVerdict(threeReads([
+      ['TONIGHT', '4 tomatoes', 'basil'],
+      ['4 tomatoes', 'basil'],
+      ['TONIGHT', '4 tomatoes', 'basil'],
+    ]));
+    expect(page!.text.split('\n')).toEqual(['TONIGHT', '4 tomatoes', 'basil']);
+  });
+
+  it('counts a read that produced nothing usable, rather than pretending it did not happen', () => {
+    const state = castPage(castPage(emptyPage(), readOf(['basil'])), []);
+    expect(state.reads).toBe(2);
+    expect(state.lines).toHaveLength(1);
+  });
+
+  it('is null before anything has been read', () => {
+    expect(pageVerdict(emptyPage())).toBeNull();
+    expect(pageVerdict(castPage(emptyPage(), []))).toBeNull();
+  });
+
+  it('drops lines below the confidence floor without giving them a slot', () => {
+    const state = castPage(emptyPage(), [
+      { text: 'basil', confidence: 0.85 },
+      { text: 'garbage', confidence: 0.1 },
+    ]);
+    expect(state.lines).toHaveLength(1);
+  });
+
+  /**
+   * The property entry 32 measured as faultless and which must survive: 20 of 20 single lines
+   * accepted and correct, 10 of 10 garbage rejected, zero false accepts.
+   */
+  it('behaves exactly as the single-line vote does on a single-line card', () => {
+    const page = pageVerdict(threeReads([['MILK 2%'], ['MlLK 2%'], ['MILK 2%']]));
+    const line = verdict(
+      [['MILK 2%'], ['MlLK 2%'], ['MILK 2%']]
+        .reduce((state, [text]) => castVote(state, text!, 0.85), emptyVote()),
+    );
+    expect(page!.text).toBe(line!.text);
+    expect(page!.lines).toHaveLength(1);
   });
 });

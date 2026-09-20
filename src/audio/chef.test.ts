@@ -443,3 +443,70 @@ describe('the pre-generated bank still comes first', () => {
     expect(played).toHaveLength(1);
   });
 });
+
+/**
+ * Tier 1 without a browser key.
+ *
+ * DECISIONS.md entry 32 measured what the browser-key bank actually amounted to:
+ * `VITE_ELEVENLABS_KEY` and `VITE_ELEVENLABS_VOICE` are absent from `.env` entirely, the menu
+ * app never passed them at all, and `main.ts` was reading names that no longer exist. Tier 1
+ * had therefore never fired outside this file. Generating it through the relay is what makes
+ * it real -- and it stays opt-in, because a relay-configured chef that pre-generated on its
+ * own would undo entry 28's measured "with nothing asked for, nothing is requested".
+ */
+describe('the bank through the relay', () => {
+  it('generates every line through the relay when asked, with no key in the browser', async () => {
+    behaviour = (_req, res) => sendAudio(res);
+    const { allLines } = await import('../core/barks.js');
+
+    const chef = createChef(fakeContext(), { speechRelay: relayUrl, preloadBank: true });
+    await chef.ready;
+
+    expect(bankCalls).toHaveLength(0);
+    expect(received).toHaveLength(allLines().length);
+    expect(received[0]).toEqual({ text: allLines()[0] });
+    expect(chef.tier()).toBe('elevenlabs');
+  });
+
+  it('plays a bark from that bank without a second request', async () => {
+    behaviour = (_req, res) => sendAudio(res);
+    const { allLines } = await import('../core/barks.js');
+
+    const chef = createChef(fakeContext(), { speechRelay: relayUrl, preloadBank: true });
+    await chef.ready;
+    const asked = received.length;
+
+    played = [];
+    chef.say(bark(allLines()[0] ?? ''));
+    await waitFor(() => played.length >= 1);
+    await settle();
+
+    expect(received).toHaveLength(asked);
+    expect(chef.lastTier()).toBe('bank');
+  });
+
+  it('requests nothing at all unless the bank was asked for', async () => {
+    behaviour = (_req, res) => sendAudio(res);
+    const chef = createChef(fakeContext(), { speechRelay: relayUrl });
+    await chef.ready;
+    await settle();
+
+    expect(received).toHaveLength(0);
+    expect(bankCalls).toHaveLength(0);
+  });
+
+  it('stops after the first refusal rather than spending thirty timeouts', async () => {
+    let calls = 0;
+    behaviour = (_req, res) => {
+      calls += 1;
+      if (calls > 3) sendError(res, 502);
+      else sendAudio(res);
+    };
+
+    const chef = createChef(fakeContext(), { speechRelay: relayUrl, preloadBank: true });
+    await chef.ready;
+
+    expect(received).toHaveLength(4);
+    expect(chef.tier()).toBe('elevenlabs');
+  });
+});

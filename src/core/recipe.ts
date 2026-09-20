@@ -157,6 +157,41 @@ export const RECIPES: readonly Recipe[] = [
     minMixRatio: 0.55,
   },
   {
+    id: 'tossed-garden-salad',
+    name: 'Tossed Garden Salad',
+    description:
+      'Torn lettuce, tomato and a handful of shredded cheese, tossed until the cheese stops '
+      + 'sitting in one corner. No heat, no knife skills to speak of, and the only thing that '
+      + 'can really go wrong is the tossing.',
+    difficulty: 'easy',
+    averageMinutes: 6,
+    icon: '\u{1F96C}',
+    tags: ['salad', 'no-cook', 'quick', 'beginner'],
+    // Every one of these three is nameable by `ingredients.ts` AND drawn by the hero icon set,
+    // which no other recipe in this book can say. That makes it the one recipe whose whole
+    // requirement list the camera can actually confirm, rather than half of it.
+    requires: [
+      { ingredient: 'lettuce', count: { min: 1, max: 1 } },
+      { ingredient: 'tomato', count: { min: 1, max: 3 } },
+      { ingredient: 'cheese', count: { min: 1, max: 2 } },
+    ],
+    steps: [
+      { id: 'rinse', instruction: 'Rinse the lettuce and shake it dry', verifiable: 'vision', satisfies: ['lettuce'] },
+      { id: 'tear', instruction: 'Tear the lettuce into bite-sized pieces into a wide bowl', verifiable: 'vision', satisfies: ['lettuce'] },
+      { id: 'slice', instruction: 'Slice the tomatoes into rounds about 5mm thick', verifiable: 'vision', satisfies: ['tomato'] },
+      { id: 'add-tomato', instruction: 'Scatter the tomato over the lettuce, not in a pile', verifiable: 'vision', satisfies: ['tomato'] },
+      { id: 'cheese', instruction: 'Scatter the shredded cheese across the whole bowl', verifiable: 'vision', satisfies: ['cheese'] },
+      { id: 'season', instruction: 'Season with salt and pepper', verifiable: 'cook-confirmed' },
+      // The step the recipe exists to teach, and the one the camera can genuinely grade: the
+      // `unmixed` deficit measures each ingredient's spread against the board's and says "it is
+      // all in one place -- toss it through" when it clumps. Nothing is asked of a model here.
+      { id: 'toss', instruction: 'Toss from underneath, lifting and turning, until the cheese is spread evenly', verifiable: 'vision', satisfies: ['lettuce', 'tomato', 'cheese'] },
+    ],
+    // Stricter than the others on purpose. In a platter salad an ingredient may legitimately sit
+    // in one region; in a tossed one, a clump IS the mistake, so the bar for "mixed" is higher.
+    minMixRatio: 0.65,
+  },
+  {
     id: 'caprese-bruschetta',
     name: 'Caprese Bruschetta',
     description:

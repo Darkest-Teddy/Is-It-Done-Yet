@@ -36,10 +36,22 @@ import {
   faultKey,
   nextInterruption,
   recordInterruption,
+  recordSpoke,
   type Interruption,
   type NagPolicy,
   type NagState,
 } from '../core/voice/nag.js';
+import {
+  emptyPraise,
+  emptyWatch,
+  forgetPraise,
+  nextPraise,
+  observePraise,
+  recordPraise,
+  type Praise,
+  type PraiseState,
+  type PraiseWatch,
+} from '../core/voice/praise.js';
 import { piecesFrom } from '../vision/pieces.js';
 import type { Blob } from '../vision/segment.js';
 
@@ -69,6 +81,8 @@ export const DEFAULT_SESSION_OPTIONS: SessionOptions = {
 export class CoachSession {
   private log: DeficitLog = emptyLog();
   private nag: NagState = emptyNag();
+  private watch: PraiseWatch = emptyWatch();
+  private praised: PraiseState = emptyPraise();
   private readonly confirmed = new Set<string>();
   private startedMs: number | null = null;
   private lastMs = 0;
@@ -163,9 +177,74 @@ export class CoachSession {
     return hit;
   }
 
+  /**
+   * The one thing worth being PLEASED about right now, or null -- which is, again, the usual
+   * answer and the one this method is designed to give most of the time.
+   *
+   * The mirror of `interruption`, and deliberately built as one. It shares the deficit log, the
+   * nag state's clock and the policy; it differs only in being rarer. Everything that decides
+   * anything is in `core/voice/praise.ts`, pure, so "the chef congratulated me for nothing" is
+   * a bug reproducible from a list of timestamps rather than only from a kitchen.
+   *
+   * Calling this has the same deliberate side effect as `interruption`: a returned praise is
+   * recorded as spoken, in the praise state AND on the shared clock, so the next correction
+   * also waits. A caller that had to remember to do that would forget once, in front of a
+   * judge, and the chef would congratulate them every frame.
+   *
+   * ORDER MATTERS AT THE CALL SITE. Ask `interruption` first and only ask this when it returns
+   * null: if something is wrong right now, the useful sentence is the correction, and a cook
+   * hearing "much steadier" while the tomato is still missing learns that the chef is not
+   * actually watching.
+   *
+   * @param evenness the round's live evenness, 0..1, or null when too little was measured. The
+   *   session cannot compute it -- thicknesses are uncalibrated here (DECISIONS.md entry 25) --
+   *   so it is passed in rather than guessed at.
+   */
+  praise(
+    nowMs: number,
+    confidence: number,
+    evenness: number | null,
+    policy: NagPolicy = DEFAULT_NAG_POLICY,
+    intensity = 1,
+  ): Praise | null {
+    this.watch = observePraise(
+      this.watch,
+      {
+        spans: finalize(this.log),
+        spokenKeys: new Set(Object.keys(this.nag.spokenAtMs)),
+        evenness,
+        doneCount: this.state?.process.doneCount ?? 0,
+        stepCount: this.state?.process.totalCount ?? 0,
+        troubled: this.state !== null && !this.state.servable,
+      },
+      nowMs,
+      policy,
+    );
+
+    const hit = nextPraise(
+      this.watch.pending,
+      this.praised,
+      this.nag.lastAtMs,
+      nowMs,
+      confidence,
+      { policy, intensity },
+    );
+    if (hit !== null) {
+      this.praised = recordPraise(this.praised, hit, nowMs);
+      this.watch = forgetPraise(this.watch, hit.key);
+      this.nag = recordSpoke(this.nag, nowMs);
+    }
+    return hit;
+  }
+
   /** How many times the chef has interrupted, for a status line and for the debrief. */
   get interruptionCount(): number {
     return this.nag.count;
+  }
+
+  /** How many times the chef has said something went right. For the debrief. */
+  get praiseCount(): number {
+    return this.praised.count;
   }
 
   /** Marks a step the camera cannot check as done. Idempotent. */
