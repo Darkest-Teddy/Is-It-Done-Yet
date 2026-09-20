@@ -1,0 +1,46 @@
+# Unity generated / machine-specific / huge. Paths are relative to unity/, which is the
+# Unity project root -- the repo-root .gitignore covers the same ground for anyone who
+# reads that one first.
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+
+# Asset meta files are NOT ignored: Unity identifies every asset by the GUID inside its
+# .meta, and dropping them makes every reference in every scene and prefab break on the
+# next machine. Only meta files for ignored folders are excluded, which the rules above
+# already handle.
+
+# Solution / project files regenerate from the asmdefs on every open.
+*.csproj
+*.unityproj
+*.sln
+*.slnx
+*.suo
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# Build outputs.
+*.apk
+*.aab
+*.unitypackage
+*.app
+/[Ee]xported[Oo]bj/
+/.vs/
+/.gradle/
+crashlytics-build.properties
+
+# macOS
+.DS_Store
