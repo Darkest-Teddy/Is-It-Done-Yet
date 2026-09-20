@@ -148,6 +148,14 @@ namespace IsItDoneYet.App
         public IEnumerator CheckIngredients(IngredientCheckRequestDto request, Action<ApiResult<IngredientCheckDto>> done) =>
             Send("POST", "/api/ingredients/check", JsonUtility.ToJson(request), CoachTimeoutSeconds, done);
 
+        /// <summary>
+        /// Writes a recipe. The confirmed output of a scan comes through here, not through the
+        /// scan endpoint -- a transcription gets no more trust than something typed by hand,
+        /// and the server validates both with the same schema.
+        /// </summary>
+        public IEnumerator CreateRecipe(RecipeDto recipe, Action<ApiResult<RecipeDto>> done) =>
+            Send("POST", "/api/recipes", JsonUtility.ToJson(recipe), TimeoutSeconds, done);
+
         public IEnumerator ScanRecipe(string imageDataUri, Action<ApiResult<ScanResultDto>> done) =>
             Send("POST", "/api/recipes/scan", JsonUtility.ToJson(new ScanRequestDto { image = imageDataUri }), CoachTimeoutSeconds, done);
 
