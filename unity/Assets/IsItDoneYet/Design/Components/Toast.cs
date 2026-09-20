@@ -18,7 +18,7 @@ namespace IsItDoneYet.Design
     {
         [SerializeField] GlassPanel _panel;
         [SerializeField] Label _message;
-        [SerializeField] Label _glyph;
+        [SerializeField] IconQuad _glyph;
         [SerializeField] Transform _pipRoot;
 
         [Header("Size")]
@@ -52,24 +52,6 @@ namespace IsItDoneYet.Design
             PlayIn();
         }
 
-        /// <summary>
-        /// A glyph per state, in text rather than as a sprite.
-        ///
-        /// Four characters in the SDF atlas beat four textures: no atlas page, no import
-        /// settings, and they inherit the label's outline so they stay legible over passthrough
-        /// for free. The generator is told to include these explicitly -- see FontAssetBuilder.
-        /// </summary>
-        static string GlyphFor(ObservationStatus status)
-        {
-            switch (status)
-            {
-                case ObservationStatus.Ok: return "✓";
-                case ObservationStatus.Warn: return "!";
-                case ObservationStatus.Bad: return "✕";
-                default: return "?";
-            }
-        }
-
         static void ToneFor(ObservationStatus status, out ColorRole fill, out ColorRole ink)
         {
             switch (status)
@@ -95,10 +77,12 @@ namespace IsItDoneYet.Design
 
             if (_glyph != null)
             {
-                _glyph.Text = GlyphFor(_status);
-                _glyph.Color = ink;
-                _glyph.OnFill = fill;
-                _glyph.TypeRole = "displayXs";
+                // Geometry, not a character. Neither licensed face has a check or a cross --
+                // the font tool reported both missing from both faces -- and TextMeshPro draws
+                // a missing glyph as a blank box rather than falling back the way a browser
+                // does. These four marks are drawn for this build in the design's own language.
+                _glyph.SetIcon(IconQuad.ForStatus(_status));
+                _glyph.Tint = ink;
                 _glyph.Refresh();
             }
 

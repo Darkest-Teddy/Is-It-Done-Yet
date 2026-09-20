@@ -97,6 +97,19 @@ for (const [uuid, entry] of Object.entries(manifest)) {
 const template = JSON.parse(section('template'));
 const svgs = template.match(/<svg[\s\S]*?<\/svg>/g) ?? [];
 
+/**
+ * Marks written for this build rather than extracted from the reference.
+ *
+ * The four coach status glyphs exist because NEITHER licensed font contains a check or a
+ * cross -- verified by the font tool, which reported them missing from both Ranchers and
+ * Hanken Grotesk. The reference gets away with `✓` because a browser silently falls back to a
+ * system face; TextMeshPro does not, and a missing glyph there is a blank box.
+ *
+ * Drawn in the design's own language: the one outline colour, the same round joins, the same
+ * heavy stroke. Original work, so there is nothing to licence.
+ */
+const AUTHORED = ['status-ok', 'status-warn', 'status-bad', 'status-unsure', 'camera-active'];
+
 let layer = 0;
 for (let i = 0; i < svgs.length; i++) {
   /**
@@ -115,6 +128,16 @@ for (let i = 0; i < svgs.length; i++) {
     .toFile(resolve(PNG_DIR, `${name}.png`));
   index.svg.push({ name, source: `design/icons/svg/${name}.svg` });
   console.log(`svg  ${name}`);
+}
+
+for (const name of AUTHORED) {
+  const markup = await readFile(resolve(SVG_DIR, `${name}.svg`), 'utf8');
+  await sharp(Buffer.from(markup))
+    .resize(256, 256, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .png({ compressionLevel: 9 })
+    .toFile(resolve(PNG_DIR, `${name}.png`));
+  index.svg.push({ name, source: `design/icons/svg/${name}.svg`, authored: true });
+  console.log(`svg  ${name} (authored for this build)`);
 }
 
 await writeFile(resolve(repo, 'design/icons/index.json'), `${JSON.stringify(index, null, 2)}\n`);

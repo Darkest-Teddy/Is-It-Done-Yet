@@ -1,0 +1,425 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f549b3aad9392430ba36d6da9edabdc0, type: 3}
+  m_Name: DesignTokens
+  m_EditorClassIdentifier: IsItDoneYet.Design::IsItDoneYet.Design.DesignTokens
+  SourceFile: design/tokens.json
+  ImportedAt: 2026-09-20T08:55:15.9437540Z
+  Themes:
+  - Name: 0
+    Colors:
+    - Role: 0
+      Srgb: {r: 0.27450982, g: 0.0627451, b: 0.101960786, a: 1}
+    - Role: 1
+      Srgb: {r: 0.23137255, g: 0.16470589, b: 0.105882354, a: 1}
+    - Role: 2
+      Srgb: {r: 0.16470589, g: 0.12941177, b: 0.10980392, a: 1}
+    - Role: 3
+      Srgb: {r: 0.96862745, g: 0.8901961, b: 0.8, a: 1}
+    - Role: 4
+      Srgb: {r: 1, g: 0.9529412, b: 0.89411765, a: 1}
+    - Role: 5
+      Srgb: {r: 0.9529412, g: 0.8862745, b: 0.80784315, a: 1}
+    - Role: 6
+      Srgb: {r: 0.27450982, g: 0.0627451, b: 0.101960786, a: 1}
+    - Role: 7
+      Srgb: {r: 0.9607843, g: 0.13725491, b: 0.05490196, a: 1}
+    - Role: 8
+      Srgb: {r: 0.9843137, g: 0.8235294, b: 0.29411766, a: 1}
+    - Role: 9
+      Srgb: {r: 0.8039216, g: 0.9019608, b: 0.78039217, a: 1}
+    - Role: 10
+      Srgb: {r: 0.18431373, g: 0.3529412, b: 0.14901961, a: 1}
+    - Role: 11
+      Srgb: {r: 0.9843137, g: 0.8901961, b: 0.627451, a: 1}
+    - Role: 12
+      Srgb: {r: 0.5411765, g: 0.41568628, b: 0.18039216, a: 1}
+    - Role: 13
+      Srgb: {r: 0.9764706, g: 0.78039217, b: 0.74509805, a: 1}
+    - Role: 14
+      Srgb: {r: 0.6039216, g: 0.30588236, b: 0.26666668, a: 1}
+    - Role: 15
+      Srgb: {r: 0.76862746, g: 0.85490197, b: 0.93333334, a: 1}
+    - Role: 16
+      Srgb: {r: 0.18431373, g: 0.3019608, b: 0.40784314, a: 1}
+    - Role: 17
+      Srgb: {r: 0.9764706, g: 0.827451, b: 0.7058824, a: 1}
+    - Role: 18
+      Srgb: {r: 0.5411765, g: 0.29411766, b: 0.12941177, a: 1}
+    - Role: 19
+      Srgb: {r: 0.27450982, g: 0.0627451, b: 0.101960786, a: 1}
+    - Role: 20
+      Srgb: {r: 0.5411765, g: 0.3529412, b: 0.23529412, a: 1}
+    - Role: 21
+      Srgb: {r: 0.3529412, g: 0.22745098, b: 0.13333334, a: 1}
+    - Role: 22
+      Srgb: {r: 1, g: 0.9529412, b: 0.89411765, a: 1}
+    - Role: 23
+      Srgb: {r: 0.90588236, g: 0.78039217, b: 0.68235296, a: 1}
+    - Role: 24
+      Srgb: {r: 1, g: 0.8509804, b: 0.7882353, a: 1}
+    - Role: 25
+      Srgb: {r: 0.27450982, g: 0.0627451, b: 0.101960786, a: 1}
+    - Role: 26
+      Srgb: {r: 0.7254902, g: 0.54901963, b: 0.43137255, a: 1}
+    - Role: 27
+      Srgb: {r: 0.84705883, g: 0.7490196, b: 0.6431373, a: 1}
+    - Role: 28
+      Srgb: {r: 0.5568628, g: 0.41960785, b: 0.32156864, a: 1}
+    - Role: 29
+      Srgb: {r: 0.4862745, g: 0.35686275, b: 0.27450982, a: 1}
+    TypeScale: 1
+    MotionScale: 1
+    LoopingAnimation: 1
+    PanelOpacity: 0.94
+    HasBadge: 0
+    BadgeText: 
+    BadgeFill: {r: 1, g: 1, b: 1, a: 1}
+    BadgeInk: {r: 0, g: 0, b: 0, a: 1}
+  - Name: 1
+    Colors:
+    - Role: 0
+      Srgb: {r: 0.27450982, g: 0.0627451, b: 0.101960786, a: 1}
+    - Role: 1
+      Srgb: {r: 0.23137255, g: 0.16470589, b: 0.105882354, a: 1}
+    - Role: 2
+      Srgb: {r: 0.16470589, g: 0.12941177, b: 0.10980392, a: 1}
+    - Role: 3
+      Srgb: {r: 0.96862745, g: 0.8901961, b: 0.8, a: 1}
+    - Role: 4
+      Srgb: {r: 1, g: 0.9529412, b: 0.89411765, a: 1}
+    - Role: 5
+      Srgb: {r: 0.9529412, g: 0.8862745, b: 0.80784315, a: 1}
+    - Role: 6
+      Srgb: {r: 0.27450982, g: 0.0627451, b: 0.101960786, a: 1}
+    - Role: 7
+      Srgb: {r: 0.9843137, g: 0.8235294, b: 0.29411766, a: 1}
+    - Role: 8
+      Srgb: {r: 0.9843137, g: 0.8235294, b: 0.29411766, a: 1}
+    - Role: 9
+      Srgb: {r: 0.8039216, g: 0.9019608, b: 0.78039217, a: 1}
+    - Role: 10
+      Srgb: {r: 0.18431373, g: 0.3529412, b: 0.14901961, a: 1}
+    - Role: 11
+      Srgb: {r: 0.9843137, g: 0.8901961, b: 0.627451, a: 1}
+    - Role: 12
+      Srgb: {r: 0.5411765, g: 0.41568628, b: 0.18039216, a: 1}
+    - Role: 13
+      Srgb: {r: 0.9764706, g: 0.78039217, b: 0.74509805, a: 1}
+    - Role: 14
+      Srgb: {r: 0.6039216, g: 0.30588236, b: 0.26666668, a: 1}
+    - Role: 15
+      Srgb: {r: 0.76862746, g: 0.85490197, b: 0.93333334, a: 1}
+    - Role: 16
+      Srgb: {r: 0.18431373, g: 0.3019608, b: 0.40784314, a: 1}
+    - Role: 17
+      Srgb: {r: 0.9764706, g: 0.827451, b: 0.7058824, a: 1}
+    - Role: 18
+      Srgb: {r: 0.5411765, g: 0.29411766, b: 0.12941177, a: 1}
+    - Role: 19
+      Srgb: {r: 0.27450982, g: 0.0627451, b: 0.101960786, a: 1}
+    - Role: 20
+      Srgb: {r: 0.5411765, g: 0.3529412, b: 0.23529412, a: 1}
+    - Role: 21
+      Srgb: {r: 0.3529412, g: 0.22745098, b: 0.13333334, a: 1}
+    - Role: 22
+      Srgb: {r: 1, g: 0.9529412, b: 0.89411765, a: 1}
+    - Role: 23
+      Srgb: {r: 0.90588236, g: 0.78039217, b: 0.68235296, a: 1}
+    - Role: 24
+      Srgb: {r: 0.27450982, g: 0.0627451, b: 0.101960786, a: 1}
+    - Role: 25
+      Srgb: {r: 0.27450982, g: 0.0627451, b: 0.101960786, a: 1}
+    - Role: 26
+      Srgb: {r: 0.7254902, g: 0.54901963, b: 0.43137255, a: 1}
+    - Role: 27
+      Srgb: {r: 0.84705883, g: 0.7490196, b: 0.6431373, a: 1}
+    - Role: 28
+      Srgb: {r: 0.5568628, g: 0.41960785, b: 0.32156864, a: 1}
+    - Role: 29
+      Srgb: {r: 0.4862745, g: 0.35686275, b: 0.27450982, a: 1}
+    TypeScale: 1.25
+    MotionScale: 0.35
+    LoopingAnimation: 0
+    PanelOpacity: 1
+    HasBadge: 0
+    BadgeText: 
+    BadgeFill: {r: 1, g: 1, b: 1, a: 1}
+    BadgeInk: {r: 0, g: 0, b: 0, a: 1}
+  - Name: 2
+    Colors:
+    - Role: 0
+      Srgb: {r: 0.27450982, g: 0.0627451, b: 0.101960786, a: 1}
+    - Role: 1
+      Srgb: {r: 0.23137255, g: 0.16470589, b: 0.105882354, a: 1}
+    - Role: 2
+      Srgb: {r: 0.16470589, g: 0.12941177, b: 0.10980392, a: 1}
+    - Role: 3
+      Srgb: {r: 0.96862745, g: 0.8901961, b: 0.8, a: 1}
+    - Role: 4
+      Srgb: {r: 1, g: 0.9529412, b: 0.89411765, a: 1}
+    - Role: 5
+      Srgb: {r: 0.9529412, g: 0.8862745, b: 0.80784315, a: 1}
+    - Role: 6
+      Srgb: {r: 0.27450982, g: 0.0627451, b: 0.101960786, a: 1}
+    - Role: 7
+      Srgb: {r: 0.18431373, g: 0.42745098, b: 0.65882355, a: 1}
+    - Role: 8
+      Srgb: {r: 0.9843137, g: 0.8235294, b: 0.29411766, a: 1}
+    - Role: 9
+      Srgb: {r: 0.8039216, g: 0.9019608, b: 0.78039217, a: 1}
+    - Role: 10
+      Srgb: {r: 0.18431373, g: 0.3529412, b: 0.14901961, a: 1}
+    - Role: 11
+      Srgb: {r: 0.9843137, g: 0.8901961, b: 0.627451, a: 1}
+    - Role: 12
+      Srgb: {r: 0.5411765, g: 0.41568628, b: 0.18039216, a: 1}
+    - Role: 13
+      Srgb: {r: 0.9764706, g: 0.78039217, b: 0.74509805, a: 1}
+    - Role: 14
+      Srgb: {r: 0.6039216, g: 0.30588236, b: 0.26666668, a: 1}
+    - Role: 15
+      Srgb: {r: 0.76862746, g: 0.85490197, b: 0.93333334, a: 1}
+    - Role: 16
+      Srgb: {r: 0.18431373, g: 0.3019608, b: 0.40784314, a: 1}
+    - Role: 17
+      Srgb: {r: 0.9764706, g: 0.827451, b: 0.7058824, a: 1}
+    - Role: 18
+      Srgb: {r: 0.5411765, g: 0.29411766, b: 0.12941177, a: 1}
+    - Role: 19
+      Srgb: {r: 0.27450982, g: 0.0627451, b: 0.101960786, a: 1}
+    - Role: 20
+      Srgb: {r: 0.5411765, g: 0.3529412, b: 0.23529412, a: 1}
+    - Role: 21
+      Srgb: {r: 0.3529412, g: 0.22745098, b: 0.13333334, a: 1}
+    - Role: 22
+      Srgb: {r: 1, g: 0.9529412, b: 0.89411765, a: 1}
+    - Role: 23
+      Srgb: {r: 0.90588236, g: 0.78039217, b: 0.68235296, a: 1}
+    - Role: 24
+      Srgb: {r: 1, g: 0.9529412, b: 0.89411765, a: 1}
+    - Role: 25
+      Srgb: {r: 0.27450982, g: 0.0627451, b: 0.101960786, a: 1}
+    - Role: 26
+      Srgb: {r: 0.7254902, g: 0.54901963, b: 0.43137255, a: 1}
+    - Role: 27
+      Srgb: {r: 0.84705883, g: 0.7490196, b: 0.6431373, a: 1}
+    - Role: 28
+      Srgb: {r: 0.5568628, g: 0.41960785, b: 0.32156864, a: 1}
+    - Role: 29
+      Srgb: {r: 0.4862745, g: 0.35686275, b: 0.27450982, a: 1}
+    TypeScale: 1
+    MotionScale: 1
+    LoopingAnimation: 1
+    PanelOpacity: 0.94
+    HasBadge: 1
+    BadgeText: PRACTICE
+    BadgeFill: {r: 0.18431373, g: 0.42745098, b: 0.65882355, a: 1}
+    BadgeInk: {r: 1, g: 0.9529412, b: 0.89411765, a: 1}
+  RadiusXs: 5
+  RadiusSm: 9
+  RadiusMd: 14
+  RadiusLg: 18
+  RadiusXl: 22
+  Radius2Xl: 26
+  Radius3Xl: 34
+  BorderHairline: 2
+  BorderThin: 3
+  BorderBase: 4
+  BorderThick: 5
+  BorderHeavy: 6
+  Shadows:
+  - Name: flat
+    HardOffsetPx: {x: 0, y: 0}
+    HardAlpha: 0
+    BlurOffsetPx: {x: 0, y: 0}
+    BlurPx: 0
+    BlurAlpha: 0
+    LipAlpha: 0
+    FootAlpha: 0
+  - Name: chip
+    HardOffsetPx: {x: 0, y: 3}
+    HardAlpha: 0.28
+    BlurOffsetPx: {x: 0, y: 0}
+    BlurPx: 0
+    BlurAlpha: 0
+    LipAlpha: 0.55
+    FootAlpha: 0.14
+  - Name: card
+    HardOffsetPx: {x: 7, y: 9}
+    HardAlpha: 0.5
+    BlurOffsetPx: {x: 14, y: 20}
+    BlurPx: 30
+    BlurAlpha: 0.45
+    LipAlpha: 0.7
+    FootAlpha: 0.16
+  - Name: panel
+    HardOffsetPx: {x: 9, y: 12}
+    HardAlpha: 0.5
+    BlurOffsetPx: {x: 18, y: 26}
+    BlurPx: 38
+    BlurAlpha: 0.5
+    LipAlpha: 0.75
+    FootAlpha: 0.18
+  - Name: hero
+    HardOffsetPx: {x: 14, y: 18}
+    HardAlpha: 0.55
+    BlurOffsetPx: {x: 28, y: 38}
+    BlurPx: 54
+    BlurAlpha: 0.55
+    LipAlpha: 0.72
+    FootAlpha: 0.18
+  ShadowHardColor: {r: 0.27450982, g: 0.0627451, b: 0.101960786, a: 1}
+  ShadowBlurColor: {r: 0, g: 0, b: 0, a: 1}
+  ShadowLipColor: {r: 1, g: 1, b: 1, a: 1}
+  ShadowFootColor: {r: 0.47058824, g: 0.2901961, b: 0.17254902, a: 1}
+  TypeRoles:
+  - Name: hero
+    Display: 1
+    SizePx: 132
+    Weight: 400
+    LineHeight: 1.2
+    TrackingEm: 0
+    Uppercase: 1
+  - Name: screenTitle
+    Display: 1
+    SizePx: 38
+    Weight: 400
+    LineHeight: 1.2
+    TrackingEm: 0.03
+    Uppercase: 1
+  - Name: panelTitle
+    Display: 1
+    SizePx: 30
+    Weight: 400
+    LineHeight: 1.2
+    TrackingEm: 0
+    Uppercase: 1
+  - Name: statValue
+    Display: 1
+    SizePx: 27
+    Weight: 400
+    LineHeight: 1.2
+    TrackingEm: 0
+    Uppercase: 1
+  - Name: scoreValue
+    Display: 1
+    SizePx: 78
+    Weight: 400
+    LineHeight: 1.2
+    TrackingEm: 0
+    Uppercase: 0
+  - Name: body
+    Display: 0
+    SizePx: 15
+    Weight: 700
+    LineHeight: 1.4
+    TrackingEm: 0
+    Uppercase: 0
+  - Name: bodyLarge
+    Display: 0
+    SizePx: 17
+    Weight: 700
+    LineHeight: 1.45
+    TrackingEm: 0
+    Uppercase: 0
+  - Name: caption
+    Display: 0
+    SizePx: 13
+    Weight: 700
+    LineHeight: 1.4
+    TrackingEm: 0
+    Uppercase: 0
+  - Name: label
+    Display: 0
+    SizePx: 12
+    Weight: 800
+    LineHeight: 1.2
+    TrackingEm: 0.14
+    Uppercase: 1
+  - Name: labelTight
+    Display: 0
+    SizePx: 11
+    Weight: 800
+    LineHeight: 1.2
+    TrackingEm: 0.06
+    Uppercase: 1
+  - Name: eyebrow
+    Display: 0
+    SizePx: 12
+    Weight: 800
+    LineHeight: 1.2
+    TrackingEm: 0.18
+    Uppercase: 1
+  DisplayFont: {fileID: 11400000, guid: 0401fd7adb262463dba7064decd56d4d, type: 2}
+  BodyFont: {fileID: 11400000, guid: 11d61234b67194c5e88e4633d0a1a477, type: 2}
+  Durations:
+  - Name: instant
+    Seconds: 0.12
+  - Name: pop
+    Seconds: 0.5
+  - Name: toast
+    Seconds: 0.42
+  - Name: cardLift
+    Seconds: 0.18
+  - Name: numberRoll
+    Seconds: 0.6
+  - Name: themeCrossfade
+    Seconds: 0.35
+  - Name: bob
+    Seconds: 3.9
+  - Name: tag
+    Seconds: 3.7
+  - Name: sizzle
+    Seconds: 1.8
+  - Name: chop
+    Seconds: 1.6
+  - Name: press
+    Seconds: 2.5
+  - Name: gravityStack
+    Seconds: 2.8
+  Easings:
+  - Name: standard
+    CubicBezier: {x: 0.4, y: 0, z: 0.2, w: 1}
+  - Name: out
+    CubicBezier: {x: 0, y: 0, z: 0.2, w: 1}
+  - Name: inOut
+    CubicBezier: {x: 0.42, y: 0, z: 0.58, w: 1}
+  - Name: overshoot
+    CubicBezier: {x: 0.3, y: 1.5, z: 0.5, w: 1}
+  Springs:
+  - Name: toast
+    Stiffness: 240
+    Damping: 26
+  - Name: punch
+    Stiffness: 420
+    Damping: 18
+  SquashImpact: {x: 1.1, y: 0.82}
+  SquashRebound: {x: 0.96, y: 1.05}
+  MaxFlashHz: 3
+  Xr:
+    MinBodyTextDmm: 24
+    MinTouchTargetDmm: 64
+    TouchPaddingDmm: 16
+    PrimaryContentFovDeg: 41
+    TargetHz: 72
+    DirectHandM: 0.45
+    HybridM: 0.7
+    IndirectM: 1
+    HudTitleM: 1.4
+    SideMenuRadiusM: 0.9
+    GrabbablePanelMinM: 0.6
+    GrabbablePanelMaxM: 1
+    TitleAboveEyeDeg: 15
+    ToastBelowEyeDeg: 12
+    LazyFollowDeadZoneDeg: 8
+  LargeTextOnly: 070000000b0000000d000000i

@@ -103,6 +103,31 @@
     {
       "name": "bun-top",
       "source": "design/icons/svg/bun-top.svg"
+    },
+    {
+      "name": "status-ok",
+      "source": "design/icons/svg/status-ok.svg",
+      "authored": true
+    },
+    {
+      "name": "status-warn",
+      "source": "design/icons/svg/status-warn.svg",
+      "authored": true
+    },
+    {
+      "name": "status-bad",
+      "source": "design/icons/svg/status-bad.svg",
+      "authored": true
+    },
+    {
+      "name": "status-unsure",
+      "source": "design/icons/svg/status-unsure.svg",
+      "authored": true
+    },
+    {
+      "name": "camera-active",
+      "source": "design/icons/svg/camera-active.svg",
+      "authored": true
     }
   ]
 }
