@@ -394,8 +394,8 @@
 .pick__hero {
   display: grid;
   place-items: center;
-  width: 10rem;
-  height: 10rem;
+  width: 12.4rem;
+  height: 12.4rem;
   flex: 0 0 auto;
   background: var(--yellow-soft);
   border: 0.24rem solid var(--ink);
@@ -410,8 +410,8 @@
 .pick__chip {
   display: grid;
   place-items: center;
-  width: 3.4rem;
-  height: 3.4rem;
+  width: 3.7rem;
+  height: 3.7rem;
   background: var(--leaf);
   border: 0.18rem solid var(--ink);
   border-radius: 0.8rem;
@@ -500,7 +500,7 @@
   box-shadow: inset 0 3px 0 rgb(255 255 255 / 0.5);
 }
 
-.library__card-name { line-height: 1.02; }
+.library__card-name { line-height: 1.2; }
 .library__card-meta { display: flex; gap: 0.35rem; flex-wrap: wrap; }
 .library__card-status { font-size: 0.75rem; font-weight: 800; color: var(--brown); }
 .library__card-status.is-ready { color: #3f6b33; }
@@ -559,15 +559,17 @@
 .dish__hero-chip {
   display: grid;
   place-items: center;
-  width: 6.2rem;
-  height: 6.2rem;
+  padding: 0.5rem;
   background: var(--cream-deep);
   border: 0.24rem solid var(--ink);
   border-radius: 1.1rem;
   box-shadow: inset 0 3px 0 rgb(255 255 255 / 0.55);
 }
 
-.dish__hero-chip + .dish__hero-chip { margin-left: -1.6rem; }
+/* Overlapped the way the artboard stacks them, and aligned on their bottoms so the step down
+   in size reads as a cluster rather than three unrelated tiles. */
+.dish__hero-art { align-items: flex-end; }
+.dish__hero-chip + .dish__hero-chip { margin-left: -1.4rem; }
 
 .dish__blurb { margin-top: 0.5rem; max-width: 46rem; }
 
@@ -658,7 +660,7 @@
 .cut__left { gap: 0.8rem; justify-content: flex-start; }
 
 .cut__clock-card { display: flex; flex-direction: column; gap: 0.2rem; }
-.cut__clock { line-height: 0.9; }
+.cut__clock { line-height: 1.2; }
 .cut__clock-meter { margin-top: 0.5rem; }
 
 .cut__stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.6rem; }

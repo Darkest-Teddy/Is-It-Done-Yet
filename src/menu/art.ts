@@ -38,6 +38,36 @@ export type HeroIcon = (typeof HERO)[number];
 
 export const heroUrl = (name: HeroIcon): string => `${BASE}icons/${name}.png`;
 
+/**
+ * Ingredients the hero set draws, and therefore the ones the design itself uses.
+ *
+ * Everything else falls through to the 437-icon library below. Kept as its own table rather
+ * than folded into `NAMED` so the precedence is impossible to misread.
+ */
+const HERO_FOR: Readonly<Record<string, HeroIcon>> = {
+  tomato: 'tomato',
+  'cherry tomato': 'tomato',
+  lettuce: 'lettuce',
+  romaine: 'lettuce',
+  cabbage: 'lettuce',
+  onion: 'onion',
+  'red onion': 'onion',
+  cheese: 'cheese',
+  cheddar: 'cheese',
+  mushroom: 'mushroom',
+  carrot: 'carrot',
+  egg: 'egg',
+  chili: 'chili',
+  'chilli powder': 'chili',
+  ketchup: 'ketchup',
+  beef: 'patty',
+  'ground beef': 'patty',
+  patty: 'patty',
+  bun: 'bun-top',
+  'brioche bun': 'bun-top',
+  bread: 'bun-bottom',
+};
+
 /** How many icons each category folder holds. Used to bound the fallback pick. */
 const LIBRARY_SIZE: Readonly<Record<string, number>> = {
   carb: 50,
@@ -58,23 +88,13 @@ const libraryUrl = (folder: string, index: number): string =>
  */
 const NAMED: Readonly<Record<string, string>> = {
   // greens and vegetables
-  tomato: libraryUrl('green', 20),
-  'cherry tomato': libraryUrl('green', 124),
   cucumber: libraryUrl('green', 27),
   basil: libraryUrl('green', 45),
   cilantro: libraryUrl('green', 12),
   coriander: libraryUrl('green', 12),
   parsley: libraryUrl('green', 2),
-  lettuce: libraryUrl('green', 57),
-  romaine: libraryUrl('green', 57),
   spinach: libraryUrl('green', 79),
-  carrot: libraryUrl('green', 114),
-  chili: libraryUrl('green', 50),
-  'chilli powder': libraryUrl('condiment', 10),
   garlic: libraryUrl('green', 9),
-  onion: libraryUrl('green', 119),
-  'red onion': libraryUrl('green', 77),
-  mushroom: libraryUrl('green', 68),
   lime: libraryUrl('green', 51),
   broccoli: libraryUrl('green', 61),
   olive: libraryUrl('green', 67),
@@ -86,15 +106,9 @@ const NAMED: Readonly<Record<string, string>> = {
 
   // protein and dairy
   mozzarella: libraryUrl('protein', 37),
-  cheese: libraryUrl('protein', 101),
-  cheddar: libraryUrl('protein', 101),
   tofu: libraryUrl('protein', 93),
   butter: libraryUrl('protein', 107),
-  egg: libraryUrl('protein', 103),
   'fried egg': libraryUrl('protein', 74),
-  beef: libraryUrl('protein', 100),
-  'ground beef': libraryUrl('protein', 100),
-  patty: libraryUrl('protein', 100),
   steak: libraryUrl('protein', 50),
   bacon: libraryUrl('protein', 14),
   salmon: libraryUrl('protein', 15),
@@ -103,10 +117,7 @@ const NAMED: Readonly<Record<string, string>> = {
 
   // carbs
   baguette: libraryUrl('carb', 4),
-  bread: libraryUrl('carb', 3),
   toast: libraryUrl('carb', 3),
-  bun: libraryUrl('carb', 37),
-  'brioche bun': libraryUrl('carb', 37),
   rice: libraryUrl('carb', 18),
   pasta: libraryUrl('carb', 13),
   noodles: libraryUrl('carb', 17),
@@ -121,7 +132,6 @@ const NAMED: Readonly<Record<string, string>> = {
   yogurt: libraryUrl('condiment', 36),
   cream: libraryUrl('condiment', 96),
   milk: libraryUrl('condiment', 77),
-  ketchup: libraryUrl('condiment', 124),
   mayonnaise: libraryUrl('condiment', 33),
   'soy sauce': libraryUrl('condiment', 2),
   honey: libraryUrl('condiment', 89),
@@ -165,6 +175,14 @@ function hash(text: string): number {
 export function artFor(ingredient: string, category: Category = 'unknown'): string {
   const key = ingredient.trim().toLowerCase();
 
+  // Hero set first, and this order is the whole point. The design document places 42 images
+  // across its seven screens and every single one is from `menu/icons` -- the tomato on the
+  // counter, the patty on the dish card, the ketchup in the sauce row. Reaching into the
+  // 437-icon library for an ingredient the hero set already draws would quietly swap the art
+  // direction for something adjacent, so the library is strictly the fallback.
+  const hero = HERO_FOR[key];
+  if (hero !== undefined) return heroUrl(hero);
+
   const named = NAMED[key];
   if (named !== undefined) return named;
 
@@ -174,8 +192,42 @@ export function artFor(ingredient: string, category: Category = 'unknown'): stri
 }
 
 /** True when `artFor` had a picture of this exact thing rather than a category stand-in. */
-export const isNamedArt = (ingredient: string): boolean =>
-  NAMED[ingredient.trim().toLowerCase()] !== undefined;
+export const isNamedArt = (ingredient: string): boolean => {
+  const key = ingredient.trim().toLowerCase();
+  return HERO_FOR[key] !== undefined || NAMED[key] !== undefined;
+};
+
+/**
+ * A size from the design document, in rem.
+ *
+ * The artboard is 1440px wide and this layout's rem tops out around 16.5px at that width, so
+ * dividing by 16.5 reproduces the design's proportions at any window size instead of freezing
+ * them at one. Call sites read `designRem(42)` rather than `2.54`, so they stay checkable
+ * against the document.
+ */
+export const designRem = (artboardPx: number): number =>
+  Math.round((artboardPx / 16.5) * 100) / 100;
+
+/**
+ * Per-icon optical scale.
+ *
+ * The design never draws these at one size: a 42px tomato sits beside a 34px ketchup, a 36px
+ * onion beside a 26px ketchup. That is not inconsistency, it is optical sizing -- the ketchup
+ * bottle is tall and narrow, so matching its WIDTH to a round tomato would make it tower over
+ * the row. Same reason the chili and the egg run slightly small. Encoded here so every call
+ * site gets the correction for free instead of each one rediscovering it.
+ */
+const OPTICAL: Readonly<Partial<Record<HeroIcon, number>>> = {
+  ketchup: 0.78,
+  egg: 0.86,
+  chili: 0.74,
+  mushroom: 0.93,
+  'bun-bottom': 0.95,
+};
+
+/** The width to draw a hero icon at, given the size its neighbours use. */
+export const heroSize = (name: HeroIcon, baseRem: number): number =>
+  Math.round(baseRem * (OPTICAL[name] ?? 1) * 100) / 100;
 
 /**
  * Tint class for a chip or tag, so a counter full of ingredients still groups by eye. Mirrors

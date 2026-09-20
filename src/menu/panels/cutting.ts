@@ -29,7 +29,7 @@ import { rankFor } from '../../core/rank.js';
 import type { AppContext, Panel, RouteParams, RoundResult } from '../app.js';
 import { addToBoard, rankBoard, type RoundEntry } from '../board.js';
 import { art, button, fill, h } from '../dom.js';
-import { artFor } from '../art.js';
+import { designRem, heroSize, heroUrl } from '../art.js';
 import { createRail } from '../rail.js';
 import { mountPassthrough } from '../passthroughView.js';
 import { AnalysisLoop, evenness, loadVision, type Analysis } from '../vision.js';
@@ -411,7 +411,7 @@ export function cuttingPanel(ctx: AppContext, params: RouteParams): Panel {
         h(
           'div',
           { class: 'cut__post' },
-          h('div', { class: 'cut__name-wrap' }, art(artFor('carrot', 'vegetable'), 2.1), nameInput),
+          h('div', { class: 'cut__name-wrap' }, art(heroUrl('carrot'), heroSize('carrot', designRem(36))), nameInput),
           submit,
         ),
       ),

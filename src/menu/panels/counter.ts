@@ -18,8 +18,8 @@
 
 import { byCategory, confirmAll, addItem, adjustCount, pantryFromScan, removeItem, unconfirmed,
   type Category, type Pantry, type PantryItem } from '../../core/pantry.js';
-import { artFor, GROUP_ICON, GROUP_INK, GROUP_LABEL, GROUP_ORDER, GROUP_TINT, groupOf, heroUrl,
-  tintFor, type CounterGroup } from '../art.js';
+import { artFor, designRem, GROUP_ICON, GROUP_INK, GROUP_LABEL, GROUP_ORDER, GROUP_TINT, groupOf,
+  heroSize, heroUrl, tintFor, type CounterGroup } from '../art.js';
 import type { AppContext, Panel, RouteParams } from '../app.js';
 import { ADDABLE, categoryFor, pretty, REQUIRED_BY_A_RECIPE } from '../catalogue.js';
 import { art, button, fill, h } from '../dom.js';
@@ -169,7 +169,7 @@ export function counterPanel(ctx: AppContext, _params: RouteParams): Panel {
         class: `counter__group${items.length === 0 ? ' is-empty' : ''}`,
         style: { background: GROUP_TINT[group] },
       },
-      art(heroUrl(GROUP_ICON[group]), 2.2),
+      art(heroUrl(GROUP_ICON[group]), heroSize(GROUP_ICON[group], designRem(42))),
       h(
         'div',
         { class: 'stack grow' },

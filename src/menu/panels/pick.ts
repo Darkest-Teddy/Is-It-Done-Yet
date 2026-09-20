@@ -11,7 +11,7 @@
  */
 
 import { matchRecipe, rankRecipes, type RecipeMatch } from '../../core/pantry.js';
-import { artFor } from '../art.js';
+import { artFor, designRem } from '../art.js';
 import type { AppContext, Panel, RouteParams } from '../app.js';
 import { categoryFor, pretty } from '../catalogue.js';
 import { art, button, fill, h } from '../dom.js';
@@ -96,7 +96,7 @@ export function pickPanel(ctx: AppContext, _params: RouteParams): Panel {
         h(
           'div',
           { class: 'pick__hero' },
-          art(artFor(recipe.requires[0]?.ingredient ?? recipe.name, 'unknown'), 7.5, recipe.name),
+          art(artFor(recipe.requires[0]?.ingredient ?? recipe.name, 'unknown'), designRem(170), recipe.name),
         ),
         h(
           'div',
@@ -128,7 +128,7 @@ export function pickPanel(ctx: AppContext, _params: RouteParams): Panel {
                   }`,
                   attrs: { title: pretty(need.ingredient) },
                 },
-                art(artFor(need.ingredient, categoryFor(need.ingredient)), 2.6, need.ingredient),
+                art(artFor(need.ingredient, categoryFor(need.ingredient)), designRem(46), need.ingredient),
               ),
             ),
           ),

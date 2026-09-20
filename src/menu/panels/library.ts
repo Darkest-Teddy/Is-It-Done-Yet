@@ -18,7 +18,7 @@
 
 import { rankRecipes, searchRecipes, type RecipeMatch } from '../../core/pantry.js';
 import type { Recipe } from '../../core/recipe.js';
-import { artFor, GROUP_TINT, groupOf } from '../art.js';
+import { artFor, designRem, GROUP_TINT, groupOf } from '../art.js';
 import type { AppContext, Panel, RouteParams } from '../app.js';
 import { categoryFor, pretty } from '../catalogue.js';
 import { art, button, fill, h } from '../dom.js';
@@ -172,7 +172,7 @@ export function libraryPanel(ctx: AppContext, _params: RouteParams): Panel {
                 // a fallback icon is a category, not an identification, so the word matters.
                 attrs: { title: `${pretty(item.ingredient)} ×${item.count}` },
               },
-              art(artFor(item.ingredient, item.category), 2.1, pretty(item.ingredient)),
+              art(artFor(item.ingredient, item.category), designRem(36), pretty(item.ingredient)),
               h('span', { class: 'library__counter-count', text: `×${item.count}` }),
             ),
           )),

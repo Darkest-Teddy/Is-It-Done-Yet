@@ -13,19 +13,21 @@
  */
 
 import { progressFor, RANKS } from '../../core/rank.js';
-import { heroUrl, type HeroIcon } from '../art.js';
+import { designRem, heroSize, heroUrl, type HeroIcon } from '../art.js';
 import type { AppContext, Panel, RouteParams } from '../app.js';
 import { art, button, h } from '../dom.js';
 import { createRail } from '../rail.js';
 
 /** The ingredient art scattered behind the panel: where it sits, how big, how far tilted. */
-const SCATTER: readonly { name: HeroIcon; left: string; top: string; size: number; tilt: number }[] = [
-  { name: 'tomato', left: '3.5%', top: '13%', size: 5.4, tilt: -8 },
-  { name: 'lettuce', left: '4%', top: '74%', size: 6.2, tilt: 7 },
-  { name: 'chili', left: '26%', top: '93%', size: 4.2, tilt: -14 },
-  { name: 'cheese', left: '96%', top: '48%', size: 4.8, tilt: 11 },
-  { name: 'patty', left: '90%', top: '85%', size: 5.8, tilt: -6 },
-  { name: 'mushroom', left: '70%', top: '95%', size: 4.4, tilt: 9 },
+const SCATTER: readonly { name: HeroIcon; left: string; top: string; px: number; tilt: number }[] = [
+  // Sizes are the artboard's, in artboard pixels: tomato 132, lettuce 150, chili 104,
+  // cheese 138, patty 146, mushroom 104.
+  { name: 'tomato', left: '3.5%', top: '13%', px: 132, tilt: -8 },
+  { name: 'lettuce', left: '4%', top: '74%', px: 150, tilt: 7 },
+  { name: 'chili', left: '26%', top: '93%', px: 104, tilt: -14 },
+  { name: 'cheese', left: '96%', top: '48%', px: 138, tilt: 11 },
+  { name: 'patty', left: '90%', top: '85%', px: 146, tilt: -6 },
+  { name: 'mushroom', left: '70%', top: '95%', px: 104, tilt: 9 },
 ];
 
 interface ModeOptions {
@@ -45,7 +47,7 @@ function modeCard(opts: ModeOptions): HTMLButtonElement {
     h(
       'div',
       { class: 'title__mode-head' },
-      h('div', { class: 'title__mode-icon', style: { background: opts.tint } }, art(heroUrl(opts.icon), 3.8)),
+      h('div', { class: 'title__mode-icon', style: { background: opts.tint } }, art(heroUrl(opts.icon), heroSize(opts.icon, designRem(62)))),
       h(
         'div',
         { class: 'stack' },
@@ -78,7 +80,7 @@ export function titlePanel(ctx: AppContext, _params: RouteParams): Panel {
             transform: `translate(-50%, -50%) rotate(${item.tilt}deg)`,
           },
         },
-        art(heroUrl(item.name), item.size),
+        art(heroUrl(item.name), designRem(item.px), ''),
       ),
     ),
   );

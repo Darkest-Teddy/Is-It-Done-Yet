@@ -18,7 +18,7 @@
 import { matchRecipe } from '../../core/pantry.js';
 import { rankFor } from '../../core/rank.js';
 import type { Recipe } from '../../core/recipe.js';
-import { artFor } from '../art.js';
+import { artFor, designRem } from '../art.js';
 import type { AppContext, Panel, RouteParams } from '../app.js';
 import { categoryFor, pretty } from '../catalogue.js';
 import { art, button, h, svg } from '../dom.js';
@@ -117,7 +117,7 @@ export function dishPanel(ctx: AppContext, params: RouteParams): Panel {
     return h(
       'div',
       { class: `dish__ing${ok ? ' is-ok' : ''}` },
-      art(artFor(need.ingredient, categoryFor(need.ingredient)), 2.3, need.ingredient),
+      art(artFor(need.ingredient, categoryFor(need.ingredient)), designRem(34), need.ingredient),
       h('span', { class: 'dish__ing-name grow truncate', text: pretty(need.ingredient) }),
       h('span', {
         class: `dish__ing-amount${ok ? ' is-ok' : ''}`,
@@ -170,11 +170,17 @@ export function dishPanel(ctx: AppContext, params: RouteParams): Panel {
         h(
           'div',
           { class: 'dish__hero-art' },
+          // The artboard's cluster steps down in size -- 180, 104, 96 -- so the first
+          // ingredient reads as the hero and the other two as supporting.
           ...recipe.requires.slice(0, 3).map((need, i) =>
             h(
               'div',
-              { class: 'dish__hero-chip', style: { zIndex: String(3 - i) } },
-              art(artFor(need.ingredient, categoryFor(need.ingredient)), 4.6, need.ingredient),
+              { class: `dish__hero-chip dish__hero-chip--${i}`, style: { zIndex: String(3 - i) } },
+              art(
+                artFor(need.ingredient, categoryFor(need.ingredient)),
+                designRem([180, 104, 96][i] ?? 96),
+                need.ingredient,
+              ),
             ),
           ),
         ),
@@ -198,7 +204,7 @@ export function dishPanel(ctx: AppContext, params: RouteParams): Panel {
               ),
             ),
             statTile('Average time', `${recipe.averageMinutes} min`),
-            statTile('Knife work', cuts === 0 ? 'No knife' : `${cuts} cutting steps`),
+            statTile('Knife work', cuts === 0 ? 'No knife' : `${cuts} cutting step${cuts === 1 ? '' : 's'}`),
             statTile('Your best round', best <= 0 ? 'Not cut yet' : rankFor(best).title),
           ),
         ),
