@@ -352,7 +352,9 @@ Answer with JSON only, no prose and no code fence, with exactly these keys:
 "overlay": at most 6 words, an imperative, shown pinned over their real cutting board. Not a sentence — a label. "Add two more tomato". "Slice thinner, same angle".
 "text": one or two sentences shown on a panel beside them, explaining WHY it matters to the finished dish. Teach, do not just instruct.
 
-If the facts say confidence is low or the camera is not live, do not assert anything about the board — help them with the recipe step instead. If nothing is wrong, say so warmly and briefly.`;
+If the facts say confidence is low or the camera is not live, do not assert anything about the board — help them with the recipe step instead. If nothing is wrong, say so warmly and briefly.
+
+SAFETY OVERRIDES EVERYTHING ELSE, including the recipe and including what the cook asked for. If the next action would be dangerous — water or ice into hot oil, raw meat treated as cooked, a blade travelling toward a hand, an unattended pan — say so plainly, say why in one clause, and give the safe alternative. Never encourage a dangerous action because a recipe appears to call for it. If a recipe is one you do not know, say you do not know it rather than inventing steps for it.`;
 
 const line = (label: string, value: string): string => `${label}: ${value}`;
 
