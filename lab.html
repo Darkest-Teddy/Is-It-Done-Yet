@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lab · camera, OCR, ingredients</title>
+    <!--
+      Feature test rig, run inside the headset.
+
+      Gate zero already proved Quest Browser reaches the passthrough cameras (DECISIONS #18).
+      What it did NOT answer is whether the real pipeline runs there at usable speed, and that
+      is the number that decides whether this is a 1Hz coach or a live overlay. So every stage
+      is timed separately and the timings are the loudest thing on the page.
+
+      Deliberately dependency-free in layout and deliberately large. Text at arm's length
+      through a 3S lens is the reason for the font sizes; a diagnostic you cannot read where you
+      have to read it is not a diagnostic. Same reasoning as quest-check.html, same POST target,
+      so findings land on the laptop as a file instead of being read aloud from inside a headset.
+    -->
+    <style>
+      :root {
+        --bg: #0b0d11; --panel: #151a22; --line: #222a35;
+        --fg: #e8ecf1; --dim: #8b95a3;
+        --ok: #6ee07a; --warn: #ffc95e; --bad: #ff7a7a; --accent: #8ee06a;
+        color-scheme: dark;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; padding: 20px; background: var(--bg); color: var(--fg);
+        font: 19px/1.45 ui-sans-serif, system-ui, sans-serif;
+      }
+      h1 { font-size: 30px; margin: 0 0 2px; }
+      .sub { color: var(--dim); font-size: 16px; margin: 0 0 16px; }
+
+      .tabs { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+      .tabs button {
+        font: 600 19px/1 inherit; padding: 16px 22px; border-radius: 12px;
+        border: 1px solid var(--line); background: var(--panel); color: var(--fg);
+      }
+      .tabs button[aria-pressed='true'] { background: var(--accent); color: #0b0d11; border-color: var(--accent); }
+
+      .grid { display: grid; grid-template-columns: minmax(0,1fr) 340px; gap: 16px; align-items: start; }
+      @media (max-width: 1000px) { .grid { grid-template-columns: 1fr; } }
+
+      .stageWrap { position: relative; background: #000; border-radius: 14px; overflow: hidden; }
+      canvas { display: block; width: 100%; height: auto; }
+
+      .side { display: flex; flex-direction: column; gap: 14px; }
+      .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+      .card h2 { font-size: 15px; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); margin: 0 0 10px; }
+
+      /* Timings are the point of this page, so they are the biggest thing in it. */
+      .perf { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-variant-numeric: tabular-nums; }
+      .perf .k { color: var(--dim); font-size: 16px; }
+      .perf .v { font: 700 22px/1.2 ui-monospace, Menlo, monospace; }
+      .headline { font: 700 46px/1 ui-monospace, Menlo, monospace; margin: 4px 0 2px; }
+      .verdict { font-size: 16px; }
+
+      label.slider { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; margin-bottom: 12px; }
+      label.slider span { font-size: 16px; color: var(--dim); }
+      label.slider output { font: 600 16px ui-monospace, Menlo, monospace; color: var(--accent); }
+      label.slider input { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); height: 34px; }
+
+      select, .btn {
+        width: 100%; font: 600 18px/1 inherit; padding: 14px; border-radius: 10px;
+        border: 1px solid var(--line); background: var(--bg); color: var(--fg);
+      }
+      .btn { background: var(--accent); color: #0b0d11; border-color: var(--accent); margin-top: 8px; }
+      .btn.ghost { background: var(--panel); color: var(--fg); border-color: var(--line); }
+
+      .list { display: flex; flex-direction: column; gap: 6px; }
+      .item { display: flex; gap: 10px; align-items: center; font-size: 18px; }
+      .item .n { font: 700 20px ui-monospace, Menlo, monospace; color: var(--accent); min-width: 34px; }
+
+      #ocrOut {
+        font: 400 17px/1.5 ui-monospace, Menlo, monospace; white-space: pre-wrap;
+        max-height: 320px; overflow: auto; color: var(--fg);
+      }
+      .muted { color: var(--dim); }
+      .hide { display: none !important; }
+      #status { font-size: 17px; color: var(--dim); margin-top: 10px; }
+    </style>
+  </head>
+  <body>
+    <h1>Lab</h1>
+    <p class="sub">Camera, ingredient detection, OCR, and the recipe library, tested against the real pipeline.</p>
+
+    <div class="tabs">
+      <button id="tab-ingredients" aria-pressed="true">Ingredients</button>
+      <button id="tab-ocr" aria-pressed="false">OCR</button>
+      <button id="tab-library" aria-pressed="false">Library</button>
+    </div>
+
+    <div class="grid">
+      <div>
+        <div class="stageWrap"><canvas id="view"></canvas></div>
+        <div id="status">starting…</div>
+      </div>
+
+      <div class="side">
+        <div class="card">
+          <h2>Performance</h2>
+          <div class="headline" id="fps">—</div>
+          <div class="verdict muted" id="perfVerdict">measuring…</div>
+          <div class="perf" style="margin-top:10px">
+            <span class="k">grab</span><span class="v" id="tGrab">—</span>
+            <span class="k">segment</span><span class="v" id="tSeg">—</span>
+            <span class="k">classify</span><span class="v" id="tCls">—</span>
+            <span class="k">frame</span><span class="v" id="tAll">—</span>
+            <span class="k">size</span><span class="v" id="tSize">—</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Camera</h2>
+          <select id="cameras"></select>
+          <button class="btn ghost" id="swap">Re-request camera</button>
+        </div>
+
+        <div class="card" id="cardTune">
+          <h2>Tuning</h2>
+          <div id="sliders"></div>
+        </div>
+
+        <div class="card" id="cardFound">
+          <h2>Detected</h2>
+          <div class="list" id="found"><span class="muted">nothing yet</span></div>
+        </div>
+
+        <div class="card hide" id="cardOcr">
+          <h2>Text read</h2>
+          <button class="btn" id="readNow">Read the frame</button>
+          <div id="ocrOut" class="muted" style="margin-top:10px">Point at a recipe card and press Read.</div>
+        </div>
+
+        <div class="card">
+          <h2>Findings</h2>
+          <button class="btn" id="send">Send results to laptop</button>
+          <div id="sendOut" class="muted" style="margin-top:8px; font-size:15px"></div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      import cv from '@techstark/opencv-js';
+      import { listCameras, open, FrameGrabber } from '/src/vision/camera.ts';
+      import { segment, useOpenCv, DEFAULT_SEGMENT_OPTIONS } from '/src/vision/segment.ts';
+      import { identify } from '/src/core/ingredients.ts';
+      import { createOcrReader } from '/src/vision/ocr.ts';
+      import { pantryFromScan, rankRecipes, iconFor } from '/src/core/pantry.ts';
+      import { RECIPES } from '/src/core/recipe.ts';
+
+      const $ = (id) => document.getElementById(id);
+      const canvas = $('view');
+      const ctx = canvas.getContext('2d');
+      const status = (t) => { $('status').textContent = t; };
+
+      useOpenCv(cv);
+
+      let mode = 'ingredients';
+      let grabber = null;
+      let video = null;
+      const opts = { ...DEFAULT_SEGMENT_OPTIONS };
+      /** Longest edge fed to OpenCV. The single biggest lever on frame time. */
+      let maxEdge = 640;
+
+      // ---- tuning sliders -------------------------------------------------------------
+      function slider(label, min, max, step, get, set) {
+        const l = document.createElement('label');
+        l.className = 'slider';
+        const s = document.createElement('span'); s.textContent = label;
+        const o = document.createElement('output'); o.textContent = get();
+        const i = document.createElement('input');
+        Object.assign(i, { type: 'range', min, max, step, value: get() });
+        i.addEventListener('input', () => { set(Number(i.value)); o.textContent = i.value; });
+        l.append(s, o, i);
+        $('sliders').append(l);
+      }
+      slider('analysis width px', 320, 1280, 32, () => maxEdge, (v) => { maxEdge = v; });
+      slider('saturation floor', 0.05, 0.6, 0.01, () => opts.minSaturation, (v) => { opts.minSaturation = v; });
+      slider('min area px', 100, 6000, 50, () => opts.minAreaPx, (v) => { opts.minAreaPx = v; });
+      slider('morph kernel', 1, 11, 2, () => opts.morphKernelPx, (v) => { opts.morphKernelPx = v; });
+
+      // ---- camera ---------------------------------------------------------------------
+      async function startCamera(deviceId) {
+        try {
+          video = document.createElement('video');
+          video.playsInline = true; video.muted = true;
+          video.srcObject = await open(deviceId ? { deviceId, width: 1280, height: 720 } : undefined);
+          await video.play();
+          grabber = new FrameGrabber(video);
+          status('camera live');
+
+          const cams = await listCameras();
+          const sel = $('cameras');
+          sel.innerHTML = '';
+          for (const c of cams) {
+            const o = document.createElement('option');
+            o.value = c.deviceId; o.textContent = c.label;
+            sel.append(o);
+          }
+          if (deviceId) sel.value = deviceId;
+        } catch (e) {
+          status(`camera failed: ${e.name}: ${e.message}`);
+        }
+      }
+      $('cameras').addEventListener('change', (e) => startCamera(e.target.value));
+      $('swap').addEventListener('click', () => startCamera($('cameras').value || undefined));
+
+      // ---- downscale ------------------------------------------------------------------
+      const work = document.createElement('canvas');
+      const wctx = work.getContext('2d', { willReadFrequently: true });
+      function scaled(src) {
+        const k = Math.min(1, maxEdge / Math.max(src.width, src.height));
+        const w = Math.max(1, Math.round(src.width * k));
+        const h = Math.max(1, Math.round(src.height * k));
+        if (work.width !== w || work.height !== h) { work.width = w; work.height = h; }
+        wctx.putImageData(src, 0, 0);
+        return { w, h };
+      }
+
+      // ---- the loop -------------------------------------------------------------------
+      const ring = [];
+      const avg = (k) => ring.length ? ring.reduce((a, r) => a + r[k], 0) / ring.length : 0;
+      let lastPantry = null;
+
+      function tick() {
+        requestAnimationFrame(tick);
+        if (!grabber) return;
+
+        const t0 = performance.now();
+        const full = grabber.grab();
+        if (!full) return;
+        const t1 = performance.now();
+
+        // Downscale by drawing the video directly, which is far cheaper than putImageData
+        // of a full frame followed by a scale.
+        const k = Math.min(1, maxEdge / Math.max(full.width, full.height));
+        const w = Math.max(1, Math.round(full.width * k));
+        const h = Math.max(1, Math.round(full.height * k));
+        if (work.width !== w || work.height !== h) { work.width = w; work.height = h; }
+        wctx.drawImage(video, 0, 0, w, h);
+        const small = wctx.getImageData(0, 0, w, h);
+
+        let blobs = [];
+        try { blobs = segment(small, opts); } catch (e) { status(`segment threw: ${e.message}`); }
+        const t2 = performance.now();
+
+        const named = blobs.map((b) => ({ blob: b, id: identify(b.features) }));
+        const t3 = performance.now();
+
+        if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+        ctx.putImageData(small, 0, 0);
+
+        if (mode !== 'ocr') {
+          for (const { blob, id } of named) {
+            ctx.beginPath();
+            blob.contour.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+            ctx.closePath();
+            ctx.strokeStyle = id ? '#8ee06a' : '#ff7a7a';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            const label = id ? `${id.name} ${(id.confidence * 100) | 0}%` : `${blob.features.hueDeg | 0}deg`;
+            ctx.font = '600 14px system-ui';
+            const tw = ctx.measureText(label).width + 8;
+            ctx.fillStyle = 'rgba(0,0,0,.72)';
+            ctx.fillRect(blob.centroid.x - tw / 2, blob.centroid.y - 10, tw, 20);
+            ctx.fillStyle = id ? '#8ee06a' : '#ff7a7a';
+            ctx.fillText(label, blob.centroid.x - tw / 2 + 4, blob.centroid.y + 5);
+          }
+        }
+
+        ring.push({ grab: t1 - t0, seg: t2 - t1, cls: t3 - t2, all: performance.now() - t0 });
+        if (ring.length > 30) ring.shift();
+
+        const all = avg('all');
+        $('fps').textContent = all > 0 ? `${(1000 / all).toFixed(1)} fps` : '—';
+        $('tGrab').textContent = `${avg('grab').toFixed(1)}ms`;
+        $('tSeg').textContent = `${avg('seg').toFixed(1)}ms`;
+        $('tCls').textContent = `${avg('cls').toFixed(1)}ms`;
+        $('tAll').textContent = `${all.toFixed(1)}ms`;
+        $('tSize').textContent = `${w}x${h}`;
+
+        // The verdict is the whole reason this page exists.
+        const v = $('perfVerdict');
+        if (all < 40) { v.textContent = 'live overlay is viable'; v.style.color = 'var(--ok)'; }
+        else if (all < 350) { v.textContent = 'fine for a ~1Hz coach, too slow to track'; v.style.color = 'var(--warn)'; }
+        else { v.textContent = 'too slow even for 1Hz — cut the analysis width'; v.style.color = 'var(--bad)'; }
+
+        const counts = new Map();
+        for (const { id } of named) if (id) counts.set(id.name, (counts.get(id.name) ?? 0) + 1);
+        lastPantry = pantryFromScan(
+          [...counts].map(([ingredient, count]) => ({ ingredient, count, category: 'unknown', confidence: 0.8 })), 0);
+
+        const found = $('found');
+        found.innerHTML = '';
+        if (counts.size === 0) found.innerHTML = '<span class="muted">nothing recognised</span>';
+        for (const [name, n] of [...counts].sort((a, b) => b[1] - a[1])) {
+          const d = document.createElement('div');
+          d.className = 'item';
+          d.innerHTML = `<span class="n">${n}</span><span>${iconFor(name)}</span><span>${name}</span>`;
+          found.append(d);
+        }
+
+        if (mode === 'library') renderLibrary();
+      }
+
+      function renderLibrary() {
+        if (!lastPantry) return;
+        const ranked = rankRecipes(lastPantry, RECIPES);
+        const found = $('found');
+        const hr = document.createElement('div');
+        hr.style.cssText = 'margin-top:10px;border-top:1px solid var(--line);padding-top:10px';
+        hr.innerHTML = ranked.map((m) =>
+          `<div class="item"><span>${m.recipe.icon}</span><span style="flex:1">${m.recipe.name}</span>` +
+          `<span style="color:${m.makeable ? 'var(--ok)' : 'var(--warn)'};font-size:15px">` +
+          `${m.makeable ? 'ready' : `missing ${m.missing.length}`}</span></div>`).join('');
+        found.append(hr);
+      }
+
+      // ---- OCR ------------------------------------------------------------------------
+      // Created eagerly so the worker download overlaps with the camera coming up, rather
+      // than stalling the first read by several seconds.
+      const ocr = createOcrReader();
+      let ocrReady = false;
+      ocr.ready.then((ok) => {
+        ocrReady = ok;
+        if (!ok) $('ocrOut').textContent = 'OCR engine failed to load.';
+      });
+
+      $('readNow').addEventListener('click', async () => {
+        if (!ocrReady) { $('ocrOut').textContent = 'OCR still loading…'; return; }
+        if (ocr.busy) return;
+        $('ocrOut').textContent = 'reading…';
+        const t = performance.now();
+        try {
+          const regions = await ocr.read(canvas, { psm: 6 });
+          const ms = (performance.now() - t).toFixed(0);
+          $('ocrOut').textContent = regions.length === 0
+            ? `no text found (${ms}ms)`
+            : `${regions.length} regions in ${ms}ms\n\n` +
+              // TextRegion.confidence is 0..1, not a percentage. Printing it raw shows "1%"
+              // for a perfect read, which reads as the OCR having failed.
+              regions.map((r) => `${((r.confidence ?? 0) * 100).toFixed(0)}%  ${r.text}`).join('\n');
+        } catch (e) {
+          $('ocrOut').textContent = `OCR failed: ${e.message}`;
+        }
+      });
+
+      // ---- tabs -----------------------------------------------------------------------
+      function setMode(m) {
+        mode = m;
+        for (const k of ['ingredients', 'ocr', 'library']) {
+          $(`tab-${k}`).setAttribute('aria-pressed', String(k === m));
+        }
+        $('cardOcr').classList.toggle('hide', m !== 'ocr');
+        $('cardTune').classList.toggle('hide', m === 'ocr');
+      }
+      for (const k of ['ingredients', 'ocr', 'library']) {
+        $(`tab-${k}`).addEventListener('click', () => setMode(k));
+      }
+
+      // ---- export ---------------------------------------------------------------------
+      $('send').addEventListener('click', async () => {
+        const body = [
+          `lab results  ${new Date().toISOString()}`,
+          `ua           ${navigator.userAgent}`,
+          `analysis     ${$('tSize').textContent} @ maxEdge ${maxEdge}`,
+          `fps          ${$('fps').textContent}   (${$('perfVerdict').textContent})`,
+          `grab/seg/cls ${$('tGrab').textContent} / ${$('tSeg').textContent} / ${$('tCls').textContent}`,
+          `tuning       sat ${opts.minSaturation}  area ${opts.minAreaPx}  morph ${opts.morphKernelPx}`,
+          `detected     ${$('found').innerText.replace(/\n+/g, ' | ')}`,
+          `ocr          ${$('ocrOut').innerText.slice(0, 400)}`,
+        ].join('\n');
+        try {
+          const r = await fetch('/quest-results', { method: 'POST', body });
+          $('sendOut').textContent = r.ok ? 'written to results/ on the laptop' : `failed: HTTP ${r.status}`;
+        } catch (e) {
+          $('sendOut').textContent = `failed: ${e.message} (dev server only)`;
+        }
+      });
+
+      await startCamera();
+      setMode('ingredients');
+      tick();
+    </script>
+  </body>
+</html>
