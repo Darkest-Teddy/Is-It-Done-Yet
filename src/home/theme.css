@@ -4,7 +4,7 @@
   WHAT THIS IS. `homev2.html` rebuilds the page currently deployed at
   https://is-it-done-yet.vercel.app/ -- same four screens, same flow, same copy -- in the visual
   language of the menu design document. The deployed page's source is not in this repository
-  (see DECISIONS.md #24), so it could not be restyled in place: its structure was read back off
+  (see DECISIONS.md #27), so it could not be restyled in place: its structure was read back off
   the live HTML and its behaviour off the shipped bundle, and both were rebuilt here.
 
   WHY NOT THE ARTBOARD STAGE. `app.html` builds each screen at its true 1440x810 artboard size

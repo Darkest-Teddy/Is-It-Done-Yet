@@ -39,9 +39,15 @@ namespace MRPerception
         /// it turns "detection is not working" into "the edges are broken up, dilate more" in
         /// about four seconds.
         ///
-        /// Read from the main thread while the worker writes it, which is a deliberate and
-        /// benign race -- the Mat is allocated once and reused, so the worst outcome is a torn
-        /// frame in a debug view. Do not build anything load-bearing on it.
+        /// Read from the main thread while the worker writes it, and this is NOT benign, which
+        /// an earlier version of this comment claimed. Imgproc.Canny calls Mat::create, so it
+        /// REALLOCATES the native buffer whenever the frame size or type changes -- the first
+        /// frames, a resolution change, a camera switch. A reallocation between a reader
+        /// checking rows()/cols() and copying the pixels is a read of freed native memory: a
+        /// hard crash, not a torn frame.
+        ///
+        /// Left as-is because it only bites on a size change and this is a debug view. Do not
+        /// build anything load-bearing on it, and do not widen the window.
         /// </summary>
         public Mat LastEdges => _edges;
 

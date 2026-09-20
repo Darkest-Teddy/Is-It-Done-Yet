@@ -10,7 +10,7 @@ import { handleSpeech, speechConfig } from './speech.mjs';
  * that is ours: the key never reaches the client, the upstream's body never reaches the client,
  * every failure is a status the browser knows how to read, and a missing key is a 503 rather
  * than a crash. The request the stub receives is asserted field by field, so if the upstream
- * contract is wrong it is wrong in a place somebody can see. See DECISIONS.md entry 25.
+ * contract is wrong it is wrong in a place somebody can see. See DECISIONS.md entry 28.
  */
 
 /** The stub upstream. */

@@ -8,6 +8,8 @@
   },
   "scripts": {
     "dev": "vite",
+    "relay": "node --env-file-if-exists=.env server/vision-relay.mjs",
+    "relay:local": "node --env-file-if-exists=.env server/vision-relay.mjs --upstream=ollama",
     "build": "vite build",
     "preview": "vite preview --port 8081 --host",
     "headset": "adb reverse tcp:8081 tcp:8081 && vite",

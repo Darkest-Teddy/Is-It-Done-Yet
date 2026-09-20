@@ -78,30 +78,52 @@ namespace MRPerception
                 if (environmentRaycast.Raycast(ray, out EnvironmentRaycastHit hit, maxDistance))
                 {
                     point = hit.point;
-                    // The depth normal is noisy on small or shiny objects. Keep it only when it
-                    // is confidently oriented; otherwise fall through to the scene model, which
-                    // has a clean normal for the surface the object is sitting on.
+
+                    // The depth normal is noisy on small or shiny objects, so it is only
+                    // trusted when it is confidently oriented. Below that the POSITION is still
+                    // good -- depth measured it -- but the orientation is not, so the scene
+                    // model is asked for a clean normal for the surface underneath.
+                    //
+                    // This used to return unconditionally, which meant the MRUK half of the
+                    // design was never reached and every low-confidence hit silently became
+                    // Vector3.up.
                     if (hit.normalConfidence > 0.5f)
                     {
                         normal = hit.normal;
                         return true;
                     }
-                    point = hit.point;
-                    normal = Vector3.up;
+
+                    normal = NormalFromScene(ray) ?? Vector3.up;
                     return true;
                 }
             }
 
+            Vector3? sceneNormal = NormalFromSceneWithPoint(ray, out Vector3 scenePoint);
+            if (sceneNormal.HasValue)
+            {
+                point = scenePoint;
+                normal = sceneNormal.Value;
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>The scene model's normal at this ray, or null when it does not know.</summary>
+        private Vector3? NormalFromScene(Ray ray) => NormalFromSceneWithPoint(ray, out _);
+
+        private Vector3? NormalFromSceneWithPoint(Ray ray, out Vector3 point)
+        {
+            point = default;
             MRUKRoom room = MRUK.Instance != null ? MRUK.Instance.GetCurrentRoom() : null;
             if (room != null &&
                 room.Raycast(ray, maxDistance, out RaycastHit mrukHit, out MRUKAnchor _))
             {
                 point = mrukHit.point;
-                normal = mrukHit.normal;
-                return true;
+                return mrukHit.normal;
             }
 
-            return false;
+            return null;
         }
 
         /// <summary>

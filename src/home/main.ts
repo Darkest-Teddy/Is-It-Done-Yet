@@ -11,7 +11,7 @@
  *   `homev2.html`   THIS -- the same cook flow as a page anyone can open in a browser at any
  *                 window size, which is what was deployed and what the public link shows.
  *
- * The deployed version of this page is not in this repository (DECISIONS.md #24). Its
+ * The deployed version of this page is not in this repository (DECISIONS.md #27). Its
  * structure was read off the live HTML and its behaviour off the shipped bundle, and both were
  * rebuilt here against the same tested core the rest of the app uses -- `src/core/pantry.ts`
  * for the tally and the matching, `src/core/recipe.ts` for the dishes, `src/vision/segment.ts`

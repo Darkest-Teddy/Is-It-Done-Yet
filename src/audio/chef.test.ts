@@ -12,7 +12,7 @@ import { MAX_RELAY_STRIKES } from '../core/voice/speech.js';
  * a fallback rather than in silence. A stubbed `fetch` would prove the stub. What cannot be
  * proven here is the decode -- `decodeAudioData` needs a real audio device -- so the context
  * below is a fake that records what it was asked to play, and the live ElevenLabs call is
- * UNVERIFIED from this repository. See DECISIONS.md entry 25.
+ * UNVERIFIED from this repository. See DECISIONS.md entry 28.
  */
 let server: Server;
 let relayUrl = '';

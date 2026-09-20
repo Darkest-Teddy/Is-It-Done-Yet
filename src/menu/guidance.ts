@@ -186,7 +186,7 @@ export function mountGuidance(options: GuidanceOptions): Guide {
     options.recipe === null
       ? null
       : new CoachSession(options.recipe, {
-          // Uncalibrated on purpose. DECISIONS.md entry 22: millimetres need a calibration step
+          // Uncalibrated on purpose. DECISIONS.md entry 25: millimetres need a calibration step
           // and ninety seconds with a judge is the worst place for one, so every thickness stays
           // null and no thickness deficit is ever raised here. Counts and proportions still are.
           pxPerMm: null,

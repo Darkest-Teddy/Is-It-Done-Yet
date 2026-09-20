@@ -13,7 +13,7 @@ import {
 /**
  * A real HTTP server rather than a mocked `fetch`.
  *
- * Nothing in this repo has called a live Qwen3 endpoint (DECISIONS.md #23), so the transport is
+ * Nothing in this repo has called a live Qwen3 endpoint (DECISIONS.md #26), so the transport is
  * the part that CAN be proven here and the part most likely to be quietly wrong: the request
  * shape, the two response envelopes, and every failure path having a fallback rather than an
  * exception. A stubbed `fetch` would prove none of that -- it would prove the stub.
@@ -130,7 +130,7 @@ describe('askQwen against a live OpenAI-compatible stub', () => {
       { role: 'user', content: 'USER' },
     ]);
     expect(received['response_format']).toEqual({ type: 'json_object' });
-    // UNVERIFIED against a live server, but it must at least be sent -- see DECISIONS.md #23.
+    // UNVERIFIED against a live server, but it must at least be sent -- see DECISIONS.md #26.
     expect(received['enable_thinking']).toBe(false);
   });
 

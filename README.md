@@ -7,7 +7,11 @@ and tells you how thick your slices actually were — in millimetres you can che
 6.2mm average, ±0.5mm. Target 6mm, ±2mm.
 ```
 
-No headset. One camera. Everything runs in the browser, locally, with no network.
+No headset. One camera. Everything on this page runs in the browser, locally, with no network.
+
+**This repo holds two builds.** This README covers the browser app in `src/`. There is also a
+Quest 3/3S MR perception app in `unity/` — see `unity/README.md`. Neither is the Quest/IWSDK
+cooking simulation that `CLAUDE.md` describes; that code is not in this repository.
 
 ---
 
@@ -48,7 +52,9 @@ cut — inflating the score in the one direction nobody would question.
 
 ### Not built
 
-Thermal simulation, hand-safety tracking, blade tracking, anything XR. `CLAUDE.md` in this repo
+Thermal simulation, hand-safety tracking, blade tracking. No XR **in this app** — but see
+`unity/` for the Quest build, which is a separate program sharing only the design in
+`src/core/perception/`. `CLAUDE.md` in this repo
 is the master spec for a Quest 3S build whose code is **not here**; `DECISIONS.md` entries 1–11
 describe it, and entry 12 explains what happened. Read both as doctrine, not description.
 
@@ -58,7 +64,7 @@ describe it, and entry 12 explains what happened. Read both as doctrine, not des
 
 ```bash
 npm ci
-npm test       # purity + typecheck + 136 tests
+npm test       # purity + typecheck + 196 tests
 npm run dev    # http://localhost:8081
 ```
 
@@ -66,7 +72,7 @@ npm run dev    # http://localhost:8081
 
 | Page | What it is |
 |---|---|
-| `/app.html` | **The menu.** Title, loading, counter tally, chef's pick, recipe library, dish card and the competitive cutting round — the seven screens from the design document. Built for the Quest Browser window; the counter and the cutting round sit on the passthrough camera. See DECISIONS #22. |
+| `/app.html` | **The menu.** Title, loading, counter tally, chef's pick, recipe library, dish card and the competitive cutting round — the seven screens from the design document. Built for the Quest Browser window; the counter and the cutting round sit on the passthrough camera. See DECISIONS #25. |
 | `/index.html` | The laptop debug app: one camera, the full cut pipeline, and a slider for every threshold. |
 | `/lab.html` | The feature test rig, sized for the Quest Browser window. Times every stage of the pipeline on the headset itself (DECISIONS #21). |
 | `/xr.html` | The `immersive-ar` session and the spatial UIKitML panels. `menu.html` previews those panels in plain DOM on a laptop. |

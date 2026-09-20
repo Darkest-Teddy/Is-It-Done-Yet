@@ -15,7 +15,7 @@
       This page reproduces the flow, structure and copy of the version deployed at
       https://is-it-done-yet.vercel.app/ -- title, counter, library, dish card -- and restyles
       it against the menu design document. The deployed page's source is not in this
-      repository and never was: DECISIONS.md #24 records how that was established and what was
+      repository and never was: DECISIONS.md #27 records how that was established and what was
       done about it. Its own HTML comment points at a `src/ui/scan.ts` and an `api/vision`
       route that exist on no branch here.
 
@@ -103,7 +103,7 @@
       // everything but navigations cache-first, which is right for a built bundle because Vite
       // fingerprints asset filenames -- and completely wrong in dev, where module URLs are
       // stable, so every edit is served from the cache and the app silently stops updating.
-      // (DECISIONS.md #22 records the session this cost.)
+      // (DECISIONS.md #25 records the session this cost.)
       if (import.meta.env.PROD && 'serviceWorker' in navigator) {
         navigator.serviceWorker
           .register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL })

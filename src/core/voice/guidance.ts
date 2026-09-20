@@ -82,7 +82,7 @@ export interface CookContext {
   /**
    * Text read off a printed recipe card by OCR, when the cook has asked for one to be read.
    *
-   * Null is the normal case and not a failure. See DECISIONS.md entry 23 for why this is a
+   * Null is the normal case and not a failure. See DECISIONS.md entry 26 for why this is a
    * deliberate, on-demand, cook-initiated read rather than something the loop does by itself.
    */
   readonly cardText: string | null;
@@ -277,7 +277,7 @@ export function localGuidance(ctx: CookContext, prompted = true): Guidance {
   if (ctx.recipeName === null) {
     // The free round. There is no recipe to be behind on, so the only useful thing to say is
     // about the cutting itself, and `evenness` is the one number that is true without a
-    // calibration step (DECISIONS.md entry 22).
+    // calibration step (DECISIONS.md entry 25).
     if (ctx.evenness !== null) {
       const pct = Math.round(ctx.evenness * 100);
       return guidance(

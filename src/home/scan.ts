@@ -2,7 +2,7 @@
  * The two detectors behind the counter screen.
  *
  * This is the file the deployed page's own HTML comment points at as `src/ui/scan.ts`. That
- * file is not in this repository and never was (DECISIONS.md #24), so this is a rebuild of it
+ * file is not in this repository and never was (DECISIONS.md #27), so this is a rebuild of it
  * from the behaviour the shipped bundle exhibits -- the same constants, the same two-detector
  * split, the same failure copy.
  *
