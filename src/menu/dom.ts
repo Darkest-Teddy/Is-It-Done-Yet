@@ -89,11 +89,28 @@ export function button(
   return h('button', { class: className, attrs: { type: 'button' }, on: { click: onClick } }, ...children);
 }
 
-/** One of the design's ingredient pictures, sized by the caller. */
-export function art(src: string, remWidth: number, alt = ''): HTMLImageElement {
+/**
+ * One of the design's ingredient pictures, sized by the caller.
+ *
+ * EAGER BY DEFAULT, and that is the opposite of the usual advice for a reason. Nearly every
+ * picture in this app is already on screen when its panel mounts -- the title screen's two mode
+ * icons, the four tally rows, the chips on a dish card. A lazy image in the viewport still
+ * loads, but only after layout, so the whole screen paints once with holes in it and again a
+ * moment later with pictures. On a headset that reads as the app being broken for a beat.
+ *
+ * `lazy` is opted into by the two places that genuinely need it: the recipe grid and the
+ * add-an-ingredient picker, which can put dozens of icons behind a scroll line.
+ */
+export function art(src: string, remWidth: number, alt = '', lazy = false): HTMLImageElement {
   return h('img', {
     class: 'art',
-    attrs: { src, alt, draggable: 'false', decoding: 'async', loading: 'lazy' },
+    attrs: {
+      src,
+      alt,
+      draggable: 'false',
+      decoding: 'async',
+      ...(lazy ? { loading: 'lazy' } : {}),
+    },
     style: { width: `${remWidth}rem`, height: `${remWidth}rem`, objectFit: 'contain' },
   });
 }

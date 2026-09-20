@@ -244,7 +244,7 @@ export function counterPanel(ctx: AppContext, _params: RouteParams): Panel {
               });
               paint();
             },
-            art(artFor(name, categoryFor(name)), 1.7),
+            art(artFor(name, categoryFor(name)), 1.7, pretty(name), true),
             h('span', { class: 'truncate', text: pretty(name) }),
           ),
         ),

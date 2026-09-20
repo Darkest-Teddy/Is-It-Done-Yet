@@ -117,7 +117,7 @@ export function libraryPanel(ctx: AppContext, _params: RouteParams): Panel {
       h(
         'div',
         { class: 'library__card-tile', style: { background: match.makeable ? 'var(--leaf)' : 'var(--cream-deep)' } },
-        art(artFor(hero, categoryFor(hero)), 4.4, recipe.name),
+        art(artFor(hero, categoryFor(hero)), 4.4, recipe.name, true),
       ),
       h('span', { class: 'display d-sm library__card-name', text: recipe.name }),
       h(
