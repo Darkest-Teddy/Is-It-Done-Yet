@@ -1,0 +1,157 @@
+/*
+  Screen 1B, in artboard pixels. Same rules as `title.css`: the board is 1600x900 and scaled by
+  one transform, so every number here is the number in the design document.
+
+  The burger keeps its exact stack -- a 420x372 box with six layers pinned by `bottom` and a
+  blurred ellipse for the contact shadow -- and loses `idy-s1` through `idy-s6`, the 2.8s loop
+  that dropped each layer in forever regardless of what was actually loading. What replaces it
+  is the same picture carrying real information: a layer is a ghost until its load step
+  finishes, so the stack IS the progress bar and a slow step is the layer still hollow.
+*/
+
+.l-board {
+  background: #f5230e;
+  border: 5px solid #3b2a1b;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow:
+    inset 0 4px 0 rgb(255 255 255 / 0.6),
+    inset 0 -30px 60px rgb(150 96 54 / 0.2),
+    0 8px 0 rgb(59 42 27 / 0.22),
+    16px 20px 0 rgb(59 42 27 / 0.2),
+    30px 40px 60px rgb(59 42 27 / 0.28);
+}
+
+.l-centre {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ---------------------------------------------------------------- the stack */
+
+.l-stack { position: relative; width: 420px; height: 372px; }
+
+.l-shadow {
+  position: absolute;
+  left: 50%;
+  bottom: -8px;
+  margin-left: -118px;
+  width: 236px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgb(59 42 27 / 0.26);
+  filter: blur(3px);
+}
+
+.l-layer {
+  position: absolute;
+  left: 50%;
+  transform-origin: 50% 100%;
+  /* Not loaded yet. A pale silhouette rather than a faded colour one: faded colour on this red
+     ground turns every pending layer a slightly different red, which is unreadable. */
+  filter: brightness(0) invert(1) opacity(0.22);
+}
+
+.l-layer.is-done { filter: none; }
+.l-layer svg { width: 100%; display: block; overflow: visible; }
+
+/* ---------------------------------------------------------------- readout */
+
+.l-readout { margin-top: 58px; text-align: center; }
+
+.l-caption {
+  font-family: var(--display);
+  font-size: 38px;
+  letter-spacing: 0.06em;
+  color: #fff3e4;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+
+.l-meter {
+  margin: 26px auto 0;
+  width: 340px;
+  height: 18px;
+  background: rgb(59 42 27 / 0.3);
+  border: 4px solid #3b2a1b;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.l-meter__fill {
+  height: 100%;
+  background: #fbd24b;
+  /* Width is progress, not motion: it only moves when a real step completes. */
+  transition: width 140ms linear;
+}
+
+.l-mode {
+  margin-top: 14px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #ffd9c9;
+}
+
+/* Not in the artboard. Six layers is six load steps, and naming them is what turns the stack
+   from decoration into a diagnostic -- worth the six lines it costs. */
+.l-steps {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  justify-content: center;
+  gap: 6px 22px;
+  margin-top: 22px;
+}
+
+.l-step {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgb(255 243 228 / 0.5);
+}
+
+.l-step.is-done { color: #fff3e4; }
+
+.l-tick {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgb(255 243 228 / 0.18);
+  font-size: 10px;
+}
+
+.l-step.is-done .l-tick { background: #fbd24b; color: #3b2a1b; }
+
+/* ---------------------------------------------------------------- trim */
+
+.l-tip {
+  position: absolute;
+  left: 40px;
+  top: 34px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #ffd9c9;
+}
+
+/* The chequered hem along the bottom edge. */
+.l-hem {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 30px;
+  background: repeating-linear-gradient(90deg, #3b2a1b 0 30px, #fff3e4 30px 60px);
+}
