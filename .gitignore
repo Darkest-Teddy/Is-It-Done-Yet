@@ -28,3 +28,5 @@ results/
 # CaptainCook4D: downloaded videos and upstream clones/venv (see data/README.md)
 data/captaincook4d/raw/
 data/captaincook4d/.cache/
+unity/dev-frames/*
+!unity/dev-frames/README.md
