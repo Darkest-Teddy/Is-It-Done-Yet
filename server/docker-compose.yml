@@ -1,0 +1,27 @@
+# An alternative to the embedded database for anyone who would rather run a real mongod.
+#
+#   docker compose up -d
+#   MONGODB_URI=mongodb://127.0.0.1:27017 npm run seed
+#   MONGODB_URI=mongodb://127.0.0.1:27017 npm run dev
+#
+# Not required. With no MONGODB_URI the server starts its own MongoDB, which is the path the
+# README documents because it needs neither Docker nor an account.
+
+services:
+  mongo:
+    image: mongo:8
+    restart: unless-stopped
+    ports:
+      # Bound to loopback on purpose. A mongo with no auth listening on 0.0.0.0 at a hackathon
+      # venue is on a network with a thousand strangers.
+      - '127.0.0.1:27017:27017'
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ['CMD', 'mongosh', '--quiet', '--eval', "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mongo-data:
