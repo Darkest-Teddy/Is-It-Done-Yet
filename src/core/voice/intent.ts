@@ -36,6 +36,15 @@ export type Intent =
   | { readonly kind: 'setTarget'; readonly mm: number }
   /** "what should I make" -- the open question the model is actually useful for. */
   | { readonly kind: 'suggest' }
+  /**
+   * "I don't know what to do next" -- the cook is stuck *inside* a dish, not shopping for one.
+   *
+   * Kept apart from `suggest` because they are opposite questions with opposite answers.
+   * `suggest` means "give me a different ticket"; `stuck` means "I am on this one and I have
+   * lost my place", and answering it with a new recipe is the worst possible reply. See
+   * `guidance.ts`, which is what actually answers it.
+   */
+  | { readonly kind: 'stuck' }
   /** "give me the tzatziki" -- switch tickets. */
   | { readonly kind: 'setRecipe'; readonly id: string }
   /** Gentle Nonna at 0, Full Service at 1. Master spec 9.5. */
@@ -196,6 +205,19 @@ const RULES: readonly Rule[] = [
   {
     test: /\b(is it done|am i done|are we done|how am i doing|hows it going|how is it going|how are (my|the) (slices|cuts)|whats my score|my score|read me|how did i do|how thick (were|was|are|did))\b/,
     build: () => ({ kind: 'progress' }),
+  },
+  {
+    /**
+     * Being stuck, in every phrasing people actually use for it.
+     *
+     * BEFORE `suggest` deliberately. The two overlap in vocabulary and diverge completely in
+     * what a correct answer looks like, and the discriminator is that being stuck is about the
+     * dish in front of you. "What do I do" is a cook mid-recipe; "what should I cook" is a cook
+     * with an empty board. The `suggest` phrasings below are left exactly as they were, so
+     * nothing that used to pick a new ticket has quietly stopped doing so.
+     */
+    test: /\b(i ?(dont|do not) know what|dont know what|no idea what|what do i do|what am i (meant|supposed) to do|what(s| is) my next step|what(s| is) the next step|next step|(im|i am) stuck|(im|i am) lost|(im|i am) confused|help|walk me through|talk me through|guide me|unsure|what(s| is) wrong|am i doing (this|it) right)\b/,
+    build: () => ({ kind: 'stuck' }),
   },
   {
     test: /\b(what should i (make|cook|do)|what can i (make|cook)|cook this up|cook it up|what do you suggest|suggest something|give me (a|another) (recipe|ticket|dish)|whats next|what next|surprise me)\b/,

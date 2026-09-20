@@ -1,0 +1,187 @@
+/*
+  The chef's guidance card, and the pin it puts over the real board.
+
+  A NEW FILE RATHER THAN AN ADDITION TO cutting.css, because these two things are not screen
+  2E. The card is the text channel of an answer that also goes out as speech and as an overlay,
+  and the pin is the overlay channel; they are one feature with three renderers and they belong
+  together. Screen 2E is one of the places that mounts them.
+
+  Everything is in artboard pixels, matching cutting.css, because the card lives inside the
+  same scaled 1440x810 board. The left column is where it goes: the head sits at left 48 / top
+  34, the board guide at left 352, the stats at left 352 / bottom 76, so the strip below the
+  title and left of the board is the one genuinely empty region on that screen.
+
+  Palette and chrome are the design system's own -- cream panel, 5px maroon outline, the hard
+  offset lift -- so the card reads as part of the same kitchen rather than as a debug overlay
+  someone bolted on.
+*/
+
+.g-card {
+  position: absolute;
+  left: 44px;
+  top: 150px;
+  width: 296px;
+  max-height: 600px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #fff3e4;
+  border: 5px solid #46101a;
+  border-radius: 24px;
+  padding: 16px 16px 18px;
+  box-shadow:
+    inset 0 4px 0 rgb(255 255 255 / 0.75),
+    inset 0 -12px 22px rgb(120 74 44 / 0.18),
+    0 5px 0 rgb(70 16 26 / 0.35),
+    9px 12px 0 rgb(70 16 26 / 0.5),
+    18px 26px 38px rgb(0 0 0 / 0.5);
+}
+
+.g-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+
+.g-title {
+  font-family: var(--display);
+  font-size: 26px;
+  line-height: 1;
+  color: #46101a;
+  text-transform: uppercase;
+}
+
+/*
+  Which tier answered, said out loud rather than hidden.
+
+  The same argument `stt.ts` makes about naming the active speech provider: a status line that
+  says which door the answer came through is what stops "the chef is being vague" turning into
+  twenty minutes of debugging a model that was never reached.
+*/
+.g-badge {
+  flex: 0 0 auto;
+  background: #cde6c7;
+  border: 3px solid #46101a;
+  border-radius: 999px;
+  padding: 3px 10px 4px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #2f5a26;
+  white-space: nowrap;
+}
+
+.g-badge.is-pending { background: #fbe3a0; color: #8a6a2e; }
+
+/* An unprompted correction is a different event from an answer, and must not look identical. */
+.g-badge.is-alert { background: #f9c7be; color: #9a4e44; }
+
+.g-line {
+  font-family: var(--display);
+  font-size: 22px;
+  line-height: 1.12;
+  color: #f5230e;
+}
+
+.g-why { margin: 0; font-size: 13px; font-weight: 600; line-height: 1.35; color: #3b2a1b; }
+
+.g-heard {
+  font-size: 11px;
+  font-weight: 700;
+  font-style: italic;
+  color: #8a5a3c;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.g-note { font-size: 11px; font-weight: 800; color: #9a2a18; line-height: 1.3; }
+
+.g-actions { display: flex; gap: 8px; }
+
+/* Inherits .k-act from cutting.css for the press feedback; only the sizing differs. */
+.g-ask { flex: 1; }
+.g-read { flex: 1; background: #c4daee; color: #46101a; }
+
+.g-typed {
+  width: 100%;
+  background: #fff;
+  border: 3px solid #46101a;
+  border-radius: 12px;
+  padding: 8px 10px;
+  font-family: var(--body);
+  font-size: 13px;
+  color: #46101a;
+}
+
+.g-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #8a5a3c;
+}
+
+.g-modes { display: flex; gap: 6px; }
+
+/*
+  Master spec 9.5's intensity slider, as three buttons.
+
+  Three states rather than a slider because a ray-pointed slider on a headset is miserable and
+  because the only distinctions that matter here are the three the nag policy actually has.
+  "Silent" is first and is a real off switch: an assistant that cannot be switched off is one
+  people switch off by taking the headset away.
+*/
+.g-mode {
+  flex: 1;
+  background: #f7e3cc;
+  border: 3px solid #46101a;
+  border-radius: 999px;
+  padding: 5px 4px 6px;
+  font-family: var(--body);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8a5a3c;
+  cursor: pointer;
+}
+
+.g-mode.is-on { background: #fbd24b; color: #46101a; }
+.g-mode:active { transform: translateY(2px); }
+
+.g-rule { font-size: 11px; font-weight: 700; color: #8a5a3c; line-height: 1.3; }
+
+/*
+  The AR channel.
+
+  Positioned by `passthroughView.setOverlay` in FRAME coordinates, so it stays on the same part
+  of the camera image when the window is resized -- see that file's header for why a naive
+  percentage drifts. Translated so the anchor is its bottom centre: the pin points down at the
+  board, and growing text must grow upwards and outwards rather than pushing itself off the
+  thing it is labelling.
+
+  Six words maximum, enforced in `core/voice/guidance.ts`. This is read at arm's length through
+  a lens by somebody holding a knife.
+*/
+.g-pin {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  max-width: 420px;
+  background: #fbd24b;
+  border: 4px solid #46101a;
+  border-radius: 16px;
+  padding: 8px 16px 10px;
+  font-family: var(--display);
+  font-size: 30px;
+  line-height: 1.05;
+  color: #46101a;
+  text-align: center;
+  text-transform: uppercase;
+  white-space: normal;
+  pointer-events: none;
+  box-shadow: 0 4px 0 rgb(70 16 26 / 0.45), 8px 12px 24px rgb(0 0 0 / 0.55);
+}
+
+/* Unprompted corrections are red. Being interrupted should not look like being answered. */
+.g-pin.is-alert { background: #f5230e; color: #fff3e4; }
+
+/* Empty means nothing is live. Hidden rather than an empty yellow box floating over the board. */
+.g-pin:empty { display: none; }

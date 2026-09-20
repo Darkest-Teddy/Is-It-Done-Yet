@@ -1,0 +1,430 @@
+/*
+  The cook flow, in the front-of-house design language.
+
+  WHAT THIS IS. `homev2.html` rebuilds the page currently deployed at
+  https://is-it-done-yet.vercel.app/ -- same four screens, same flow, same copy -- in the visual
+  language of the menu design document. The deployed page's source is not in this repository
+  (see DECISIONS.md #24), so it could not be restyled in place: its structure was read back off
+  the live HTML and its behaviour off the shipped bundle, and both were rebuilt here.
+
+  WHY NOT THE ARTBOARD STAGE. `app.html` builds each screen at its true 1440x810 artboard size
+  and scales the whole board with one transform (`src/menu/stage.ts`). That is right for seven
+  fixed compositions and wrong for this page, whose content genuinely varies in length: the
+  recipe library grows with `RECIPES`, the tally has between zero and eight groups, the
+  ingredient list is as long as the dish needs. A frozen board would clip all three. So the
+  layout reflows -- as the deployed page's own media queries already did -- and what is
+  transplanted is the *material*: the palette, the shadow stacks, the type pairing, the tinted
+  group rows and stat tiles.
+
+  Sizes are in rem off a viewport-tracking root, and artboard values are divided by 16.5 to get
+  there, the same conversion `src/menu/art.ts` documents as `designRem`. So `1.94rem` below is
+  the document's 32px, checkable against it rather than invented.
+
+  THE THREE THINGS THIS FILE EXISTS FOR.
+
+  SHADING. Nothing is a flat fill. Every raised surface carries `--gloss`: an inset white line
+  along its top edge and an inset warm shade pooling at its bottom. That pair is what makes a
+  panel read as a moulded object rather than a rectangle, and it is the single biggest
+  difference from the deployed page, which fills every card with one solid cream.
+
+  DEPTH. `--lift` is three shadows in sequence -- a coloured step in the object's own material,
+  then a hard ink step, then a soft blur. Read together they describe a slab standing off the
+  surface. A single `box-shadow` cannot do this: one blur reads as a glow, and the hard offsets
+  are what carry the thickness. Press states move the element INTO its own shadow, so the
+  offsets collapse as it goes down.
+
+  TYPE. Ranchers for display, uppercase, at the document's own tight line-heights (0.84 to
+  0.95 -- deliberately tighter than a browser default, which is what gives the headings their
+  stacked-slab look). Hanken Grotesk 700-800 for labels with real letter-spacing, 0.10em to
+  0.18em depending on size. Both self-hosted from `public/menu/fonts/`. The deployed page pulls
+  both from Google Fonts over the network, which costs a round trip before anything is readable
+  and reflows the whole page when it lands.
+*/
+
+/* Self-hosted, latin subsets, 59KB for the pair. Hanken Grotesk is variable, so one file
+   covers 400-900 and there is no second request for a bold. */
+@font-face {
+  font-family: 'Ranchers';
+  src: url('/menu/fonts/ranchers-400.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Hanken Grotesk';
+  src: url('/menu/fonts/hanken-grotesk.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+:root {
+  /* Palette, straight from the design document. The deployed page carries the same six values
+     and then uses them flat; the work here is in how they are lit, not in which they are. */
+  --ink: #46101a;          /* the 2x boards' outline, and body text */
+  --ink-warm: #3b2a1b;     /* the 1x boards' outline -- warmer, used on the title screen */
+  --cream: #fff3e4;        /* panel fill */
+  --cream-deep: #f7e3cc;   /* the title board's own fill */
+  --paper: #e7d4c0;        /* counter surface, the page ground */
+  --red: #f5230e;
+  --red-dark: #9a2a18;
+  --yellow: #fbd24b;
+  --yellow-soft: #fbe3a0;
+  --pink: #f9c7be;
+  --leaf: #cde6c7;
+  --sky: #c4daee;
+  --brown: #8a5a3c;
+  --dash: #d8bfa4;
+  --night: #2a211c;
+  --green: #2f5a26;
+  --amber: #8a4b21;
+
+  /* THE SHADING PAIR. Inset white along the top edge, inset warm shade pooling at the bottom.
+     Applied to every raised cream surface, never approximated with a single shadow. */
+  --gloss: inset 0 0.24rem 0 rgb(255 255 255 / 0.75), inset 0 -0.73rem 1.33rem rgb(120 74 44 / 0.18);
+
+  /* THE DEPTH STACK. Coloured step, ink step, soft drop -- in that order, because the blur has
+     to sit behind both hard edges or it fogs them. */
+  --lift: 0 0.3rem 0 rgb(70 16 26 / 0.35), 0.55rem 0.73rem 0 rgb(70 16 26 / 0.5),
+    1.09rem 1.58rem 2.3rem rgb(0 0 0 / 0.5);
+  --lift-sm: 0 0.18rem 0 rgb(70 16 26 / 0.3), 0.24rem 0.36rem 0 rgb(70 16 26 / 0.5),
+    0.55rem 0.85rem 1.21rem rgb(0 0 0 / 0.4);
+
+  /* The 1x boards light warmer: the coloured step is a tan rather than a maroon, because it is
+     standing on paper rather than on a dark board. */
+  --lift-warm: 0 0.18rem 0 #a97a54, 0.24rem 0.36rem 0 #3b2a1b, 0.55rem 0.79rem 0.97rem rgb(59 42 27 / 0.28);
+  --gloss-warm: inset 0 0.18rem 0 rgb(255 255 255 / 0.6), inset 0 -0.42rem 0.85rem rgb(120 74 44 / 0.18);
+
+  --display: 'Ranchers', 'Hanken Grotesk', system-ui, sans-serif;
+  --body: 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
+
+  /* One rem tracks the window with a floor and a ceiling. The floor is the size below which the
+     smallest label here stops being readable; the ceiling stops a 4K window inflating the whole
+     page into a poster. */
+  font-size: clamp(14px, 1.12vw, 20px);
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+
+html { background: var(--paper); }
+
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The 135-degree pinstripe the document lays over its paper ground. Two-pixel lines at a
+   sixteen-pixel pitch, at 3.5% -- far enough below the fill that it reads as a texture in the
+   board rather than as stripes drawn on it. Fixed, so it does not slide as the page scrolls. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgb(59 42 27 / 0.035) 0 2px,
+    transparent 2px 18px
+  );
+}
+
+img { display: block; max-width: 100%; }
+
+/* ---------------------------------------------------------------- type */
+
+.display {
+  font-family: var(--display);
+  font-weight: 400;
+  text-transform: uppercase;
+  /* The document's own value. Individual elements tighten further where it does. */
+  line-height: 0.95;
+  letter-spacing: 0.02em;
+  margin: 0;
+}
+
+/* Small caps labels. The tracking is not decoration: Hanken's uppercase is narrow, and at
+   0.7rem an untracked all-caps label reads as a smudge. */
+.label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.note {
+  font-size: 0.79rem;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--brown);
+  margin: 0;
+}
+
+.prose {
+  font-size: 0.97rem;
+  font-weight: 700;
+  line-height: 1.45;
+  color: #5a3a22;
+  margin: 0;
+}
+
+.is-ok { color: var(--green); }
+.is-warn { color: var(--amber); }
+
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- primitives */
+
+/* The cream panel every screen is built out of. Outline, gloss, lift -- all three, always. */
+.card {
+  position: relative;
+  background: var(--cream);
+  border: 0.3rem solid var(--ink);
+  border-radius: 1.58rem;
+  box-shadow: var(--gloss), var(--lift);
+  padding: 1.21rem 1.33rem 1.33rem;
+}
+
+.card--red {
+  background: var(--red);
+  color: var(--cream);
+  /* Red is dark enough that the warm inner shade would disappear into it, so the bottom inset
+     goes to black and the top highlight drops to 30% -- otherwise it reads as a white stripe. */
+  box-shadow:
+    inset 0 0.24rem 0 rgb(255 255 255 / 0.3),
+    inset 0 -0.85rem 1.58rem rgb(0 0 0 / 0.22),
+    0 0.3rem 0 var(--red-dark),
+    0.55rem 0.73rem 0 var(--ink),
+    1.09rem 1.58rem 2.06rem rgb(0 0 0 / 0.4);
+}
+
+.card--yellow { background: var(--yellow); }
+
+/* A label chip. Tinted by meaning: leaf for a good count, sky for a duration, pink for
+   difficulty, sun for a total. */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: var(--cream);
+  border: 0.18rem solid var(--ink);
+  border-radius: 999px;
+  padding: 0.3rem 0.85rem 0.36rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink);
+  white-space: nowrap;
+  box-shadow: inset 0 0.12rem 0 rgb(255 255 255 / 0.55), inset 0 -0.3rem 0.6rem rgb(70 16 26 / 0.12);
+}
+
+.pill--sun { background: var(--yellow); }
+.pill--leaf { background: var(--leaf); }
+.pill--sky { background: var(--sky); }
+.pill--pink { background: var(--pink); }
+.pill--hot { background: var(--red); color: var(--cream); }
+
+/* The display-face chip the document uses for step counters. */
+.pill--display {
+  font-family: var(--display);
+  font-size: 0.91rem;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  padding: 0.24rem 0.85rem 0.36rem;
+}
+
+/* ---------------------------------------------------------------- buttons
+
+   Every interactive thing is a real <button>: focusable, announced, and with a target box a
+   pointer can actually land on. The deployed page uses <button> for its cards too, which is
+   right and is kept. */
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  margin: 0;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.6rem;
+  padding: 0.55rem 1.4rem;
+  background: var(--cream);
+  border: 0.18rem solid var(--ink);
+  border-radius: 999px;
+  font-size: 0.79rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink);
+  box-shadow:
+    inset 0 0.15rem 0 rgb(255 255 255 / 0.6),
+    inset 0 -0.36rem 0.73rem rgb(120 74 44 / 0.16),
+    0 0.18rem 0 rgb(70 16 26 / 0.35),
+    0.18rem 0.3rem 0 rgb(70 16 26 / 0.4),
+    0.42rem 0.67rem 0.91rem rgb(59 42 27 / 0.25);
+  /* 90ms, press only. Short enough to read as the control responding rather than as an
+     animation playing -- this is latency feedback, not decoration. */
+  transition: transform 90ms ease-out, box-shadow 90ms ease-out, background-color 90ms ease-out;
+}
+
+.btn:hover, .btn:focus-visible { background: var(--yellow); outline: none; }
+
+/* The press: the element travels down and right by roughly its own offset, so it lands in the
+   hole its shadow was drawing. Everything but a hairline of the stack collapses. */
+.btn:active {
+  transform: translate(0.18rem, 0.24rem);
+  box-shadow:
+    inset 0 0.15rem 0 rgb(255 255 255 / 0.4),
+    inset 0 -0.3rem 0.6rem rgb(120 74 44 / 0.2),
+    0.12rem 0.15rem 0 rgb(70 16 26 / 0.45);
+}
+
+/* Muted, never translucent. An `opacity` fade on a panel that sits over a live camera lets the
+   counter show straight through the disabled control, which reads as a rendering fault rather
+   than as a blocked button. */
+.btn[disabled] {
+  cursor: not-allowed;
+  background: #d9c6b2;
+  color: #8a7866;
+  border-color: #8a7866;
+  box-shadow: inset 0 -0.24rem 0.48rem rgb(70 16 26 / 0.1);
+  transform: none;
+}
+
+.btn[disabled]:hover { background: #d9c6b2; }
+
+.btn--hot {
+  background: var(--red);
+  color: var(--cream);
+  box-shadow:
+    inset 0 0.15rem 0 rgb(255 255 255 / 0.3),
+    inset 0 -0.36rem 0.73rem rgb(0 0 0 / 0.2),
+    0 0.18rem 0 var(--red-dark),
+    0.18rem 0.3rem 0 var(--ink),
+    0.42rem 0.67rem 0.91rem rgb(59 42 27 / 0.3);
+}
+
+.btn--hot:hover, .btn--hot:focus-visible { background: #ff3a22; }
+.btn--hot[disabled], .btn--hot[disabled]:hover { background: #d9c6b2; color: #8a7866; }
+
+.btn--sun { background: var(--yellow); }
+.btn--sun:hover, .btn--sun:focus-visible { background: #ffdf6d; }
+
+.btn--big { min-height: 3.1rem; font-size: 0.88rem; padding: 0.7rem 1.7rem; }
+.btn--wide { width: 100%; }
+
+/* The big pressable slabs: a mode card, "cook something for me", a recipe row. Same press
+   response as `.btn`, so nothing in the page answers two different ways. */
+.press {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: var(--cream);
+  border: 0.3rem solid var(--ink);
+  border-radius: 1.58rem;
+  box-shadow: var(--gloss), var(--lift);
+  padding: 1.09rem 1.21rem 1.21rem;
+  transition: transform 90ms ease-out, box-shadow 90ms ease-out;
+}
+
+/* Hover lifts AWAY from the light: up and left, with the offsets growing to match. */
+.press:hover, .press:focus-visible {
+  outline: none;
+  transform: translate(-0.18rem, -0.24rem);
+  box-shadow:
+    var(--gloss),
+    0 0.36rem 0 rgb(70 16 26 / 0.35),
+    0.73rem 0.97rem 0 rgb(70 16 26 / 0.5),
+    1.45rem 1.94rem 2.67rem rgb(0 0 0 / 0.5);
+}
+
+.press:active {
+  transform: translate(0.3rem, 0.36rem);
+  box-shadow: var(--gloss), 0.18rem 0.18rem 0 var(--ink);
+}
+
+.press[disabled] {
+  cursor: not-allowed;
+  background: #d9c6b2;
+  transform: none;
+  box-shadow: 0 0.3rem 0 #8a7866, 0.55rem 0.73rem 0 var(--ink);
+}
+
+.press--sun { background: var(--yellow); }
+
+.press--red {
+  background: var(--red);
+  color: var(--cream);
+  box-shadow:
+    inset 0 0.24rem 0 rgb(255 255 255 / 0.3),
+    inset 0 -0.85rem 1.58rem rgb(0 0 0 / 0.22),
+    0 0.3rem 0 var(--red-dark),
+    0.55rem 0.73rem 0 var(--ink),
+    1.09rem 1.58rem 2.06rem rgb(0 0 0 / 0.4);
+}
+
+.press--red:hover, .press--red:focus-visible {
+  box-shadow:
+    inset 0 0.24rem 0 rgb(255 255 255 / 0.3),
+    inset 0 -0.85rem 1.58rem rgb(0 0 0 / 0.22),
+    0 0.36rem 0 var(--red-dark),
+    0.73rem 0.97rem 0 var(--ink),
+    1.45rem 1.94rem 2.67rem rgb(0 0 0 / 0.45);
+}
+
+/* ---------------------------------------------------------------- inset wells
+
+   A row or tile sunk INTO a panel rather than standing on it: the highlight and shade swap
+   ends, so the top edge is dark and the bottom is light. The tally group rows and the stat
+   tiles are both this, which is why they read as pressed into the card. */
+.well {
+  border: 0.24rem solid var(--ink);
+  border-radius: 1.09rem;
+  box-shadow:
+    inset 0 0.18rem 0 rgb(255 255 255 / 0.55),
+    inset 0 -0.48rem 0.85rem rgb(70 16 26 / 0.14),
+    0 0.18rem 0 rgb(70 16 26 / 0.28);
+}
+
+.divider {
+  border: 0;
+  border-top: 0.18rem dashed var(--dash);
+  margin: 1.09rem 0 0;
+}
+
+/* ---------------------------------------------------------------- scrolling boxes */
+
+.scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ink) transparent;
+  min-height: 0;
+}
+
+.scroll::-webkit-scrollbar { width: 0.5rem; }
+.scroll::-webkit-scrollbar-thumb { background: var(--ink); border-radius: 999px; }
+.scroll::-webkit-scrollbar-track { background: transparent; }

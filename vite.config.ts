@@ -45,6 +45,76 @@ function questResults(): Plugin {
 }
 
 /**
+ * Mounts the Qwen3 guidance relay on the dev server.
+ *
+ * The same handler `server/static.mjs` mounts for the built app, so what gets exercised while
+ * building the feature is what runs on the deployed one. Without this, the relay would only
+ * exist in production and the only way to develop against a model would be a `VITE_`-prefixed
+ * key in the browser -- which is exactly the thing `.env.example` warns about and the relay
+ * exists to avoid.
+ *
+ * With `QWEN_BASE_URL` unset the handler answers 503 and the app falls back to its local
+ * guidance, which is a complete answer on its own. Nothing here is required for the app to run.
+ */
+function guidanceRelay(): Plugin {
+  return {
+    name: 'guidance-relay',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use('/api/guidance', (req, res, next) => {
+        if (req.method !== 'POST') {
+          next();
+          return;
+        }
+        void import('./server/guidance.mjs')
+          .then((module) => (module as { handleGuidance: (a: unknown, b: unknown) => Promise<void> })
+            .handleGuidance(req, res))
+          .catch((error: unknown) => {
+            server.config.logger.error(`[guidance] ${(error as Error).message}`);
+            res.statusCode = 500;
+            res.end('{"error":"relay unavailable"}');
+          });
+      });
+    },
+  };
+}
+
+/**
+ * Mounts the ElevenLabs speech relay on the dev server, for the same reasons as above.
+ *
+ * Kept as its own plugin rather than folded into `guidanceRelay` because the two fail
+ * independently: a deployment can have a model and no voice, or a voice and no model, and a
+ * single plugin mounting both would make that read as one switch.
+ *
+ * With no key the handler answers 503, the browser marks the tier dead after the first one and
+ * stops asking, and the chef falls back to whatever voice the browser has. On the headset that
+ * is nothing (DECISIONS.md entry 19) and the subtitle carries the answer alone -- which is the
+ * behaviour this repo shipped before the relay existed, not a regression introduced by it.
+ */
+function speechRelay(): Plugin {
+  return {
+    name: 'speech-relay',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use('/api/speech', (req, res, next) => {
+        if (req.method !== 'POST') {
+          next();
+          return;
+        }
+        void import('./server/speech.mjs')
+          .then((module) => (module as { handleSpeech: (a: unknown, b: unknown) => Promise<void> })
+            .handleSpeech(req, res))
+          .catch((error: unknown) => {
+            server.config.logger.error(`[speech] ${(error as Error).message}`);
+            res.statusCode = 500;
+            res.end('{"error":"relay unavailable"}');
+          });
+      });
+    },
+  };
+}
+
+/**
  * HTTPS, and the two ways a headset reaches this server.
  *
  * OVER USB (`npm run adb:reverse`, then `npm run dev:usb`): the headset sees this as
@@ -60,7 +130,9 @@ function questResults(): Plugin {
 const useHttps = process.env['VITE_HTTPS'] !== '0';
 
 export default defineConfig({
-  plugins: useHttps ? [questResults(), basicSsl()] : [questResults()],
+  plugins: useHttps
+    ? [questResults(), guidanceRelay(), speechRelay(), basicSsl()]
+    : [questResults(), guidanceRelay(), speechRelay()],
 
   // 0.0.0.0 so the headset, a phone, or the Beam Pro on the same LAN can open it.
   server: { host: '0.0.0.0', port: 8081, open: false },
@@ -81,7 +153,9 @@ export default defineConfig({
     // the others silently never reach the bundle -- the app appears to deploy, then 404s.
     // Object form, not the bare string the IWSDK scaffold used: that one fails the dependency
     // scan outright under Vite 7 (DECISIONS.md #11).
-    rollupOptions: { input: { main: 'index.html', xr: 'xr.html', app: 'app.html' } },
+    rollupOptions: {
+      input: { main: 'index.html', xr: 'xr.html', app: 'app.html', homev2: 'homev2.html' },
+    },
   },
 
   esbuild: { target: 'esnext' },

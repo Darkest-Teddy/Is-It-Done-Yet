@@ -731,3 +731,329 @@ The cooking loop itself (`src/main.ts`, `src/app/session.ts`) is untouched, and 
 `public/ui/*.uikitml` panels and `menu.html`, which are the in-session spatial layout and its
 preview. Two visual languages coexist in the repo on purpose: this one is the menu the wearer
 navigates, that one is the coaching panel that floats beside the board while they cook.
+
+## 23. The chef answers in three channels at once, and interrupts in only one voice
+
+**Spec section:** §9.2, which wants an agent with tool access to live game state, and §9.5's
+intensity slider. Entry 16 already inverted §9.2's default for *commands*. This is the same
+argument applied to *guidance*, which is the harder case, plus the half nobody asked the chef
+for: speaking up unprompted.
+
+**Reality:** "I don't know what to do next" has no table entry. It is not a command with a
+correct parse — the answer depends on which recipe, which step, what is on the counter and what
+the camera last saw, and no amount of regex produces it. So this is the first place in the repo
+where a model is genuinely load-bearing rather than decorative, and it is also the first place
+where the chef can speak without being spoken to. Those two facts pull in opposite directions,
+and most of this entry is about keeping them apart.
+
+**Decision: one answer object, three renderers.** `Guidance { speech, overlay, text }` is
+produced once and `present()` in `src/menu/guidance.ts` is the only function that writes to any
+channel. Assembling them separately is how you get a chef saying "add the tomato" while the pin
+over the board still reads "slice thinner" from ten seconds ago, and a cook who sees that stops
+trusting all three. `parseModelGuidance` therefore falls back **whole**, never field by field: a
+reply missing `speech` is discarded entirely rather than half-repaired from the local answer.
+
+The AR channel is capped at **six words** and pinned just above the board guide, in artboard
+coordinates inside the scaled 1440x810 board rather than in window coordinates — the same trap
+the camera fault card fell into and had to be moved out of. It is read at arm's length through a
+lens by somebody holding a knife; a paragraph floating in space is not a message, it is an
+obstruction. The spoken and written channels carry the reasoning.
+
+**Decision: local first, model second, and the local answer is never a placeholder.**
+`localGuidance` is a five-rung ladder over `steps.ts` and `deficit.ts` and it is a complete
+answer — with no key, no relay and no network it *is* the feature, and it still speaks, still
+pins an imperative over the real board, and still writes the reasoning on the panel. When a model
+is configured the chef acknowledges instantly ("Let me look.") while the local answer goes up on
+the panel at the same moment, so the screen is never blank and the room is never silent during
+the round trip. When the reply lands it replaces all three channels at once. When it does not,
+the local answer was already the thing on screen and nothing has to be undone. Rules #9 and #10:
+timeout, fallback, and nothing awaited on the path that answers a human.
+
+**Decision: the asked path may use the model. The unprompted path may not.** This asymmetry is
+deliberate and it is the most important line in the entry. When the cook asks, a wrong answer
+costs them a few seconds and they are already looking at the panel. When the chef interrupts, it
+is spending attention it was not offered, and a model handed a scene description will invent a
+mistake to be helpful about. So an interruption is only ever a `Deficit`'s own instruction —
+derived from a measurement, already a complete sentence written for the cook, already tested. A
+false accusation does not cost one correction, it costs every correction after it, because the
+cook learns the chef is unreliable and stops listening. At that point a silent chef would have
+scored better.
+
+**The comparison engine is the one that was already here.** `deficit.ts` decides what is wrong,
+`kitchen.ts` adds the faults no camera could see, `timeline.ts` decides what has persisted, and
+`CoachSession` already held both — its header has described it as "the loop that turns frames
+into coaching" since it was written. Nothing about detection was rebuilt. What was missing was
+the judgement about whether a true observation is worth saying out loud, and that is
+`core/voice/nag.ts`: pure, with no clock of its own, and therefore provable from a list of
+timestamps rather than only from a headset. Four rules, and every one of them is a refusal —
+persisted rather than seen, one thing at a time, never the same correction while the cook is
+visibly acting on it, and silence below a confidence floor. `CoachSession.interruption()` records
+a returned interruption as spoken on purpose: the alternative is a caller that has to remember
+to, and the one time somebody forgets, the chef repeats itself every frame in front of a judge.
+
+**`observationConfidence` exists for exactly one failure mode.** `diff` compares the board
+against the recipe, so a board with nothing on it reports *every* requirement missing at blocking
+severity. Unguarded, a hand passing over the lens becomes the chef announcing that the cook has
+forgotten four ingredients that are sitting in front of them. Zero pieces, no camera, or a stale
+frame all return a hard zero — treated as "the camera is not looking at the board", never as "the
+board is empty". The threshold is one constant shared by the interruption gate and the answer
+ladder, so the chef cannot refuse to interrupt about a fault it is simultaneously happy to read
+aloud.
+
+**The intensity slider changes how often the chef speaks, not just how rudely.** §9.5 calls it
+an accessibility feature and the funniest control in the game; making it govern interruption
+frequency is what makes the first half of that true. Three settings on the card, and **Silent**
+is a real off switch. An assistant that cannot be switched off is one people switch off by
+taking the headset away.
+
+**Two triggers, and the second one does not exist on the headset.** The Unsure button sits on
+the cutting screen's action row and on the controller rail as X with an `x` shortcut — a real
+focusable button, for the reason `rail.ts` gives at length: a Quest Browser tab never receives
+controller face buttons, so a printed legend would be a lie along the bottom of every screen. The
+wake phrase goes through `parseIntent`, which gained a `stuck` intent, kept deliberately apart
+from `suggest` because "I am mid-dish and lost" and "give me a different dish" are opposite
+questions and answering the first with the second is the worst reply available. Entry 17 already
+measured that Quest Browser ships no `SpeechRecognition`, so on the headset `bestProvider` hands
+back the typed tier and the card grows a text box feeding the identical path. Entry 19 measured
+that it ships no `speechSynthesis` either — which is why the text channel is not decoration. On
+the headset, without a cached ElevenLabs bank, the written and pinned channels *are* the chef.
+
+**Qwen3, behind a relay, with no provider hardcoded.** Qwen3 is served by DashScope's
+OpenAI-compatible endpoint, by OpenRouter, and by anything running vLLM or Ollama; they differ in
+the base URL and the model id and in nothing else a client cares about, so both are configuration
+and the request body is plain chat-completions. `server/guidance.mjs` holds the key and is
+mounted at `/api/guidance` by both the Vite dev server and the static server, so the relay path
+is identical in dev and in production. `.env.example` has warned since the OpenAI work that a
+`VITE_` key is inlined into the client bundle and readable by anyone who opens the page, and this
+repo publishes a built app — so the browser-key path still exists, for a laptop at a booth, and
+is documented as the lesser of the two rather than offered as an equal.
+
+**What is unverified, stated plainly.** Nothing in this repo has called a live Qwen3 endpoint.
+The transport was exercised end to end against a local OpenAI-shaped stub — request body,
+`<think>`-wrapped and fenced replies, a 502 from a broken upstream, and a timeout — but the live
+model call remains unproven. The default model id `qwen3-32b` is a plausible DashScope-style id
+and is commented as unverified in all three places it appears; ids differ per provider for the
+same weights, so DashScope lists bare ids, OpenRouter namespaces them (`qwen/...`) and Ollama
+uses a tag (`qwen3:8b`). `enable_thinking: false` is sent because DashScope and recent vLLM
+builds read it and the others ignore an unknown field, but that has not been confirmed against a
+live server — `stripThinking` is the defence that does not depend on it being honoured, because
+Qwen3 is a hybrid-reasoning family and some servers deliver the reasoning inside the message
+content as a `<think>` block, where `JSON.parse` fails in a way that looks exactly like the model
+having ignored the format instruction.
+
+**OCR is on demand, and the honesty is the point.** The brief asked for OCR feeding the
+comparison loop. Entry 21 measured segmentation at 87ms per frame on the headset and Tesseract is
+heavier than that by a wide margin; the analysis loop also runs at 420px on the long edge, which
+is far below what any OCR engine needs for body text. Running it continuously would cost the
+frame budget and return junk, and no throughput figure is claimed here because none has been
+measured. So "Read a card" is a button: it takes the video at **full** resolution rather than the
+analysis canvas, votes across three reads with `core/perception/textVote.ts`, and reports nothing
+the reads did not agree on — a null verdict renders as "nothing legible", never as a best guess,
+because a card reading "4 tomatoes" becoming "4 tomatuea" is worse than no read at all. What it
+is expected to manage is large print on a card **held up to the camera**. Reading a recipe card
+lying flat on the counter at arm's length is **UNVERIFIED on a headset** and should not be
+promised to anyone until somebody has tried it. Accepted text joins the context the model reasons
+over; the deterministic engine does not depend on it at any point, which is what lets the
+autonomous half work without it.
+
+**What this is not.** The autonomous watch runs only while a round is running and only when a
+recipe is selected — the free round has no recipe to be behind on, so it gets guidance on demand
+and nothing unprompted. Thicknesses stay uncalibrated, exactly as entry 22 left them, so no
+millimetre deficit is ever raised on this screen: counts, proportions, evenness and the
+cook-confirmed steps are what the chef speaks about. `src/main.ts` and the `public/ui/*.uikitml`
+panels are untouched. `CoachSession` gained `ingestPieces` and `interruption` and lost nothing,
+so the laptop debug app still drives it exactly as it did.
+
+## 24. The deployed cook flow has no source in this repository, so it was rebuilt rather than restyled
+
+There is a live page at `https://is-it-done-yet.vercel.app/`. It is the cook flow — title,
+counter tally, recipe library, dish card — built to the same brief as the menu document, and it
+is markedly plainer than that document intends: flat fills, plain outlined rectangles, no depth
+anywhere, and both webfonts pulled from Google Fonts at runtime. The obvious task is to restyle
+it in place. That turned out to be impossible, and establishing *why* is the first half of this
+entry.
+
+**Nothing on any branch contains that page.** Its title-screen copy ("Count my counter") appears
+in no commit reachable from any ref. The two files its own HTML comment points at —
+`src/ui/scan.ts` and an `api/vision` route — exist in no tree in the repository's history;
+walking `git ls-tree` over every commit on every branch returns nothing for either. The
+conclusion is not that the source was deleted, it is that it was never pushed: the page was
+deployed from somebody's local working tree and that tree is the only copy. So there is no file
+to edit, and "restyle the deployed page" reduces to "write the deployed page".
+
+**What exists now is `homev2.html` and `src/home/`, a reconstruction.** The flow, the structure and
+the copy were read off the live HTML and the shipped bundle — both are still fetchable, and the
+bundle still carries its strings — and rebuilt against the tested core the rest of the app
+already uses: `src/core/pantry.ts` for the tally and the matching, `src/core/recipe.ts` for the
+dishes, `src/vision/segment.ts` for the frames. It is a third entry point beside the two that
+were already there, and the three are deliberately not merged: `index.html` is the laptop debug
+app, `app.html` is the artboard at its true 1440x810 scaled by one transform for reading through
+a lens, and `homev2.html` is the same cook flow as a page that reflows into whatever window it is
+opened in. `src/menu/` and `app.html` are untouched.
+
+**The restyle is the three things the deployed page does not do.**
+
+*Shading.* Nothing is a flat fill. Every raised surface carries `--gloss` — an inset white line
+along its top edge and an inset warm shade at its bottom — so a panel reads as a lit object
+rather than as a coloured rectangle. It is two inset shadows and it does more than any amount of
+texture would.
+
+*Depth.* `--lift` is a stack, not a blur: a coloured step in the object's own material, a hard
+offset in the outline colour, then one soft drop underneath. That stacked hard offset is the
+artboard's entire depth language, and it is the single largest visual difference from the
+deployed page, whose cards sit flat on the ground behind a 3px outline and nothing else. Hover
+lifts *away* from the light and the offsets grow to match; a press sinks the object and collapses
+them. The dish card is the deepest object in the flow, on the widest offsets in the document,
+because it is the screen the flow ends on.
+
+*Typography.* Ranchers for display and Hanken Grotesk for text, both self-hosted from
+`public/menu/fonts/` and preloaded rather than fetched from Google Fonts. The deployed page pays
+a preconnect, a stylesheet round trip and a font fetch before anything is readable, and then
+reflows every screen at once when the faces land — and since the whole design is set in those two
+faces, that reflow is the entire page moving. The files were already in the repository. The
+display face is also used at genuinely display sizes: the dish name is roughly four times the
+size the deployed page sets it, and the wordmark carries the document's six-layer cream outline.
+
+**One piece of copy was deliberately not reproduced, and it is the one the brief cares about.**
+The deployed dish card's only action says "Start cooking". Pressing it writes "step tracking is
+not wired up yet" into the note beside it. That is honest on the second press and a promise the
+app cannot keep on the first, which is exactly the wrong way round — the label is what a visitor
+reads and commits to, and the note is what they read after being let down. There is no guided
+cook in this flow to start: the cutting round lives on `app.html` and has no notion of which dish
+was picked, so wiring the button to it would swap one false claim for another. The button now
+says **"Show the steps"**, and shows them. `recipe.steps` is real data, and every step already
+carries `verifiable`, so each line says whether the counter camera can confirm it ("camera can
+check this") or whether only the cook can ("you confirm this one"). That tag is the honest,
+per-step version of the claim the old label was making across a whole recipe. The button is also
+never disabled: readiness is what the ingredient count and the note above it report, and greying
+out the only action on the screen because a tomato is missing would withhold the half of a recipe
+that does not depend on the counter at all.
+
+Everything else is the deployed page's copy word for word, including the two-detector
+explanation, the group headings, "Cook something for me", "Browse instead" and "Identify
+everything". Where a number is shown it is computed: the title screen's "3 dishes" is
+`RECIPES.length`, its rank is `progressFor(0)` rather than a flattering literal, and the
+library's "0 of 3 ready" is counted. The artboard's own "5 runs" flag has no data behind it and
+so is not drawn; entry 22 settled that rule and this follows it.
+
+**The deployed page fixed a bug in a comment, and the rebuild had reintroduced it.** Its HTML
+carries a note saying the scan's status line must not be the tally's subtitle, because the live
+loop rewrites that four times a second, so anything the scan put there — including the reason it
+failed — was gone in 250ms and the button read as having done nothing at all. The reconstruction
+wrote the deep scan's result, its failure reason and the recommender's "nothing is makeable yet"
+straight back into that subtitle. `src/home/screens/counter.ts` now has its own `c-scanline`,
+outlined and tinted by outcome, which the render path never touches. Worth recording because the
+bug had already been solved once, in a comment, by someone whose code is gone.
+
+**`src/home/` does not have the hidden-tab fit bug, and that was checked rather than assumed.**
+`src/menu/stage.ts` used to retry its scale-to-fit on `requestAnimationFrame`, which does not run
+in a background tab, so a board built while hidden stayed unscaled and overflowing and read as a
+cropped design; it retries on a short timeout now. `src/home/` has no scale-to-fit at all — it is
+a reflowing page, not an artboard — and its only two `requestAnimationFrame` calls are the camera
+analysis loop in `src/home/scan.ts`, which is a genuine per-frame loop and *should* stop when the
+tab is hidden, because there is no point segmenting frames nobody is looking at. Nothing to fix,
+which is itself the finding.
+
+**What is not verified.** `src/home/` has no unit tests. The suite has no DOM environment — all
+501 tests run in plain Node — and adding jsdom to cover four screen builders was more risk to the
+existing suite than the coverage is worth this close to the deadline. The screens were checked by
+hand in a browser instead, at 1536, 820 and 420 CSS pixels, walking title → counter → library →
+dish with the method open and testing for horizontal overflow at each width; there is none. The
+camera path is unexercised beyond its closed state: the live count, the overlay and the stability
+window have never run in this page against a real stream, only in `src/menu/`, from which they
+were carried over unchanged. `api/vision` does not exist in this repository either, so "Identify
+everything" probes for the relay at startup and disables itself as "(no key set)" — the branch
+that runs locally is the one reporting the relay's absence, and the branch that actually calls it
+has therefore never been exercised here.
+
+## 25. The chef's bank can only say what was written in advance, so the headset never heard the model
+
+**Spec section:** §9.2 and §9.3. §9.3 asks for a bank of lines pre-generated at load and played
+instantly on game events, with a live agent reserved for open conversation. That is the right
+design and it is what `src/audio/chef.ts` implemented. Entry 23 then built the open-conversation
+half — the in-cooking chef, three channels, Qwen3 phrasing the answer. The two halves were
+correct separately and did not meet.
+
+**Reality:** the bank is a `Map` keyed by **exact line text**. It is filled by iterating
+`allLines()` from `core/barks.ts`, and playback is `bank.get(bark.line)`. It can therefore speak
+exactly the sentences somebody typed into that file and no others. Every line the guidance panel
+produces is novel — Qwen3 writes its own, and even the model-free `localGuidance` assembles
+sentences out of deficit text at runtime. Not one of them was ever in the Map.
+
+On a laptop that miss is invisible, because `speechSynthesis` catches it, which is why this
+survived being built and tested. Entry 19 measured the headset: `speechSynthesis` is **absent**
+in Quest Browser, not unreliable, so the chef there "is either ElevenLabs or subtitles, with
+nothing in between". A line that was never pre-generated is not in ElevenLabs either. The result
+was that **every model-generated answer was silent on the only device this is built for**, and
+the panel that was supposed to prove the chef could think was proving it in writing only.
+
+Entry 19 called this out as far as the bank goes — it said the bank must be generated before a
+headset demo starts and that the subtitle path has to carry the demo alone. What it did not
+anticipate is that a whole feature would later produce text the bank structurally cannot hold.
+
+**Decision: a fourth tier — synthesise novel text on demand — above the browser voice and below
+the bank.** The two ElevenLabs tiers do two different jobs and both are kept. The bank exists so
+a reaction to a cut arrives *with* the cut; a round trip per slice puts the chef a second behind
+the knife, which is §9.3's own argument and still correct. The on-demand tier is for an answer
+to a question, where the cook has already asked and is already looking at the panel.
+
+**Whole clips, not streaming.** `chef.ts` already decodes an `arrayBuffer` into an `AudioBuffer`
+and plays it through a source node; that path is the one known to work on the headset, and it is
+reused rather than re-invented. Streaming would mean Media Source Extensions and hand-rolled
+chunk handling on a browser that is already awkward, and it would buy almost nothing, because
+the latency is solved elsewhere: `openingMove` speaks an acknowledgement the instant the button
+is pressed and `present()` replaces all three channels when the real answer lands. The one thing
+added for latency is `prime()`, which fetches that fixed acknowledgement at mount — a cover that
+arrives four seconds late covers nothing.
+
+**Through the relay, never a browser key.** `server/speech.mjs` is a sibling of `guidance.mjs`
+and follows it exactly: zero dependencies, mounted at `/api/speech` by both `vite.config.ts` and
+`static.mjs` so dev and production run the same handler, the upstream body never forwarded, the
+key never leaving the server. It refuses to let the caller name the voice, which is the one
+place it is *stricter* than the guidance relay — that relay lets a caller pick a model because
+switching between a local Ollama and a hosted endpoint mid-demo is a legitimate thing to want,
+and there is no equivalent reason to synthesise into a voice the caller chose. `.env.example`
+has warned since the OpenAI work that a `VITE_` key is readable by anyone who opens the page,
+and this repo publishes a built app.
+
+**The browser-side bank generation keeps its browser-side key and was deliberately left alone.**
+It runs once, at load, on a booth laptop we own, and routing it through the relay would trade a
+known-working instant-bark path for a migration nobody asked for at this point in the schedule.
+
+**This tier is load-bearing, so its failure mode got more design than the feature.** If it hangs,
+the headset is silent and text is all that is left, so: a four-second ceiling per line, shorter
+than the bank's, because the acknowledgement only covers so much; one failure is tolerated and
+the second retires the tier for the life of the page; and a 404 or a 503 retires it immediately,
+because those mean the deployment has no voice rather than that the network is having a bad
+second. That is a deliberate change of posture from the bank, which gives up after a *single*
+failure — the bank is a load-time batch of thirty requests where the first failure predicts the
+rest, and this is one request per answer across a whole session, where one timeout is weather.
+Clips are cached by normalised text, so the same answer is never paid for twice, and two callers
+wanting one line at once make one request.
+
+All of that lives in `src/core/voice/speech.ts`, pure and tested, rather than in a counter buried
+in a closure, because a rule about when to stop trying the network is exactly the kind of thing
+that should be arguable in a test.
+
+**With nothing configured, nothing changed, and that was checked rather than assumed.** The relay
+is opt-in on `VITE_SPEECH_RELAY`, matching `configFromEnv` in `src/ai/qwen.ts`. In a browser with
+it unset, pressing Unsure makes **zero** network requests and the browser voice speaks, exactly as
+before. With the relay set but no key on the server, the first ask makes one POST, takes a 503,
+speaks through the browser voice, and every ask after it makes no request at all.
+
+**What is verified, and what is not.** The relay transport is proven end to end in a real browser
+against a local stub standing in for ElevenLabs: `POST /api/speech`, a genuine `decodeAudioData`,
+playback through an `AudioBufferSourceNode`, `speechSynthesis` untouched, and a second identical
+ask served from the cache with no second request. The relay handler itself is tested against a
+stub upstream for the things that are ours — the key never reaching the client, the upstream body
+never being forwarded, the voice and model not being caller-selectable, every failure arriving as
+a status the browser knows how to read.
+
+**NO LIVE ELEVENLABS CALL HAS BEEN MADE FROM THIS REPOSITORY**, by this work or any before it.
+The request shape in `server/speech.mjs` is the same one `src/audio/chef.ts` has always used for
+the bank, and that is the whole of the evidence for it. The `eleven_turbo_v2_5` id is carried
+over unchanged for the same reason and for one more: if the two tiers ever use different ids,
+the pre-written barks and the on-demand answers become two renderings of one voice, and the seam
+is audible. `ELEVENLABS_OUTPUT_FORMAT` is likewise unverified and is left unset by default so the
+API picks the format the bank is known to decode. None of this is exercised until somebody sets
+a real key and a real voice id and presses Unsure once.

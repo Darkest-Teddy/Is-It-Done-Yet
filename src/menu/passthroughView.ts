@@ -129,10 +129,26 @@ export function mountPassthrough(options: PassthroughOptions = {}): PassthroughV
     );
   }
 
-  /** Re-places every marker against the video's current cover box. */
+  /**
+   * Re-places every marker against the video's current cover box.
+   *
+   * WITH NO FRAME, THE ELEMENT BOX IS THE FALLBACK, and it has to be one rather than a return.
+   * `coverBox` is null whenever the stream has no dimensions yet -- before the first frame
+   * arrives, and for as long as the camera is denied or missing. Returning early there leaves
+   * every marker with no `left` and no `top`, which combined with a `translate(-50%, -100%)`
+   * puts it off the top-left corner of the window: present in the DOM, invisible on screen, and
+   * reported by every test as working.
+   *
+   * That mattered the moment an overlay carried something other than a measurement. A
+   * detection tag with no camera is meaningless and nobody misses it, but the chef's guidance
+   * pin is one of three channels carrying the SAME answer, and losing it silently in the exact
+   * degraded case the fallback exists for is the worst possible place to lose it. With no
+   * frame there are no frame coordinates, so 0..1 across the element is the honest reading of
+   * the same numbers.
+   */
   function place(): void {
-    const box = coverBox(video, node.clientWidth, node.clientHeight);
-    if (box === null) return;
+    const box = coverBox(video, node.clientWidth, node.clientHeight)
+      ?? { left: 0, top: 0, width: node.clientWidth, height: node.clientHeight };
     for (const marker of markers) {
       marker.node.style.left = `${box.left + marker.x * box.width}px`;
       marker.node.style.top = `${box.top + marker.y * box.height}px`;

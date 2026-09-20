@@ -1,0 +1,751 @@
+/*
+  The four screens of the cook flow.
+
+  Each one keeps the deployed page's structure and copy and takes its material from the
+  matching artboard: title from 1A, counter from 2A, library from 2C, dish card from 2D.
+  Where the deployed page and the artboard disagree on STRUCTURE the deployed page wins,
+  because reproducing its flow is the job; where they disagree on SURFACE the artboard wins,
+  because restyling it is the point.
+
+  Artboard pixel values appear in the comments so each rem can be checked back against the
+  document rather than taken on trust. The conversion is /16.5, per `designRem` in
+  `src/menu/art.ts`.
+*/
+
+/* ---------------------------------------------------------------- screen shell */
+
+.screen {
+  display: none;
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 1.7rem 1.8rem 2.4rem;
+}
+
+.screen.is-on { display: block; }
+
+/* The bar across the top of screens 2, 3 and 4. The artboard puts the wordmark at 26px in
+   cream over a dark board; here the ground is paper, so it takes the ink colour instead and
+   the step chip keeps its yellow. */
+.head {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.33rem;
+}
+
+.head__title {
+  font-family: var(--display);
+  font-size: 2.3rem;        /* 38px */
+  line-height: 0.95;
+  color: var(--red);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  /* The document outlines its display type in cream wherever it sits on a busy ground. One
+     ring, not the wordmark's six -- at this size more would close up the counters. */
+  text-shadow: 0 0.12rem 0 var(--cream), 0.12rem 0 0 var(--cream), -0.12rem 0 0 var(--cream),
+    0 -0.12rem 0 var(--cream), 0.24rem 0.3rem 0 rgb(59 42 27 / 0.14);
+}
+
+.head__spacer { margin-left: auto; }
+
+/* ================================================================ 1 · title (artboard 1A) */
+
+#s-title { display: none; }
+#s-title.is-on { display: grid; place-items: center; }
+
+/* The 1A board: cream-deep fill, the WARM outline the 1x screens use rather than the 2x
+   maroon, and the document's five-layer shadow -- inset highlight, inset warm pool, then
+   three offsets. */
+.t-board {
+  position: relative;
+  width: 100%;
+  max-width: 78rem;
+  background: var(--cream-deep);
+  border: 0.3rem solid var(--ink-warm);
+  border-radius: 1.09rem;
+  overflow: hidden;
+  padding: 2.4rem 2.4rem 2.9rem;
+  box-shadow:
+    inset 0 0.24rem 0 rgb(255 255 255 / 0.6),
+    inset 0 -1.8rem 3.6rem rgb(150 96 54 / 0.2),
+    0 0.48rem 0 rgb(59 42 27 / 0.22),
+    0.97rem 1.21rem 0 rgb(59 42 27 / 0.2),
+    1.8rem 2.4rem 3.6rem rgb(59 42 27 / 0.28);
+}
+
+/* The board carries the pinstripe too, so the texture continues across the edge instead of
+   stopping at it. */
+.t-board::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgb(59 42 27 / 0.035) 0 2px,
+    transparent 2px 18px
+  );
+}
+
+/* The six scattered hero icons the document places down the two margins. Hidden below 62rem,
+   where the centre column needs the full width and they would collide with the wordmark. */
+.t-scatter {
+  position: absolute;
+  pointer-events: none;
+  user-select: none;
+  filter: drop-shadow(0 4px 0 rgb(59 42 27 / 0.22)) drop-shadow(7px 12px 12px rgb(59 42 27 / 0.35));
+}
+
+@media (max-width: 62rem) {
+  .t-scatter { display: none; }
+}
+
+/* The rank chip, top left. Its shadow is the 1x stack verbatim: a tan step, an ink step, a
+   soft drop -- `0 3px 0 #A97A54, 4px 6px 0 #3B2A1B, 9px 13px 16px`. */
+.t-rank {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: var(--cream);
+  border: 0.18rem solid var(--ink-warm);
+  border-radius: 999px;
+  padding: 0.36rem 0.97rem 0.36rem 0.36rem;
+  box-shadow: var(--gloss-warm), var(--lift-warm);
+}
+
+.t-rank__badge {
+  display: grid;
+  place-items: center;
+  width: 2.3rem;
+  height: 2.3rem;          /* 38px */
+  border-radius: 50%;
+  background: var(--red);
+  border: 0.12rem solid var(--ink-warm);
+  color: var(--cream);
+  font-family: var(--display);
+  font-size: 1.21rem;
+  padding-top: 0.12rem;
+}
+
+.t-rank__text { display: flex; flex-direction: column; line-height: 1.1; }
+.t-rank__tier { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.18em; text-transform: uppercase; color: #9a6a50; }
+.t-rank__title { font-size: 0.85rem; font-weight: 800; color: var(--ink-warm); }
+
+.t-centre {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 2.4rem 0 0;
+}
+
+.t-mark { position: relative; display: inline-block; }
+
+/* The "AR" flag, rotated 11 degrees off the wordmark's top right. */
+.t-mark__ar {
+  position: absolute;
+  z-index: 2;
+  top: -0.36rem;
+  right: -4.4rem;
+  transform: rotate(11deg);
+  background: var(--ink-warm);
+  color: var(--yellow);
+  font-family: var(--display);
+  font-size: 1.33rem;
+  letter-spacing: 0.14em;
+  padding: 0.36rem 0.97rem 0.48rem;
+  border-radius: 0.48rem;
+  box-shadow: 0.18rem 0.3rem 0 rgb(59 42 27 / 0.3);
+}
+
+@media (max-width: 52rem) {
+  .t-mark__ar { display: none; }
+}
+
+/* THE WORDMARK. Red Ranchers, uppercase, on a six-layer cream outline plus one soft ink drop
+   -- the document's own stack, verbatim, scaled with the type. Six offsets rather than a
+   `-webkit-text-stroke` because a stroke centres on the glyph edge and eats into the letter;
+   offset copies sit entirely outside it, which is what keeps the red weight intact.
+
+   The two lines counter-rotate by a degree and a half, which is the document's, and is what
+   stops a two-line lockup reading as a paragraph. */
+.t-mark__type {
+  font-family: var(--display);
+  color: var(--red);
+  text-transform: uppercase;
+  line-height: 0.8;
+  font-size: clamp(3.2rem, 9vw, 8rem);
+  text-shadow:
+    0 0.1em 0 var(--cream),
+    0.1em 0 0 var(--cream),
+    -0.1em 0 0 var(--cream),
+    0 -0.1em 0 var(--cream),
+    0.088em 0.088em 0 var(--cream),
+    -0.088em 0.088em 0 var(--cream),
+    0.09em 0.113em 0 rgb(59 42 27 / 0.14);
+}
+
+.t-mark__l1 { transform: rotate(-1.6deg); }
+.t-mark__l2 { margin-top: 0.12em; transform: rotate(1deg); }
+
+.t-lede {
+  margin: 1.7rem 0 0;
+  max-width: 33rem;
+  font-size: 1.03rem;       /* 17px */
+  font-weight: 700;
+  line-height: 1.4;
+  color: #5a3a22;
+}
+
+/* The two mode cards. The document tilts them a degree in opposite directions and gives them
+   a deeper stack than a plain card -- these are the only things on the screen that are meant
+   to be pressed, so they stand furthest off the board. */
+.t-modes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+  gap: 1.58rem;
+  margin-top: 2.4rem;
+  width: 100%;
+  max-width: 45rem;
+}
+
+.t-mode {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  border: 0.3rem solid var(--ink-warm);
+  border-radius: 1.58rem;
+  padding: 1.33rem 1.45rem 1.21rem;
+  transform: rotate(var(--tilt, 0deg));
+  box-shadow:
+    inset 0 0.24rem 0 rgb(255 255 255 / 0.3),
+    inset 0 -0.85rem 1.58rem rgb(0 0 0 / 0.2),
+    0 0.36rem 0 #8a5230,
+    0.48rem 0.67rem 0 var(--ink-warm),
+    0.97rem 1.33rem 1.8rem rgb(59 42 27 / 0.35);
+  transition: transform 90ms ease-out, box-shadow 90ms ease-out;
+}
+
+.t-mode:hover, .t-mode:focus-visible {
+  outline: none;
+  transform: rotate(var(--tilt, 0deg)) translate(-0.18rem, -0.24rem);
+  box-shadow:
+    inset 0 0.24rem 0 rgb(255 255 255 / 0.3),
+    inset 0 -0.85rem 1.58rem rgb(0 0 0 / 0.2),
+    0 0.42rem 0 #8a5230,
+    0.73rem 1.03rem 0 var(--ink-warm),
+    1.33rem 1.8rem 2.4rem rgb(59 42 27 / 0.4);
+}
+
+.t-mode:active {
+  transform: rotate(var(--tilt, 0deg)) translate(0.3rem, 0.36rem);
+  box-shadow: 0.18rem 0.18rem 0 var(--ink-warm);
+}
+
+.t-mode--red { background: var(--red); color: var(--cream); }
+.t-mode--sun { background: var(--yellow); color: var(--ink-warm); }
+
+/* The yellow flag clipped over the card's top edge. */
+.t-mode__flag {
+  position: absolute;
+  top: -0.97rem;
+  right: 0.97rem;
+  background: var(--yellow);
+  border: 0.18rem solid var(--ink-warm);
+  border-radius: 999px;
+  padding: 0.18rem 0.73rem 0.3rem;
+  font-family: var(--display);
+  font-size: 0.91rem;
+  color: var(--ink-warm);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.t-mode--sun .t-mode__flag { background: var(--cream); }
+
+.t-mode__row { display: flex; align-items: center; gap: 0.97rem; }
+
+/* The icon tile. Glossed but NOT lifted: it is set into the card face, so it gets the inset
+   pair alone. */
+.t-mode__tile {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 4.7rem;
+  height: 4.7rem;          /* 78px */
+  border-radius: 1.21rem;
+  background: var(--cream);
+  border: 0.18rem solid var(--ink-warm);
+  box-shadow: inset 0 0.24rem 0 rgb(255 255 255 / 0.9), inset 0 -0.6rem 1.09rem rgb(120 74 44 / 0.22);
+}
+
+.t-mode__title {
+  font-family: var(--display);
+  font-size: 2.2rem;        /* 40px, at the document's 0.86 leading */
+  line-height: 0.86;
+  text-transform: uppercase;
+  min-width: 0;
+}
+
+/* The break is written into the markup rather than left to the box, because at 0.86 leading a
+   two-line lockup only reads as one if the lines break where the design breaks them. */
+.t-mode__title > span { display: block; }
+
+.t-mode__blurb { display: block; margin-top: 0.85rem; font-size: 0.79rem; font-weight: 700; }
+.t-mode--red .t-mode__blurb { color: #ffd9c9; }
+.t-mode--sun .t-mode__blurb { color: #7a5a16; }
+
+/* ================================================================ 2 · counter (artboard 2A) */
+
+/* The deployed page's two-column split: camera left, tally right. Kept, including its 900px
+   collapse point. */
+.counter-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(21rem, 0.7fr);
+  gap: 1.33rem;
+  align-items: start;
+}
+
+/* The right-hand stack is taller than a window, so it is what scrolls. The camera column
+   sticks, because the whole point of this screen is watching the tally change as you move
+   something on the board -- scrolling the board out of view to read the tally defeats it. */
+.counter-col { position: sticky; top: 1.4rem; }
+
+@media (max-width: 62rem) {
+  .counter-grid { grid-template-columns: 1fr; }
+  .counter-col { position: static; }
+}
+
+/* The camera panel. Its ground is the night colour rather than cream, because what fills it is
+   the counter itself -- the artboard painted a kitchen here and the real app puts the camera
+   in its place. */
+.stage {
+  position: relative;
+  overflow: hidden;
+  padding: 0;
+  background: var(--night);
+  min-height: 21rem;
+  display: grid;
+  place-items: center;
+}
+
+.stage video { display: block; width: 100%; height: auto; }
+.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+/* Shown while no stream is attached, so the panel is never an empty black rectangle. */
+.stage__idle {
+  padding: 3.6rem 1.8rem;
+  text-align: center;
+  color: #c9a98e;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+/* The camera badge. Translucent cream while off, solid leaf once live -- a state change in
+   fill rather than in opacity, so it stays legible over any frame behind it. */
+.stage__badge {
+  position: absolute;
+  left: 0.85rem;
+  top: 0.85rem;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  background: rgb(255 243 228 / 0.16);
+  border: 0.18rem solid rgb(255 243 228 / 0.45);
+  border-radius: 999px;
+  padding: 0.3rem 0.85rem 0.36rem;
+  font-size: 0.67rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--cream);
+  white-space: nowrap;
+}
+
+.stage__badge.is-live { background: var(--leaf); border-color: var(--ink); color: var(--ink); }
+
+.camrow { display: flex; gap: 0.6rem; align-items: center; margin-top: 0.85rem; flex-wrap: wrap; }
+
+/* A <select> cannot carry the inset pair on its own options list, so it takes the same outline,
+   radius and gloss as a `.btn` and nothing more. */
+.camrow select {
+  font: inherit;
+  font-size: 0.79rem;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--cream);
+  border: 0.18rem solid var(--ink);
+  border-radius: 999px;
+  padding: 0.6rem 0.97rem;
+  max-width: 18rem;
+  box-shadow: inset 0 0.15rem 0 rgb(255 255 255 / 0.6), inset 0 -0.3rem 0.6rem rgb(120 74 44 / 0.16);
+}
+
+/* Failures say what failed. Monospace on purpose: this is the one place on the page showing a
+   raw browser message, and pretending it is prose makes it harder to read, not easier. */
+.err {
+  margin-top: 0.97rem;
+  font: 700 0.79rem/1.45 ui-monospace, Menlo, Consolas, monospace;
+  color: var(--red);
+  white-space: pre-wrap;
+}
+
+.err:empty { display: none; }
+
+.tally-col { display: flex; flex-direction: column; gap: 0.97rem; }
+
+.c-title {
+  font-family: var(--display);
+  font-size: 2.06rem;       /* 34px */
+  line-height: 0.9;
+  color: var(--ink);
+  text-transform: uppercase;
+  margin: 0.24rem 0 0;
+}
+
+.c-sub { margin-top: 0.36rem; min-height: 2.4rem; }
+
+/* The scan's own line. Outlined and tinted rather than set in the body colour, because it is
+   the answer to something the cook just pressed and has to be findable in one glance among
+   text that is changing four times a second beside it. */
+.c-scanline {
+  margin: 0.73rem 0 0;
+  padding: 0.6rem 0.85rem;
+  border: 0.18rem solid var(--green);
+  border-radius: 0.73rem;
+  background: var(--leaf);
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--ink);
+  box-shadow: inset 0 0.12rem 0 rgb(255 255 255 / 0.5), 0.15rem 0.24rem 0 rgb(70 16 26 / 0.3);
+}
+
+.c-scanline.is-bad { border-color: var(--red); background: var(--pink); }
+.c-scanline.is-busy { border-color: var(--brown); background: var(--yellow-soft); }
+.c-scanline[hidden] { display: none; }
+
+.c-groups { display: flex; flex-direction: column; gap: 0.6rem; margin-top: 1.09rem; }
+
+/* The tinted tally rows: carbs yellow, protein pink, greens leaf, sauce sky. The tint is set
+   per row from `src/menu/art.ts`, so the counter groups by colour at a glance the way the
+   artboard's did. Sunk into the card, hence `.well`. */
+.c-group { display: flex; align-items: center; gap: 0.73rem; padding: 0.6rem 0.85rem; }
+
+/* Muted with saturation, not opacity: an empty row on a panel that may sit over a camera must
+   still look solid. */
+.c-group.is-empty { filter: saturate(0.3) brightness(0.97); }
+
+.c-group__body { flex: 1; min-width: 0; }
+
+.c-group__name {
+  font-family: var(--display);
+  font-size: 1.33rem;       /* 22px */
+  line-height: 1;
+  color: var(--ink);
+  text-transform: uppercase;
+}
+
+.c-group__list {
+  font-size: 0.67rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #6d4a33;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.c-group__count { font-family: var(--display); font-size: 1.82rem; color: var(--ink); }
+
+.c-chips { display: flex; flex-wrap: wrap; gap: 0.48rem; margin-top: 0.97rem; }
+
+/* A named ingredient, with its picture. Three states the deployed page also has: sure,
+   unsure (dashed amber), and named by the cloud model (leaf). */
+.c-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  background: var(--cream-deep);
+  border: 0.18rem solid var(--ink);
+  border-radius: 999px;
+  padding: 0.24rem 0.73rem 0.3rem 0.36rem;
+  font-size: 0.79rem;
+  font-weight: 800;
+  color: var(--ink);
+  box-shadow: inset 0 0.12rem 0 rgb(255 255 255 / 0.55), inset 0 -0.3rem 0.6rem rgb(70 16 26 / 0.12);
+}
+
+.c-chip.is-unsure { border-style: dashed; border-color: #c98a2e; background: var(--yellow-soft); }
+.c-chip.is-cloud { border-color: var(--green); background: var(--leaf); }
+.c-chip__n { font-family: var(--display); font-size: 0.97rem; }
+
+/* The red COUNTED panel. The one number on the screen that is the whole point of it, so it
+   gets the biggest display size and the only saturated ground. */
+.c-counted__label { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.18em; text-transform: uppercase; color: #ffd9c9; }
+.c-counted__row { display: flex; align-items: baseline; gap: 0.6rem; }
+.c-counted__n { font-family: var(--display); font-size: 4.7rem; line-height: 0.9; color: var(--cream); }
+.c-counted__unit { font-family: var(--display); font-size: 1.58rem; color: var(--yellow); text-transform: uppercase; line-height: 1; }
+.c-counted__unit > span { display: block; }
+.c-counted__note { margin-top: 0.48rem; font-size: 0.79rem; font-weight: 700; color: #ffd9c9; }
+
+/* The yellow "cook something for me" slab. Both halves are `display: block` explicitly: they
+   are spans inside a <button>, which lays its children out inline, so a title and a note that
+   happen to stack today would run together the moment the title became one line. */
+.c-cook__title, .c-cook__note, .c-browse__title, .c-browse__note { display: block; }
+.c-cook__title { font-family: var(--display); font-size: 1.82rem; line-height: 0.92; color: var(--ink); text-transform: uppercase; }
+.c-cook__title > span { display: block; }
+.c-cook__note { margin-top: 0.48rem; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.04em; color: #7a5a16; }
+.c-cook[disabled] .c-cook__title, .c-cook[disabled] .c-cook__note { color: #8a7866; }
+
+.c-browse__title { font-family: var(--display); font-size: 1.45rem; line-height: 1; color: var(--ink); text-transform: uppercase; }
+.c-browse__note { margin-top: 0.36rem; font-size: 0.72rem; font-weight: 700; color: var(--brown); }
+
+/* ================================================================ 3 · library (artboard 2C) */
+
+/* The deployed page lists recipes as full-width rows rather than the artboard's three-column
+   grid, and the row is what is kept -- the list is the flow. What changes is the material:
+   each row is now an artboard card, with the tile, the display name and the tinted meta pills
+   the grid cards carry. */
+.lib-rows { display: grid; gap: 0.85rem; max-width: 62rem; }
+
+.lib-row {
+  display: flex;
+  align-items: center;
+  gap: 1.21rem;
+  padding: 0.97rem 1.21rem;
+}
+
+/* The picture tile from the artboard's recipe card, at row height. Inset, tinted soft yellow. */
+.lib-row__tile {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 4rem;
+  height: 4rem;
+  font-size: 2.1rem;
+  line-height: 1;
+  background: var(--yellow-soft);
+  border: 0.24rem solid var(--ink);
+  border-radius: 1.09rem;
+  box-shadow: inset 0 0.24rem 0 rgb(255 255 255 / 0.6), inset 0 -0.97rem 1.58rem rgb(70 16 26 / 0.16);
+}
+
+.lib-row__body { flex: 1; min-width: 0; }
+
+.lib-row__name {
+  font-family: var(--display);
+  font-size: 1.64rem;       /* 27px */
+  line-height: 0.94;
+  color: var(--ink);
+  text-transform: uppercase;
+}
+
+.lib-row__meta { display: flex; align-items: center; gap: 0.48rem; margin-top: 0.42rem; flex-wrap: wrap; }
+
+.lib-row__status {
+  margin-left: auto;
+  flex: 0 0 auto;
+  text-align: right;
+  font-size: 0.79rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  max-width: 11rem;
+}
+
+.lib-row__missing { display: block; margin-top: 0.24rem; font-size: 1.09rem; letter-spacing: 0.12em; }
+
+.lib-empty {
+  padding: 1.58rem;
+  border: 0.24rem dashed var(--dash);
+  border-radius: 1.45rem;
+  color: var(--brown);
+}
+
+/* ================================================================ 4 · dish (artboard 2D) */
+
+.dish {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(19rem, 24rem);
+  gap: 1.33rem;
+  align-items: start;
+  max-width: 72rem;
+}
+
+@media (max-width: 58rem) {
+  .dish { grid-template-columns: 1fr; }
+}
+
+/* The main card is the deepest object on the page -- 6px outline, 32px radius, and the widest
+   offsets in the document. It holds a hero band, so its overflow is clipped and the padding
+   moves to the body inside it. */
+.d-card {
+  padding: 0;
+  overflow: hidden;
+  border-width: 0.36rem;
+  border-radius: 1.94rem;
+  box-shadow:
+    inset 0 0.3rem 0 rgb(255 255 255 / 0.72),
+    inset 0 -0.97rem 1.7rem rgb(120 74 44 / 0.18),
+    0 0.42rem 0 rgb(70 16 26 / 0.4),
+    0.85rem 1.09rem 0 rgb(70 16 26 / 0.55),
+    1.7rem 2.3rem 3.27rem rgb(0 0 0 / 0.55);
+}
+
+/* The 250px soft-yellow hero band. Its inset shade is heavier than a panel's -- it is a recess
+   in the card, not a surface on it. */
+.d-hero {
+  position: relative;
+  height: 10.9rem;
+  background: var(--yellow-soft);
+  display: grid;
+  place-items: center;
+  border-bottom: 0.36rem solid var(--ink);
+  box-shadow: inset 0 0.36rem 0 rgb(255 255 255 / 0.6), inset 0 -1.58rem 2.4rem rgb(70 16 26 / 0.16);
+  font-size: 5.5rem;
+  line-height: 1;
+}
+
+.d-hero__flag {
+  position: absolute;
+  right: 1.33rem;
+  bottom: 1.21rem;
+  background: var(--red);
+  border: 0.24rem solid var(--ink);
+  border-radius: 999px;
+  padding: 0.36rem 1.09rem 0.48rem;
+  font-family: var(--display);
+  font-size: 1.21rem;
+  color: var(--cream);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  box-shadow: 0.18rem 0.3rem 0 rgb(70 16 26 / 0.4);
+}
+
+.d-body { padding: 1.45rem 1.82rem 1.7rem; }
+
+/* 70px Ranchers at 0.84 leading. The single largest piece of type on any screen but the
+   title, and the reason the dish card reads as a poster rather than as a detail view. */
+.d-name {
+  font-family: var(--display);
+  font-size: clamp(2.6rem, 5.4vw, 4.24rem);
+  line-height: 0.84;
+  color: var(--red);
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.d-blurb { margin: 0.85rem 0 0; max-width: 42rem; font-size: 0.97rem; }
+
+.d-stats { display: flex; gap: 0.73rem; margin-top: 1.21rem; flex-wrap: wrap; }
+
+/* Tinted stat tiles: pink difficulty, sky time, leaf steps -- the artboard's own assignment.
+   Inset, so they read as pressed into the card face. */
+.d-stat {
+  flex: 1 1 8.5rem;
+  border: 0.24rem solid var(--ink);
+  border-radius: 1.09rem;
+  padding: 0.73rem 1.09rem 0.85rem;
+  box-shadow: inset 0 0.18rem 0 rgb(255 255 255 / 0.55), inset 0 -0.48rem 0.97rem rgb(70 16 26 / 0.12);
+}
+
+.d-stat--pink { background: var(--pink); }
+.d-stat--sky { background: var(--sky); }
+.d-stat--leaf { background: var(--leaf); }
+
+.d-stat__label { font-size: 0.67rem; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: #6d4a33; }
+.d-stat__value { font-family: var(--display); font-size: 1.82rem; line-height: 1.1; color: var(--ink); text-transform: uppercase; }
+
+.d-side { display: flex; flex-direction: column; gap: 0.97rem; }
+
+.d-ing__head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.73rem; }
+.d-ing__title { font-family: var(--display); font-size: 1.82rem; line-height: 1; color: var(--ink); text-transform: uppercase; }
+.d-ing__count { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--green); white-space: nowrap; }
+.d-ing__count.is-short { color: var(--amber); }
+
+.d-ing__list { display: flex; flex-direction: column; gap: 0.48rem; margin-top: 0.85rem; max-height: 24rem; }
+
+/* A satisfied ingredient row is leaf and solid; a missing one is the artboard's "optional"
+   treatment -- dashed, muted, unfilled. Two states told apart by fill AND by border style,
+   so it survives being read in greyscale. */
+.d-row {
+  display: flex;
+  align-items: center;
+  gap: 0.73rem;
+  background: var(--leaf);
+  border: 0.18rem solid var(--ink);
+  border-radius: 0.85rem;
+  padding: 0.42rem 0.85rem;
+  box-shadow: inset 0 0.12rem 0 rgb(255 255 255 / 0.5), inset 0 -0.36rem 0.73rem rgb(70 16 26 / 0.12);
+}
+
+.d-row.is-missing { background: #f3e2ce; border-style: dashed; border-color: #b98c6e; box-shadow: none; }
+.d-row__icon { flex: 0 0 auto; width: 1.7rem; height: 1.7rem; object-fit: contain; }
+.d-row__name { flex: 1; min-width: 0; font-size: 0.85rem; font-weight: 800; color: var(--ink); text-transform: capitalize; }
+.d-row.is-missing .d-row__name { color: var(--brown); }
+.d-row__have { font-size: 0.79rem; font-weight: 800; color: var(--green); white-space: nowrap; }
+.d-row.is-missing .d-row__have { color: #b08c6e; }
+
+/* The method, revealed under the slab that asks for it. Numbered rows in the card's own deeper
+   cream so they read as a continuation of the ingredient list rather than a second panel, and
+   each one carries the honest tag for whether the camera can confirm it. */
+.d-steps__card { padding: 1.09rem 1.21rem 1.21rem; }
+.d-steps { display: flex; flex-direction: column; gap: 0.48rem; margin-top: 0.85rem; }
+
+.d-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  background: var(--cream-deep);
+  border: 0.18rem solid var(--ink);
+  border-radius: 0.85rem;
+  padding: 0.48rem 0.73rem 0.6rem;
+  box-shadow: inset 0 0.12rem 0 rgb(255 255 255 / 0.5), inset 0 -0.36rem 0.73rem rgb(70 16 26 / 0.1);
+}
+
+.d-step__n {
+  flex: 0 0 auto;
+  min-width: 1.45rem;
+  height: 1.45rem;
+  display: grid;
+  place-items: center;
+  background: var(--yellow);
+  border: 0.15rem solid var(--ink);
+  border-radius: 999px;
+  font-family: var(--display);
+  font-size: 0.85rem;
+  color: var(--ink);
+  box-shadow: 0.09rem 0.15rem 0 rgb(70 16 26 / 0.4);
+}
+
+.d-step__body { flex: 1; min-width: 0; }
+.d-step__text { font-size: 0.82rem; font-weight: 700; color: var(--ink); line-height: 1.35; }
+
+.d-step__tag {
+  display: inline-block;
+  margin-top: 0.24rem;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #a07a4e;
+}
+
+.d-step__tag.is-seen { color: var(--green); }
+
+/* Spans inside a <button>, so the stacking is stated rather than inherited from the box. */
+.d-next__label, .d-next__note, .d-start__title { display: block; }
+.d-next__label { font-size: 0.67rem; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: #ffd9c9; }
+.d-next__note { margin: 0.48rem 0 1.09rem; font-size: 0.85rem; font-weight: 700; color: #ffd9c9; }
+.d-start__title { font-family: var(--display); font-size: 2.67rem; line-height: 0.9; color: var(--cream); text-transform: uppercase; }
+.d-start[disabled] .d-start__title, .d-start[disabled] .d-next__label, .d-start[disabled] .d-next__note { color: #6f5b49; }

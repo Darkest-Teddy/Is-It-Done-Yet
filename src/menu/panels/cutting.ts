@@ -30,6 +30,7 @@ import { rankFor } from '../../core/rank.js';
 import type { AppContext, Panel, RouteParams, RoundResult } from '../app.js';
 import { addToBoard, rankBoard, type RoundEntry } from '../board.js';
 import { button, fill, h } from '../dom.js';
+import { mountGuidance, type Guide } from '../guidance.js';
 import { createRail } from '../rail.js';
 import { createStage } from '../stage.js';
 import { mountPassthrough } from '../passthroughView.js';
@@ -77,6 +78,26 @@ export function cuttingPanel(ctx: AppContext, params: RouteParams): Panel {
   let live: Analysis | null = null;
   let posted: RoundEntry | null = null;
   let visionReady = false;
+
+  /**
+   * The chef. Answers "I am stuck" through speech, a pin over the real board and the card on
+   * the left, and speaks up on its own when a fault has stood long enough to be real.
+   *
+   * Built here rather than inside the panel's own logic because it owns its state across the
+   * whole screen, including between rounds -- a correction the cook has already been given
+   * should not be repeated because they pressed "run it again".
+   */
+  const guide: Guide = mountGuidance({
+    recipe,
+    counter: ctx.state.pantry.items.map((item) => ({ name: item.ingredient, count: item.count })),
+    round: () => ({
+      evenness: phase === 'running' ? evenness(widths) : ctx.state.lastRound?.evenness ?? null,
+      pieces: phase === 'running' ? peakPieces : ctx.state.lastRound?.pieces ?? peakPieces,
+      secondsLeft: practice || phase !== 'running' ? null : Math.max(0, remaining),
+    }),
+    cameraLive: () => pass.status() === 'live',
+    video: () => pass.video(),
+  });
 
   // ---------------------------------------------------------------- pieces
 
@@ -169,6 +190,9 @@ export function cuttingPanel(ctx: AppContext, params: RouteParams): Panel {
 
   function onAnalysis(analysis: Analysis): void {
     live = analysis;
+    // Synchronous and cheap: it folds the frame into the coaching session and asks two pure
+    // functions whether anything is worth saying. Nothing here awaits.
+    guide.observe(analysis);
     if (phase === 'running') {
       for (const detection of analysis.detections) widths.push(detection.minorPx);
       if (widths.length > SAMPLE_CAP) widths = widths.slice(-SAMPLE_CAP);
@@ -236,17 +260,21 @@ export function cuttingPanel(ctx: AppContext, params: RouteParams): Panel {
   // ---------------------------------------------------------------- painting
 
   function paintOverlay(): void {
+    // The chef's pin survives the round ending and the measurement tags do not: an answer the
+    // cook asked for should not vanish because the clock ran out mid-sentence.
+    const pin = guide.marker();
     if (live === null || phase !== 'running') {
-      pass.setOverlay([]);
+      pass.setOverlay(pin === null ? [] : [pin]);
       return;
     }
-    pass.setOverlay(
-      live.detections.slice(0, 12).map((detection) => ({
+    pass.setOverlay([
+      ...live.detections.slice(0, 12).map((detection) => ({
         x: detection.x,
         y: detection.y,
         node: h('span', { class: 'tag', text: `${Math.round(detection.minorPx)}px` }),
       })),
-    );
+      ...(pin === null ? [] : [pin]),
+    ]);
   }
 
   function paintBoard(): void {
@@ -362,6 +390,7 @@ export function cuttingPanel(ctx: AppContext, params: RouteParams): Panel {
         disabled: postButton.disabled,
         onPress: () => post(),
       },
+      { key: 'X', label: 'Unsure — ask the chef', shortcut: 'x', onPress: () => guide.ask(null) },
       { key: 'Y', label: 'Quit the round', onPress: () => ctx.go('title') },
       { key: '☰', label: 'Menu', end: true, shortcut: 'm', onPress: () => ctx.back() },
     ]);
@@ -387,6 +416,7 @@ export function cuttingPanel(ctx: AppContext, params: RouteParams): Panel {
       h('div', { class: 'k-timer__meter' }, clockFill),
     ),
     boardGuide,
+    guide.node,
     h(
       'div',
       { class: 'k-stats' },
@@ -418,6 +448,11 @@ export function cuttingPanel(ctx: AppContext, params: RouteParams): Panel {
 
   const node = h('section', { class: 'screen screen--board cutting' }, pass.node, stage.node);
 
+  // The pin is one of the chef's three channels, and the chef changes it on its own schedule
+  // -- an answer landing from the model, an unprompted correction, a pin going stale. The
+  // panel owns the overlay, so it has to be told.
+  const stopGuiding = guide.onChange(() => paintOverlay());
+
   const stopWatching = pass.onStatusChange(() => {
     // A camera that drops mid-round ends the round rather than quietly scoring nothing.
     if (pass.status() !== 'live' && phase === 'running') finish();
@@ -431,6 +466,8 @@ export function cuttingPanel(ctx: AppContext, params: RouteParams): Panel {
     destroy: () => {
       loop?.stop();
       if (timer !== null) clearInterval(timer);
+      stopGuiding();
+      guide.destroy();
       stopWatching();
       pass.destroy();
       stage.destroy();

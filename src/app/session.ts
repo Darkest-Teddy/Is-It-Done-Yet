@@ -11,7 +11,7 @@
  * by simply fixing the board.
  */
 
-import { boardState, type BoardState } from '../core/board.js';
+import { boardState, type BoardState, type Piece } from '../core/board.js';
 import {
   DEFAULT_DIFF_OPTIONS,
   diff,
@@ -30,6 +30,16 @@ import {
   type DeficitLog,
   type DeficitSpan,
 } from '../core/timeline.js';
+import {
+  DEFAULT_NAG_POLICY,
+  emptyNag,
+  faultKey,
+  nextInterruption,
+  recordInterruption,
+  type Interruption,
+  type NagPolicy,
+  type NagState,
+} from '../core/voice/nag.js';
 import { piecesFrom } from '../vision/pieces.js';
 import type { Blob } from '../vision/segment.js';
 
@@ -58,6 +68,7 @@ export const DEFAULT_SESSION_OPTIONS: SessionOptions = {
 
 export class CoachSession {
   private log: DeficitLog = emptyLog();
+  private nag: NagState = emptyNag();
   private readonly confirmed = new Set<string>();
   private startedMs: number | null = null;
   private lastMs = 0;
@@ -76,10 +87,23 @@ export class CoachSession {
    * and what would let a demo be rehearsed from a capture if the venue lighting defeats us.
    */
   ingest(blobs: readonly Blob[], nowMs: number): CoachState {
+    return this.ingestPieces(piecesFrom(blobs), nowMs);
+  }
+
+  /**
+   * The same fold, one step further along the pipeline.
+   *
+   * Exists because the front-of-house app has already named its blobs by the time it reaches
+   * here -- `src/menu/vision.ts` segments and identifies in one pass for the on-screen tags --
+   * and re-running `piecesFrom` over blobs it has already thrown away is not possible. Naming
+   * twice would also be two chances to disagree about what is on the board, which is the kind
+   * of split that produces a tag saying "cucumber" beside a chef insisting there is none.
+   */
+  ingestPieces(pieces: readonly Piece[], nowMs: number): CoachState {
     if (this.startedMs === null) this.startedMs = nowMs;
     this.lastMs = nowMs;
 
-    const board = boardState(piecesFrom(blobs), this.options.pxPerMm);
+    const board = boardState(pieces, this.options.pxPerMm);
     const deficits = diff(board, this.recipe, {
       ...this.options.diff,
       confirmedSteps: this.confirmed,
@@ -95,6 +119,53 @@ export class CoachSession {
       servable: isServable(deficits),
     };
     return this.state;
+  }
+
+  /**
+   * The one thing worth saying out loud UNPROMPTED right now, or null -- which is the usual
+   * answer, and is the answer this method is designed to give most of the time.
+   *
+   * The session is where this belongs because the session already owns the deficit log, and the
+   * log is what makes the difference between a flicker and a fault. Everything else --
+   * persistence, severity floor, cooldown, not repeating a correction the cook is visibly
+   * acting on, the confidence gate that keeps a blind frame from becoming a false accusation --
+   * is in `core/voice/nag.ts`, pure and tested against a list of timestamps.
+   *
+   * Calling this has a side effect ON PURPOSE: a returned interruption is recorded as spoken.
+   * The alternative is a caller that has to remember to record it, and the one time somebody
+   * forgets, the chef repeats itself every frame in front of a judge.
+   *
+   * @param confidence from `guidance.observationConfidence`. Pass it honestly; passing 1
+   *   unconditionally defeats the only thing standing between this feature and accusing a cook
+   *   of forgetting ingredients that are sitting in front of them.
+   */
+  interruption(
+    nowMs: number,
+    confidence: number,
+    policy: NagPolicy = DEFAULT_NAG_POLICY,
+  ): Interruption | null {
+    // PERSISTED *AND* STILL TRUE THIS INSTANT. Both halves are needed and neither is enough.
+    //
+    // `timeline` holds a span open through a grace period after the problem disappears, which
+    // is right for the report -- it is what stops one dropped frame turning "you never added
+    // the tomato" into forty separate two-second problems. It is wrong for speaking, because
+    // inside that grace window a span that is already fixed still reads as open and has by then
+    // easily outlasted the persistence threshold. Left unguarded, the chef announces a fault
+    // the cook corrected half a second earlier, which is the false-accusation failure wearing a
+    // different hat: they look at the board, see it is fine, and stop believing the next one.
+    //
+    // Caught by `session.test.ts`, not by inspection.
+    const present = new Set((this.state?.deficits ?? []).map(faultKey));
+    const live = finalize(this.log).filter((span) => present.has(faultKey(span)));
+
+    const hit = nextInterruption(live, this.nag, nowMs, confidence, policy);
+    if (hit !== null) this.nag = recordInterruption(this.nag, hit, nowMs);
+    return hit;
+  }
+
+  /** How many times the chef has interrupted, for a status line and for the debrief. */
+  get interruptionCount(): number {
+    return this.nag.count;
   }
 
   /** Marks a step the camera cannot check as done. Idempotent. */

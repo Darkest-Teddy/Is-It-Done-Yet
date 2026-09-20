@@ -27,6 +27,9 @@ import { stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { extname, join, normalize, resolve, sep } from 'node:path';
 
+import { guidanceConfig, handleGuidance } from './guidance.mjs';
+import { handleSpeech, speechConfig } from './speech.mjs';
+
 const ROOT = resolve(process.env['STATIC_ROOT'] ?? 'dist');
 const PORT = Number(process.env['PORT'] ?? 8080);
 const HOST = process.env['HOST'] ?? '0.0.0.0';
@@ -88,14 +91,30 @@ function cacheFor(pathname, file) {
   return 'public, max-age=3600';
 }
 
+/** The two non-static routes, and they hold the keys. See `guidance.mjs` and `speech.mjs`. */
+const GUIDANCE_PATH = process.env['GUIDANCE_PATH'] ?? '/api/guidance';
+const SPEECH_PATH = process.env['SPEECH_PATH'] ?? '/api/speech';
+
 const server = createServer((req, res) => {
   const method = req.method ?? 'GET';
+  const pathname = (req.url ?? '/').split('?')[0] ?? '/';
+
+  // Checked before the method guard: both relays are POSTs, and the guard below rejects those.
+  if (pathname === GUIDANCE_PATH) {
+    void handleGuidance(req, res);
+    return;
+  }
+
+  if (pathname === SPEECH_PATH) {
+    void handleSpeech(req, res);
+    return;
+  }
+
   if (method !== 'GET' && method !== 'HEAD') {
     res.writeHead(405, { allow: 'GET, HEAD' }).end('method not allowed');
     return;
   }
 
-  const pathname = (req.url ?? '/').split('?')[0] ?? '/';
   const file = resolveFile(req.url ?? '/');
   if (file === null) {
     res.writeHead(400).end('bad request');
@@ -136,4 +155,21 @@ const server = createServer((req, res) => {
 
 server.listen(PORT, HOST, () => {
   console.log(`[static] serving ${ROOT} on http://${HOST}:${PORT}  (/ -> ${INDEX})`);
+  // Said at startup rather than discovered at 4am from a 503. With no upstream the app is not
+  // broken -- guidance falls back to the local answer -- but knowing which of the two you are
+  // running is the difference between a five-second diagnosis and a long one.
+  console.log(
+    guidanceConfig() === null
+      ? `[static] ${GUIDANCE_PATH} is mounted but QWEN_BASE_URL is unset -- guidance stays local`
+      : `[static] ${GUIDANCE_PATH} -> ${guidanceConfig().baseUrl} (${guidanceConfig().model})`,
+  );
+  // Worth saying out loud for the same reason, and more urgently: with no voice configured the
+  // headset has none at all. DECISIONS.md entry 19 -- Quest Browser ships no `speechSynthesis`,
+  // so the only thing behind this line there is the subtitle.
+  console.log(
+    speechConfig() === null
+      ? `[static] ${SPEECH_PATH} is mounted but ELEVENLABS_API_KEY / ELEVENLABS_VOICE_ID are`
+        + ' unset -- model-written lines are subtitles only on the headset'
+      : `[static] ${SPEECH_PATH} -> ${speechConfig().baseUrl} (${speechConfig().model})`,
+  );
 });

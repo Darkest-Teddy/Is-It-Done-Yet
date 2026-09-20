@@ -176,6 +176,17 @@ export function respond(
     case 'suggest':
       return suggest(state, random);
 
+    case 'stuck':
+      // The real answer lives in `guidance.ts`, which can see the recipe step and the board.
+      // This layer knows only the ticket, so it says the most useful true thing it has and
+      // escalates -- a caller with a model wired in gets the better answer a moment later,
+      // and a caller without one has still been told where they are.
+      return reply(
+        `${doneness(state)} ${state.recipe.note}`,
+        null,
+        true,
+      );
+
     case 'repeat':
       return reply(state.lastLine ?? 'I have not said anything yet.');
 
