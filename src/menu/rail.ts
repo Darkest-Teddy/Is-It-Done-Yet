@@ -37,6 +37,15 @@ export interface RailAction {
   readonly shortcut?: string;
 }
 
+/**
+ * Which markup the rail renders as.
+ *
+ * `board` is the artboard's own strip -- 62px tall, pinned inside a 1440x810 board, circular
+ * keycaps. `bar` is the fluid variant the first version of these screens used. Both share this
+ * file because the part that matters is the keyboard binding, not the chrome.
+ */
+export type RailVariant = 'bar' | 'board';
+
 export interface Rail {
   readonly node: HTMLElement;
   readonly destroy: () => void;
@@ -54,8 +63,16 @@ const shortcutOf = (action: RailAction): string =>
 export function createRail(
   actions: readonly RailAction[],
   onEscape?: () => void,
+  variant: RailVariant = 'bar',
 ): Rail {
-  const node = h('nav', { class: 'rail', attrs: { 'aria-label': 'Controls' } });
+  const board = variant === 'board';
+  const cls = board
+    ? { root: 'b2-rail', btn: 'b2-rail__btn', key: 'b2-key', text: 'b2-rail__label',
+        sun: 'b2-key--sun', wide: 'b2-key--wide', accent: 'b2-rail__label--sun', end: 'b2-rail__end' }
+    : { root: 'rail', btn: 'rail__btn', key: 'rail__key', text: 'rail__text',
+        sun: 'rail__key--sun', wide: 'rail__key--wide', accent: 'rail__btn--accent', end: 'rail__end' };
+
+  const node = h('nav', { class: cls.root, attrs: { 'aria-label': 'Controls' } });
   let current: readonly RailAction[] = [];
 
   function render(next: readonly RailAction[]): void {
@@ -64,20 +81,23 @@ export function createRail(
 
     for (const action of next) {
       const badge = h('span', {
-        class: `rail__key${action.accent === true ? ' rail__key--sun' : ''}`
-          + (action.key.length > 2 ? ' rail__key--wide' : ''),
+        class: `${cls.key}${action.accent === true ? ` ${cls.sun}` : ''}`
+          + (action.key.length > 2 ? ` ${cls.wide}` : ''),
         text: action.key,
         attrs: { 'aria-hidden': 'true' },
       });
 
       const entry = button(
-        `rail__btn${action.accent === true ? ' rail__btn--accent' : ''}`
-          + (action.end === true ? ' rail__end' : ''),
+        `${cls.btn}${action.accent === true && !board ? ` ${cls.accent}` : ''}`
+          + (action.end === true ? ` ${cls.end}` : ''),
         () => {
           if (action.disabled !== true) action.onPress();
         },
         badge,
-        h('span', { class: 'rail__text', text: action.label }),
+        h('span', {
+          class: `${cls.text}${action.accent === true && board ? ` ${cls.accent}` : ''}`,
+          text: action.label,
+        }),
       );
 
       if (action.disabled === true) entry.disabled = true;

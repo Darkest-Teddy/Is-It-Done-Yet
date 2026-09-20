@@ -16,6 +16,7 @@ import './theme.css';
 import './panels.css';
 import './title.css';
 import './loading.css';
+import './counter.css';
 
 import { createApp, type PanelFactory, type Route } from './app.js';
 import { passthrough } from './passthrough.js';

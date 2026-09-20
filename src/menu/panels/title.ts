@@ -21,8 +21,9 @@
  * "LIVE · 412" is a player count with no service behind it, so the badge carries the number that
  * is actually true: how many runs are on the board.
  *
- * Line-heights follow the v2 export (1.2, not the original 0.8/0.86), which is the fix that
- * re-export exists to deliver -- Ranchers has tall caps and the tight values clipped them.
+ * Type metrics are the folder's, line-heights included. There is an offline re-export outside
+ * the folder that relaxes the tight display line-heights to 1.2; the folder is the source of
+ * truth for this build, so 0.8 and 0.86 stay as the document sets them.
  */
 
 import { progressFor, RANKS } from '../../core/rank.js';

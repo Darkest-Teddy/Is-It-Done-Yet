@@ -152,10 +152,8 @@ img { display: block; max-width: 100%; }
   font-family: var(--display);
   text-transform: uppercase;
   font-weight: 400;
-  /* 1.2, from the v2 export, and it is the single biggest fix in it. Ranchers has tall caps
-     and a deep comma; every tight value in the v1 artboard (0.8 through 1.1) clipped them.
-     Applied to the class rather than per-heading so nothing can drift back. */
-  line-height: 1.2;
+  /* The folder's own value. Individual screens override per element where the document does. */
+  line-height: 0.95;
   letter-spacing: 0.02em;
   margin: 0;
 }
@@ -165,12 +163,12 @@ img { display: block; max-width: 100%; }
 .d-md { font-size: 1.95rem; }
 .d-lg { font-size: 2.5rem; }
 .d-xl { font-size: 3.3rem; }
-.d-hero { font-size: 4.4rem; line-height: 1.2; }
+.d-hero { font-size: 4.4rem; line-height: 0.85; }
 
 .label {
   font-size: 0.78rem;
   font-weight: 800;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.15em;
   text-transform: uppercase;
   margin: 0;
 }
@@ -225,7 +223,7 @@ img { display: block; max-width: 100%; }
   padding: 0.34rem 0.85rem;
   font-size: 0.76rem;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--ink);
   white-space: nowrap;
@@ -270,10 +268,9 @@ button {
   border-radius: 999px;
   font-size: 0.82rem;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--ink);
-  white-space: nowrap;
   box-shadow: 0 0.2rem 0 rgb(70 16 26 / 0.35);
   /* 90ms, and only on press. Fast enough to read as the button responding rather than as an
      animation playing. */
@@ -402,7 +399,7 @@ button {
 .rail__text {
   font-size: 0.76rem;
   font-weight: 800;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   white-space: nowrap;
 }

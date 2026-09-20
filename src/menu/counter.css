@@ -1,0 +1,448 @@
+/*
+  Screen 2A, in artboard pixels off the folder's `Is It Done Yet - Menu.dc.html`.
+
+  The 2x boards are 1440x810 and share a vocabulary the 1x boards do not: a maroon `#46101A`
+  outline instead of the warm `#3B2A1B`, a darker shadow stack, and a controller rail pinned
+  along the bottom. Those shared pieces live at the top of this file and the other 2x screens
+  reuse them.
+
+  ONE DELIBERATE DEPARTURE, and it is the point of the project. The document paints a kitchen
+  behind this panel -- `#4A382E` floor, a `#7C5B46` rail, an `#8E6B52` worktop, with four
+  ingredients and their name tags sitting on it at fixed coordinates. All of that is a stand-in
+  for the real counter. Here the ground is the passthrough camera and the tags are drawn only
+  where the scan actually found something, so the three painted divs are gone and nothing else
+  moves.
+*/
+
+/* ================================================================ shared 2x board */
+
+.b2 {
+  width: 1440px;
+  height: 810px;
+  background: #2a211c;
+  border: 5px solid #46101a;
+  border-radius: 26px;
+  overflow: hidden;
+  box-shadow:
+    inset 0 3px 0 rgb(255 255 255 / 0.14),
+    inset 0 -26px 44px rgb(0 0 0 / 0.34),
+    0 6px 0 rgb(70 16 26 / 0.3),
+    14px 18px 0 rgb(70 16 26 / 0.22),
+    26px 34px 60px rgb(0 0 0 / 0.35);
+}
+
+/* A board whose ground is the camera rather than paint. The stage is transparent so the
+   passthrough behind it shows through the whole screen, not just the board's rectangle. */
+.b2--live { background: transparent; }
+
+/* The cream card used for every panel on a 2x board. */
+.b2-card {
+  background: #fff3e4;
+  border: 5px solid #46101a;
+  border-radius: 26px;
+  box-shadow:
+    inset 0 4px 0 rgb(255 255 255 / 0.75),
+    inset 0 -12px 22px rgb(120 74 44 / 0.18),
+    0 5px 0 rgb(70 16 26 / 0.35),
+    9px 12px 0 rgb(70 16 26 / 0.5),
+    18px 26px 38px rgb(0 0 0 / 0.5);
+}
+
+.b2-head {
+  position: absolute;
+  left: 48px;
+  top: 34px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.b2-word {
+  font-family: var(--display);
+  font-size: 26px;
+  color: #fff3e4;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.b2-step {
+  background: #fbd24b;
+  border: 3px solid #46101a;
+  border-radius: 999px;
+  padding: 4px 14px 6px;
+  font-family: var(--display);
+  font-size: 15px;
+  color: #46101a;
+  letter-spacing: 0.1em;
+}
+
+/* ---------------------------------------------------------------- controller rail */
+
+.b2-rail {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 62px;
+  background: #46101a;
+  display: flex;
+  align-items: center;
+  gap: 34px;
+  padding: 0 48px;
+}
+
+.b2-rail__btn {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: transparent;
+  border: 0;
+  padding: 4px 6px;
+  border-radius: 999px;
+  transition: background-color 90ms ease-out;
+}
+
+.b2-rail__btn:hover, .b2-rail__btn:focus-visible {
+  outline: none;
+  background: rgb(255 243 228 / 0.14);
+}
+
+.b2-rail__btn[disabled] { opacity: 0.45; cursor: default; }
+.b2-rail__btn[disabled]:hover { background: transparent; }
+.b2-rail__end { margin-left: auto; }
+
+.b2-key {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #fff3e4;
+  border: 3px solid #46101a;
+  font-family: var(--display);
+  font-size: 14px;
+  color: #46101a;
+  padding-top: 2px;
+}
+
+.b2-key--sun { background: #fbd24b; }
+.b2-key--wide { border-radius: 9px; font-size: 12px; }
+
+.b2-rail__label {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #e7c7ae;
+  white-space: nowrap;
+}
+
+.b2-rail__label--sun { color: #fbd24b; }
+
+/* ================================================================ 2A  counter tally */
+
+.c-tally {
+  position: absolute;
+  left: 48px;
+  top: 96px;
+  width: 430px;
+  padding: 22px 22px 24px;
+  max-height: 636px;
+  display: flex;
+  flex-direction: column;
+}
+
+.c-title {
+  font-family: var(--display);
+  font-size: 34px;
+  color: #46101a;
+  text-transform: uppercase;
+  line-height: 0.9;
+}
+
+.c-sub { margin-top: 6px; font-size: 13px; font-weight: 700; color: #8a5a3c; }
+
+.c-groups { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
+
+.c-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 4px solid #46101a;
+  border-radius: 18px;
+  padding: 10px 14px;
+  box-shadow:
+    inset 0 3px 0 rgb(255 255 255 / 0.55),
+    inset 0 -8px 14px rgb(70 16 26 / 0.14),
+    0 3px 0 rgb(70 16 26 / 0.28);
+}
+
+/* Muted with colour rather than opacity -- this panel floats over a live camera, and a faded
+   row shows the counter straight through it. */
+.c-group.is-empty { filter: saturate(0.3) brightness(0.96); }
+
+.c-group__body { flex: 1; min-width: 0; }
+
+.c-group__name {
+  font-family: var(--display);
+  font-size: 22px;
+  color: #46101a;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.c-group__list {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.c-group__count { font-family: var(--display); font-size: 30px; color: #46101a; }
+
+.c-fix {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 3px dashed #d8bfa4;
+}
+
+.c-fix__label {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #8a5a3c;
+}
+
+.c-pill {
+  background: #fff3e4;
+  border: 3px solid #46101a;
+  border-radius: 999px;
+  padding: 7px 16px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #46101a;
+  white-space: nowrap;
+  transition: background-color 90ms ease-out;
+}
+
+.c-pill:hover, .c-pill:focus-visible { outline: none; background: #fbd24b; }
+.c-pill[disabled] { background: #d9c6b2; color: #8a7866; border-color: #8a7866; cursor: default; }
+
+/* ---------------------------------------------------------------- the editor
+
+   Not in the artboard. The document draws a finished tally; a real scan needs correcting, and
+   "fix by hand" is the accuracy strategy rather than a nicety -- a tally the cook has corrected
+   is right by construction instead of on average. It opens inside the card and scrolls there. */
+
+.c-editor { display: none; }
+
+.c-editor.is-open {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 3px dashed #d8bfa4;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #46101a transparent;
+}
+
+.c-editor__label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #8a5a3c;
+}
+
+.c-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 3px solid #46101a;
+  border-radius: 14px;
+  padding: 6px 8px;
+}
+
+.c-row.is-unsure { border-style: dashed; }
+.c-row__name { flex: 1; min-width: 0; font-size: 13px; font-weight: 800; color: #46101a; }
+.c-row__conf { font-size: 10px; font-weight: 700; color: #8a5a3c; }
+.c-row__count { font-family: var(--display); font-size: 20px; min-width: 26px; text-align: center; }
+
+.c-step {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  border: 3px solid #46101a;
+  border-radius: 9px;
+  background: #fff3e4;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+  transition: background-color 90ms ease-out;
+}
+
+.c-step:hover, .c-step:focus-visible { outline: none; background: #fbd24b; }
+.c-step--drop:hover { background: #f5230e; color: #fff3e4; }
+
+.c-add { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+
+.c-add__chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 7px;
+  background: #f7e3cc;
+  border: 3px solid #46101a;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 800;
+  text-align: left;
+  min-width: 0;
+  transition: background-color 90ms ease-out;
+}
+
+.c-add__chip.is-wanted { background: #cde6c7; }
+.c-add__chip:hover, .c-add__chip:focus-visible { outline: none; background: #fbd24b; }
+.c-add__chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---------------------------------------------------------------- right rail */
+
+.c-rail {
+  position: absolute;
+  right: 48px;
+  top: 96px;
+  width: 330px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.c-counted { background: #f5230e; padding: 20px 22px 22px; }
+
+.c-counted__label {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #ffd9c9;
+}
+
+.c-counted__row { display: flex; align-items: baseline; gap: 10px; }
+.c-counted__n { font-family: var(--display); font-size: 78px; line-height: 0.9; color: #fff3e4; }
+.c-counted__unit { font-family: var(--display); font-size: 26px; color: #fbd24b; text-transform: uppercase; }
+.c-counted__note { margin-top: 8px; font-size: 13px; font-weight: 700; color: #ffd9c9; }
+
+.c-cook {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: #fbd24b;
+  padding: 18px 20px 20px;
+  transition: transform 90ms ease-out, box-shadow 90ms ease-out;
+}
+
+.c-cook:hover, .c-cook:focus-visible { outline: none; transform: translate(-2px, -3px); }
+.c-cook:active { transform: translate(4px, 5px); box-shadow: 3px 3px 0 #46101a; }
+.c-cook[disabled] { background: #d9c6b2; cursor: default; transform: none; }
+
+.c-cook__title {
+  font-family: var(--display);
+  font-size: 30px;
+  line-height: 0.92;
+  color: #46101a;
+  text-transform: uppercase;
+}
+
+.c-cook[disabled] .c-cook__title, .c-cook[disabled] .c-cook__note { color: #8a7866; }
+.c-cook__note { margin-top: 8px; font-size: 12px; font-weight: 800; color: #7a5a16; letter-spacing: 0.04em; }
+.c-cook__hint { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+
+.c-cook__key {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #fff3e4;
+  border: 3px solid #46101a;
+  font-family: var(--display);
+  font-size: 17px;
+  color: #46101a;
+  padding-top: 2px;
+}
+
+.c-cook__keylabel {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #46101a;
+}
+
+.c-browse {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: #fff3e4;
+  padding: 16px 20px 18px;
+  transition: transform 90ms ease-out, box-shadow 90ms ease-out;
+}
+
+.c-browse:hover, .c-browse:focus-visible { outline: none; transform: translate(-2px, -3px); }
+.c-browse:active { transform: translate(4px, 5px); box-shadow: 3px 3px 0 #46101a; }
+.c-browse__title { font-family: var(--display); font-size: 24px; color: #46101a; text-transform: uppercase; line-height: 1; }
+.c-browse__note { margin-top: 6px; font-size: 12px; font-weight: 700; color: #8a5a3c; }
+
+/* The scan control. The artboard has no equivalent because its tally is already filled in. */
+.c-scan {
+  width: 100%;
+  background: #fbd24b;
+  border: 5px solid #46101a;
+  border-radius: 26px;
+  padding: 14px 20px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #46101a;
+  box-shadow: 0 5px 0 rgb(70 16 26 / 0.35), 9px 12px 0 rgb(70 16 26 / 0.5);
+  transition: transform 90ms ease-out, box-shadow 90ms ease-out;
+}
+
+.c-scan:hover, .c-scan:focus-visible { outline: none; background: #ffdf6d; }
+.c-scan:active { transform: translate(4px, 5px); box-shadow: 2px 2px 0 rgb(70 16 26 / 0.5); }
+.c-scan[disabled] { background: #d9c6b2; color: #8a7866; cursor: default; }
+
+/* ---------------------------------------------------------------- camera state */
+
+.c-cam {
+  position: absolute;
+  right: 48px;
+  top: 40px;
+  background: rgb(255 243 228 / 0.14);
+  border: 3px solid rgb(255 243 228 / 0.45);
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #fff3e4;
+  white-space: nowrap;
+}
+
+.c-cam.is-live { background: #cde6c7; border-color: #46101a; color: #46101a; }

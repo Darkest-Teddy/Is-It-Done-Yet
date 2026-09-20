@@ -306,7 +306,7 @@
   box-shadow: inset 0 3px 0 rgb(255 255 255 / 0.5);
 }
 
-.library__card-name { line-height: 1.2; }
+.library__card-name { line-height: 1.02; }
 .library__card-meta { display: flex; gap: 0.35rem; flex-wrap: wrap; }
 .library__card-status { font-size: 0.75rem; font-weight: 800; color: var(--brown); }
 .library__card-status.is-ready { color: #3f6b33; }
@@ -466,7 +466,7 @@
 .cut__left { gap: 0.8rem; justify-content: flex-start; }
 
 .cut__clock-card { display: flex; flex-direction: column; gap: 0.2rem; }
-.cut__clock { line-height: 1.2; }
+.cut__clock { line-height: 0.9; }
 .cut__clock-meter { margin-top: 0.5rem; }
 
 .cut__stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.6rem; }
