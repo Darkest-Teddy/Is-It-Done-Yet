@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>WebXR + camera coexistence</title>
+<!--
+  Does getUserMedia keep delivering frames INSIDE an immersive-ar session?
+
+  DECISIONS entry 18 established that the passthrough cameras are reachable from a 2D page in
+  Quest Browser. That is not the same question. An immersive session takes over the compositor,
+  and a browser is entitled to suspend media capture when a page stops being the visible
+  foreground document. If capture dies on entry, overlays anchored to real objects are not
+  reachable from the browser at all and the whole plan collapses back to a 2D panel.
+
+  The measurement is deliberately dumb and therefore trustworthy: sample the <video> element's
+  currentTime and its mean luminance on a timer. currentTime advancing proves new frames are
+  decoding; luminance above zero proves they are not black. Both are checked before entry, held
+  during the session, and compared on exit.
+
+  Everything is also console.log'd, so it can be watched live over the DevTools bridge
+  (adb forward tcp:9222 localabstract:chrome_devtools_remote) while the headset is on a face.
+-->
+<style>
+  body {
+    margin: 0; padding: 24px; background: #0b0d11; color: #e8ecf1;
+    font: 20px/1.5 ui-sans-serif, system-ui, sans-serif;
+  }
+  h1 { font-size: 30px; margin: 0 0 16px; }
+  button {
+    font: 600 22px ui-sans-serif, system-ui, sans-serif; padding: 18px 26px;
+    margin: 0 12px 12px 0; border-radius: 12px; border: 1px solid #1e242e;
+    background: #151a22; color: #e8ecf1; cursor: pointer;
+  }
+  button:disabled { opacity: .4; }
+  #log {
+    margin-top: 16px; white-space: pre-wrap; font: 15px/1.5 ui-monospace, monospace;
+    background: #0f131a; border: 1px solid #1e242e; border-radius: 10px; padding: 14px;
+    max-height: 50vh; overflow: auto;
+  }
+  .big { font-size: 26px; font-weight: 700; padding: 14px 0; }
+  .pass { color: #6ee07a; } .fail { color: #ff7a7a; } .warn { color: #ffc95e; }
+  video { width: 260px; border-radius: 10px; background: #000; }
+</style>
+</head>
+<body>
+<h1>WebXR + camera coexistence</h1>
+<div id="verdict" class="big warn">1 — start the camera, 2 — enter AR, look around, 3 — exit</div>
+
+<button id="cam">1. Start camera</button>
+<button id="enter" disabled>2. Enter AR</button>
+<button id="send" disabled>3. Send to laptop</button>
+
+<div><video id="v" playsinline muted></video></div>
+<div id="log"></div>
+
+<script>
+const logEl = document.getElementById('log');
+const verdict = document.getElementById('verdict');
+const video = document.getElementById('v');
+const lines = [];
+
+function log(text) {
+  const stamp = `${(performance.now() / 1000).toFixed(1)}s`;
+  const line = `${stamp.padStart(7)}  ${text}`;
+  lines.push(line);
+  console.log('[xrcam]', line);          // readable live over the DevTools bridge
+  logEl.textContent = lines.slice(-40).join('\n');
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+// ---- Frame liveness -----------------------------------------------------------------------
+// currentTime advancing = new frames decoding. Mean luminance > 0 = they are not black.
+// Both matter: a stalled stream and a black stream look identical to a status code.
+
+const probe = document.createElement('canvas');
+probe.width = 64; probe.height = 48;
+const pctx = probe.getContext('2d', { willReadFrequently: true });
+
+let lastTime = -1;
+let advances = 0;
+let samples = 0;
+let blackSamples = 0;
+let phase = 'idle';
+const perPhase = {};
+
+function sample() {
+  if (video.readyState < 2) return;
+  samples++;
+  const t = video.currentTime;
+  if (t > lastTime) { advances++; lastTime = t; }
+
+  let lum = 0;
+  try {
+    pctx.drawImage(video, 0, 0, probe.width, probe.height);
+    const { data } = pctx.getImageData(0, 0, probe.width, probe.height);
+    for (let i = 0; i < data.length; i += 4) lum += (data[i] + data[i + 1] + data[i + 2]) / 3;
+    lum /= data.length / 4;
+  } catch (e) { lum = -1; }          // tainted canvas would show up here, not as a silent zero
+  if (lum >= 0 && lum < 2) blackSamples++;
+
+  const p = perPhase[phase] ??= { samples: 0, advances: 0, lumSum: 0, black: 0 };
+  p.samples++;
+  if (t > (p.lastT ?? -1)) { p.advances++; p.lastT = t; }
+  p.lumSum += Math.max(0, lum);
+  if (lum >= 0 && lum < 2) p.black++;
+}
+setInterval(sample, 100);
+
+function report(name) {
+  const p = perPhase[name];
+  if (!p || p.samples === 0) return `${name}: no samples`;
+  return `${name}: ${p.advances}/${p.samples} advancing, mean luminance ` +
+         `${(p.lumSum / p.samples).toFixed(1)}, ${p.black} black`;
+}
+
+// ---- 1. Camera ----------------------------------------------------------------------------
+
+document.getElementById('cam').addEventListener('click', async () => {
+  try {
+    log('requesting camera...');
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: 1280, height: 960 },
+    });
+    video.srcObject = stream;
+    await video.play();
+    const s = stream.getVideoTracks()[0].getSettings();
+    log(`camera live: ${s.width}x${s.height} @ ${s.frameRate ?? '?'}fps`);
+    phase = 'before';
+    document.getElementById('enter').disabled = !navigator.xr;
+    if (!navigator.xr) log('navigator.xr ABSENT -- cannot test the session half');
+  } catch (e) {
+    log(`camera FAILED: ${e.name}: ${e.message}`);
+    verdict.className = 'big fail';
+    verdict.textContent = `camera failed: ${e.name}`;
+  }
+});
+
+// ---- 2. Immersive session -----------------------------------------------------------------
+
+document.getElementById('enter').addEventListener('click', async () => {
+  if (!navigator.xr) { log('no navigator.xr'); return; }
+  let session;
+  try {
+    log('requesting immersive-ar...');
+    session = await navigator.xr.requestSession('immersive-ar', {
+      optionalFeatures: ['local-floor', 'anchors', 'plane-detection', 'hit-test'],
+    });
+  } catch (e) {
+    log(`requestSession FAILED: ${e.name}: ${e.message}`);
+    return;
+  }
+
+  log('session started -- LOOK AROUND, then exit with the menu button');
+  phase = 'during';
+
+  // A minimal WebGL layer. Without one the session has nothing to present and some runtimes
+  // end it immediately, which would look exactly like the camera killing the session.
+  const canvas = document.createElement('canvas');
+  const gl = canvas.getContext('webgl2', { xrCompatible: true, alpha: true });
+  if (gl === null) { log('no webgl2 context'); }
+  else {
+    await gl.makeXRCompatible?.();
+    session.updateRenderState({ baseLayer: new XRWebGLLayer(session, gl) });
+  }
+
+  let space = null;
+  try { space = await session.requestReferenceSpace('local-floor'); }
+  catch { try { space = await session.requestReferenceSpace('local'); } catch { /* none */ } }
+  log(`reference space: ${space ? 'acquired' : 'NONE'}`);
+
+  let xrFrames = 0;
+  const onFrame = (_t, frame) => {
+    xrFrames++;
+    if (gl !== null) {
+      const layer = session.renderState.baseLayer;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
+      // Faint pulse so it is obvious you are inside a session and it is still rendering.
+      const k = (Math.sin(xrFrames / 30) + 1) / 2;
+      gl.clearColor(0.1 * k, 0.5 * k, 0.9 * k, 0.35);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    }
+    if (xrFrames % 90 === 0) log(`in session: ${xrFrames} xr frames | ${report('during')}`);
+    session.requestAnimationFrame(onFrame);
+  };
+  session.requestAnimationFrame(onFrame);
+
+  session.addEventListener('end', () => {
+    phase = 'after';
+    log('session ended');
+    log(report('before'));
+    log(report('during'));
+    setTimeout(() => {
+      log(report('after'));
+      const d = perPhase.during;
+      const alive = d && d.advances > 3 && (d.lumSum / d.samples) >= 2;
+      verdict.className = `big ${alive ? 'pass' : 'fail'}`;
+      verdict.textContent = alive
+        ? 'PASS — camera kept delivering real frames inside the AR session'
+        : 'FAIL — camera stalled or went black inside the session';
+      log(verdict.textContent);
+      document.getElementById('send').disabled = false;
+    }, 1500);
+  });
+});
+
+// ---- 3. Results ---------------------------------------------------------------------------
+
+document.getElementById('send').addEventListener('click', async () => {
+  const body = [
+    `when: ${new Date().toISOString()}`,
+    `ua:   ${navigator.userAgent}`,
+    `test: WebXR + camera coexistence`,
+    `verdict: ${verdict.textContent}`,
+    '',
+    ...lines,
+  ].join('\n');
+  try {
+    const res = await fetch('/quest-results', { method: 'POST', body });
+    log(res.ok ? 'sent to laptop' : `server said ${res.status}`);
+  } catch (e) { log(`send failed: ${e.message}`); }
+});
+
+log(`navigator.xr: ${navigator.xr ? 'present' : 'ABSENT'}`);
+if (navigator.xr) {
+  navigator.xr.isSessionSupported('immersive-ar')
+    .then((ok) => log(`immersive-ar supported: ${ok}`));
+}
+</script>
+</body>
+</html>

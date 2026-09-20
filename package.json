@@ -9,6 +9,10 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "preview": "vite preview --port 8081 --host",
+    "headset": "adb reverse tcp:8081 tcp:8081 && vite",
+    "headset:preview": "npm run build && adb reverse tcp:8081 tcp:8081 && vite preview --port 8081 --host",
+    "devtools": "adb forward tcp:9222 localabstract:chrome_devtools_remote && echo 'open chrome://inspect, or curl http://localhost:9222/json'",
     "test:core": "vitest run src/core",
     "check:purity": "node scripts/check-purity.mjs",
     "typecheck": "tsc --noEmit",
