@@ -58,9 +58,29 @@ describe it, and entry 12 explains what happened. Read both as doctrine, not des
 
 ```bash
 npm ci
-npm test       # purity + typecheck + 136 tests
+npm test       # purity + typecheck + the unit suite
 npm run dev    # http://localhost:8081
 ```
+
+### The API (optional)
+
+The recipe book and the global leaderboard are served by [`server/`](./server/README.md). It is
+optional in both directions: the app runs without it, and it runs without an account.
+
+```bash
+cd server && npm install && npm run dev    # :3000, embedded MongoDB, seeded
+```
+
+With `MONGODB_URI` unset the server starts its own MongoDB in-process and keeps the data in
+`server/.data/`, so there is nothing to sign up for. Point the front end at it by setting
+`VITE_API_URL` **at build time**:
+
+```bash
+VITE_API_URL=http://localhost:3000 npm run dev
+```
+
+Unset, the recipe book lists the recipes bundled in `src/core/recipe.ts` and the leaderboard
+shows the local booth board only. Deployment: [`server/DEPLOY.md`](./server/DEPLOY.md).
 
 ### The rig
 

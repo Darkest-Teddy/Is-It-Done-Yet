@@ -26,6 +26,7 @@ import {
 import { configFromEnv, scanCounter } from '../ai/openai.js';
 import { emptyPantry, type Pantry } from '../core/pantry.js';
 import { RECIPES } from '../core/recipe.js';
+import { fetchRecipes } from '../net/api.js';
 import { CoachSession } from '../app/session.js';
 import { DEFAULT_SEGMENT_OPTIONS, segment, useOpenCv } from '../vision/segment.js';
 import { RecipePanels, type ScanResult } from './panels.js';
@@ -294,7 +295,15 @@ async function mountPanels(
   pantry: Pantry = emptyPantry(),
 ): Promise<RecipePanels | null> {
   try {
-    const panels = await RecipePanels.load(pantry, RECIPES, {
+    // The recipe book, if there is one to reach. `fetchRecipes` has its own timeout and never
+    // throws, and the bundled table is the fallback -- so a dead API, a saturated venue network
+    // or an unset VITE_API_URL costs the extra recipes and nothing else. Master spec rule #9.
+    const remote = await fetchRecipes();
+    const recipes = remote.ok && remote.value.length > 0 ? remote.value : RECIPES;
+    if (!remote.ok) log(`recipe API unavailable (${remote.error}) -- using the ${RECIPES.length} bundled recipes`);
+    else log(`recipe book: ${recipes.length} recipes`);
+
+    const panels = await RecipePanels.load(pantry, recipes, {
       onStart: (recipe) => {
         log(`starting "${recipe.name}"`);
       },

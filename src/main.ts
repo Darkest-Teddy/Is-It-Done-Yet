@@ -6,6 +6,8 @@ import {
   add as addEntry, type Entry, entryFrom, parseEntries, positionOf, rank,
 } from './core/leaderboard.js';
 import { progressOf, type Recipe, RECIPES } from './core/recipes.js';
+import type { Recipe as Dish } from './core/recipe.js';
+import { mountLeaderboard, mountRecipeBook, mountRunSubmit } from './ui/panels.js';
 import { createChef } from './audio/chef.js';
 import { createChop } from './audio/chop.js';
 import { feedbackForCut, type FeedbackOptions } from './core/feedback.js';
@@ -36,6 +38,13 @@ const cutsEl = document.getElementById('cuts') as HTMLOListElement;
 const ticketEl = document.getElementById('ticket') as HTMLElement;
 const boardEl = document.getElementById('board') as HTMLOListElement;
 const ctx = canvas.getContext('2d')!;
+
+/** Throws on a missing id rather than returning null, so a renamed element fails at startup. */
+function byId(id: string): HTMLElement {
+  const el = document.getElementById(id);
+  if (el === null) throw new Error(`missing element #${id}`);
+  return el;
+}
 
 const status = (text: string): void => { statusEl.textContent = text; };
 
@@ -75,6 +84,15 @@ const trackOptions = (): TrackOptions => ({
  * what you want while tuning with no ticket in play.
  */
 let activeRecipe: Recipe | null = null;
+
+/**
+ * A dish picked from the recipe book while no cutting ticket is active.
+ *
+ * Held separately from `activeRecipe` rather than converted into one, because a dish has no
+ * thickness target and inventing one would put a number on the screen that nothing measured.
+ * This rig scores knife work; a dish only names what the knife work is for.
+ */
+let chosenDish: Dish | null = null;
 
 const scoringOptions = (): ScoringOptions => ({
   targetThicknessMm: activeRecipe?.targetThicknessMm ?? tunable('TARGET_THICKNESS_MM'),
@@ -395,6 +413,13 @@ async function start(): Promise<void> {
     voiceId: import.meta.env.VITE_ELEVENLABS_VOICE as string | undefined,
   });
 
+  /**
+   * Assigned further down, once the panels are mounted, and read through `?.` until then.
+   * `renderTicket` runs before that point (it is called from `resetSession`), and a mount order
+   * that cannot tolerate being called early is a mount order somebody will break.
+   */
+  let runSubmit: { update: () => void } | null = null;
+
   const renderBoard = (): void => {
     boardEl.replaceChildren(...rank(board).slice(0, 8).map((e, i) => {
       const li = document.createElement('li');
@@ -407,7 +432,11 @@ async function start(): Promise<void> {
 
   const renderTicket = (): void => {
     if (activeRecipe === null) {
-      ticketEl.textContent = 'Free practice — no ticket. Targets come from the sliders.';
+      ticketEl.textContent = chosenDish === null
+        ? 'Free practice — no ticket. Targets come from the sliders.'
+        : `${chosenDish.icon} ${chosenDish.name} — ${chosenDish.steps.length} steps. `
+          + 'This rig scores the knife work; targets come from the sliders.';
+      runSubmit?.update();
       return;
     }
     const p = progressOf(activeRecipe, session.records.length);
@@ -415,6 +444,7 @@ async function start(): Promise<void> {
       `${activeRecipe.name} — ${p.done}/${p.required} slices at `
       + `${activeRecipe.targetThicknessMm}mm. ${activeRecipe.note}`
       + (p.complete ? '  ✓ ticket complete' : '');
+    runSubmit?.update();
   };
 
   const resetSession = (): void => {
@@ -711,6 +741,45 @@ async function start(): Promise<void> {
     controls.append(heading);
     for (const t of allTunables()) if (t.group === group) slider(t);
   }
+
+  // ---- Recipe book, global board, score submission ---------------------------------------
+  //
+  // All three are additive: with no VITE_API_URL, or with the API unreachable, the recipe book
+  // lists the bundled recipes, the global board says so, and the local booth board under the
+  // canvas is untouched. Master spec rule #9, and rule #12.
+
+  // Named for the panel, not the data: `board` above is the local booth board's rows.
+  const globalBoard = mountLeaderboard();
+  byId('open-board').addEventListener('click', () => { globalBoard.open(); });
+
+  const recipeBook = mountRecipeBook({
+    onChoose: (dish) => {
+      // The cutting tickets are seeded as `cut-<id>`, so a ticket chosen from the book is the
+      // same ticket the dropdown offers -- and the dropdown is kept in agreement, because two
+      // controls disagreeing about what you are cutting is worse than having one.
+      const ticket = RECIPES.find((r) => `cut-${r.id}` === dish.id) ?? null;
+      chosenDish = ticket === null ? dish : null;
+      activeRecipe = ticket;
+      tickets.value = ticket?.id ?? '';
+      resetSession();
+    },
+  });
+  byId('open-recipes').addEventListener('click', () => { recipeBook.open(); });
+
+  runSubmit = mountRunSubmit(
+    () => {
+      const score = scoreSession(session.records, scoringOptions());
+      if (score.count === 0) return null;
+      return {
+        total: score.total,
+        meanMm: score.meanMm,
+        sigmaMm: score.sigmaMm,
+        cuts: score.count,
+        recipeId: activeRecipe?.id ?? 'free',
+      };
+    },
+    () => { void globalBoard.refresh(); },
+  );
 
   renderTicket();
   renderBoard();

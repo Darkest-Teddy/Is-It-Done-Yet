@@ -620,3 +620,57 @@ piece of work, not a flag, and it must be budgeted before anyone commits to anch
 
 Recorded now because the panel demo is available immediately and the session demo is not, and
 the difference is one measurement rather than an opinion.
+
+## 22. There is a server now, and the local board stayed
+
+**Spec section:** §5 puts MongoDB Atlas in Layer 3 behind "Node 22 + Hono on Vercel — thin,
+holds keys, proxies", and §12 lists a booth leaderboard under *should ship*. Entry in
+`src/core/leaderboard.ts` argues the opposite case: at a booth with one laptop, every player is
+on the same machine, so `localStorage` **is** the shared store, and rule #12 says pick whatever
+survives bad wifi.
+
+**Reality:** both are right about different things. The local board is the one that works at
+8pm on Saturday with the venue network saturated. It is also the one that forgets everything
+when somebody opens the page on the second headset, and §13 wants recipes in Atlas for
+`fetch_recipe` regardless.
+
+**Decision: add `server/`, and add nothing to the failure path.**
+
+- Express 5 and the official `mongodb` driver rather than Hono on Vercel. Hono buys nothing
+  here — this holds no keys and proxies nothing, it is an ordinary CRUD API — and a container
+  runs on Render, Fly or a laptop without a platform-specific adapter.
+- **Plain ESM JavaScript, not TypeScript.** The one real cost is losing `strict` on the server.
+  What it buys is no build step anywhere: `node src/index.js` in development, in the tests and
+  in the Docker image, which is one less thing that can be broken at 4am. The shapes that
+  matter are enforced at runtime by zod, where the untrusted input actually arrives, rather
+  than at compile time where it does not.
+- **The local board is untouched.** Both exist: `mise.leaderboard` in `localStorage` under the
+  canvas, the global one behind a button. The global board is the feature; the local one is the
+  thing that still works when the feature does not.
+- **Every network path has a bundled fallback.** With no `VITE_API_URL`, or a dead API, the
+  recipe book lists the recipes in `src/core/recipe.ts` and says so in a line under the list.
+  `src/net/api.ts` returns failures as values and never throws at a caller.
+
+**One source of truth for recipes, enforced.** `server/src/builtin-recipes.json` is generated
+from `src/core/recipe.ts` (the three CaptainCook4D dishes) and `src/core/recipes.ts` (the ten
+cutting tickets, seeded as `cut-<id>`) by `npm run recipes:export`, and a test fails if the two
+have drifted. The stored document is a recipe card — `ingredients: [{ name, quantity, unit }]`,
+ordered `steps` — plus the coach fields that card has no slot for: per-step `stepId`,
+`verifiable` and `satisfies`, and a `coach` object holding `requires`. That is what makes the
+round trip lossless without a second recipe model, which master spec rule #8 exists to prevent.
+
+**No database account required to develop.** With `MONGODB_URI` unset the server starts an
+embedded MongoDB (`mongodb-memory-server`) with a persistent `server/.data/` and seeds it. The
+integration tests use the same mechanism against an ephemeral instance, so they always run —
+there is no "integration tests skipped, no database" state for a test to hide in.
+
+**What this does not fix, and the fix is known.** Scores arrive from the client. Validation,
+the name filter and the rate limit deter a bored teenager and nothing else: anyone with the
+developer console can post any number. The real fix is a server-issued session token tying a
+score to a session with a minimum duration. It is not built, and claiming the board is
+tamper-proof would be worse than the gap.
+
+**What is stored about a player:** a name they typed and a number. No account, no IP address,
+no user agent, no identifier of any kind — there is a test asserting exactly that on both the
+response and the stored document. Rate-limit counters are per-address, in memory, and never
+written down.
