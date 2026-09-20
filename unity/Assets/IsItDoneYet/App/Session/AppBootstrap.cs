@@ -70,11 +70,28 @@ namespace IsItDoneYet.App
 
             if (Onboarding != null) Onboarding.gameObject.SetActive(OnboardingFlow.ShouldShow());
 
-            // One frame, so the head pose is valid before the HUD is placed. Placing on the
-            // first frame lands everything at the world origin, which on a Quest is wherever
-            // the guardian was drawn -- usually behind the cook.
+            /*
+             * Placement is left to HudRoot, which waits for a head pose that could belong to a
+             * real head. Forcing it here after a single frame is what put the entire HUD on the
+             * floor: OVR reports (0,0,0) until tracking initialises, and one frame is nowhere
+             * near long enough.
+             */
             yield return null;
-            Hud?.Recenter();
+
+            // One line, on purpose. Without it the only way to tell a mis-placed HUD from a
+            // HUD that never ran is to put the headset on and guess.
+            // Logged once, after the HUD has actually placed, so a mis-placed HUD can be told
+            // from one that never ran without putting the headset on and guessing.
+            var waited = 0f;
+            while (Hud != null && !Hud.Placed && waited < 10f) { waited += Time.unscaledDeltaTime; yield return null; }
+
+            if (Hud != null && Hud.Head != null)
+            {
+                Debug.Log($"[IDY] placed={Hud.Placed} after {waited:0.0}s | head {Hud.Head.position} " +
+                          $"| title {(Hud.Title != null ? Hud.Title.position.ToString() : "null")} " +
+                          $"| onboarding {(Hud.Onboarding != null ? Hud.Onboarding.position.ToString() : "null")} " +
+                          $"| consent {OnboardingFlow.HasConsent} | recipes {(Book != null ? Book.Recipes.Count : -1)}");
+            }
         }
 
         void Update()

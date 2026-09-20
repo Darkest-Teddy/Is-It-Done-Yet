@@ -239,3 +239,50 @@ namespace IsItDoneYet.Tests
         }
     }
 }
+
+namespace IsItDoneYet.Tests
+{
+    /// <summary>
+    /// The head-pose guard. This one shipped broken and the symptom was "the app looks
+    /// unchanged", which is the most expensive symptom there is.
+    /// </summary>
+    public class HeadPoseTests
+    {
+        [Test]
+        public void TheRigOriginIsNotARealHeadPose()
+        {
+            // What OVR reports before tracking initialises. Placing against it put the title at
+            // shin height and the onboarding card below the floor.
+            Assert.IsFalse(App.HudRoot.PoseLooksReal(Vector3.zero, 0.3f));
+        }
+
+        [Test]
+        public void AStandingHeadIsReal()
+        {
+            Assert.IsTrue(App.HudRoot.PoseLooksReal(new Vector3(0f, 1.6f, 0f), 0.3f));
+        }
+
+        [Test]
+        public void ASeatedHeadIsStillReal()
+        {
+            Assert.IsTrue(App.HudRoot.PoseLooksReal(new Vector3(0f, 1.1f, 0f), 0.3f));
+        }
+
+        [Test]
+        public void AHeadDirectlyOverTheOriginIsNotMistakenForTheOrigin()
+        {
+            /*
+             * The reason height is the test and "is the position non-zero" is not: a cook
+             * standing exactly on the rig origin has an x and z of nearly zero, so a magnitude
+             * check cannot tell them from an uninitialised pose. Their head is still 1.6m up.
+             */
+            Assert.IsTrue(App.HudRoot.PoseLooksReal(new Vector3(0.001f, 1.65f, -0.002f), 0.3f));
+        }
+
+        [Test]
+        public void AHeadOnTheFloorIsNotAHead()
+        {
+            Assert.IsFalse(App.HudRoot.PoseLooksReal(new Vector3(0.4f, 0.05f, 1.2f), 0.3f));
+        }
+    }
+}

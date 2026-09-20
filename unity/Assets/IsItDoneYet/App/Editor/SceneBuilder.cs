@@ -109,7 +109,8 @@ namespace IsItDoneYet.App.Editor
 
             var toasts = BuildToasts(hudGo, layout, head);
             var rail = BuildStepRail(hudGo);
-            BuildCameraIndicator(hudGo, uploader);
+            hud.StepRail = rail.transform;
+            hud.CameraIndicator = BuildCameraIndicator(hudGo, uploader).transform;
 
             // ---- panels --------------------------------------------------------------------
             var panels = Child(root.transform, "Panels");
@@ -138,6 +139,7 @@ namespace IsItDoneYet.App.Editor
 
             // ---- onboarding ----------------------------------------------------------------
             var onboarding = BuildOnboarding(root.transform, uploader, deviceSource);
+            hud.Onboarding = onboarding.transform;
 
             // ---- dev -----------------------------------------------------------------------
             var devGo = Child(root.transform, "Dev");

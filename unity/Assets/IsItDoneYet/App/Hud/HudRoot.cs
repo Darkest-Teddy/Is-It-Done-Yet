@@ -29,24 +29,54 @@ namespace IsItDoneYet.App
         public Transform Checklist;
         public Transform Timeline;
         public Transform Leaderboard;
+        [Tooltip("The first screen a cook sees. Unplaced, it sits at the rig origin -- on the floor.")]
+        public Transform Onboarding;
+        public Transform StepRail;
+        public Transform CameraIndicator;
 
         [Header("Placement")]
-        [Tooltip("Place on the first frame the head pose is valid. Without this the HUD lands at the origin.")]
+        [Tooltip("Place as soon as the head pose is real. Without this the HUD lands at the rig origin.")]
         public bool PlaceOnStart = true;
 
+        [Tooltip("A tracked head is never this low. Below it, the pose has not initialised yet.")]
+        public float MinHeadHeightM = 0.3f;
+
+        [Tooltip("Place anyway after this long, so a pose that never looks real still gets a HUD.")]
+        public float PlaceTimeoutSeconds = 6f;
+
         bool _placed;
+        float _waiting;
 
         void LateUpdate()
         {
             if (_placed || !PlaceOnStart || Head == null || Layout == null) return;
-            // The head pose is identity for the first frame or two while tracking starts. A HUD
-            // placed then lands at the world origin, which on a Quest is wherever the guardian
-            // was drawn -- usually behind the cook.
-            if (Head.position.sqrMagnitude < 1e-6f && Head.rotation == Quaternion.identity) return;
+
+            _waiting += Time.unscaledDeltaTime;
+            if (!PoseLooksReal(Head.position, MinHeadHeightM) && _waiting < PlaceTimeoutSeconds) return;
+
             Recenter();
         }
 
+        /// <summary>
+        /// Is this a pose a tracked head could actually be in?
+        ///
+        /// Height is the only reliable signal. Before tracking initialises, OVR reports the rig
+        /// origin -- and a cook standing exactly on that origin has an x and z of nearly zero
+        /// too, so "is the position non-zero" cannot tell the two apart. What it cannot be is
+        /// low: a head on the floor is not a head.
+        ///
+        /// This was a real failure and it looked like the app had not changed at all. The HUD
+        /// placed against a head at (0,0,0), which put the title at shin height and the
+        /// onboarding card slightly BELOW the floor, while the scene's original text kept
+        /// rendering where it always had.
+        /// </summary>
+        public static bool PoseLooksReal(Vector3 headPosition, float minHeightM) =>
+            headPosition.y > minHeightM;
+
         /// <summary>Puts every anchor back in front of the cook, from where they are standing now.</summary>
+        /// <summary>True once the HUD has been positioned against a real head pose.</summary>
+        public bool Placed => _placed;
+
         public void Recenter()
         {
             if (Layout == null || Head == null) return;
@@ -59,6 +89,17 @@ namespace IsItDoneYet.App
             Place(Checklist, LayoutAnchor.Checklist);
             Place(Timeline, LayoutAnchor.Timeline);
             Place(Leaderboard, LayoutAnchor.Leaderboard);
+
+            /*
+             * These three were missing, and Onboarding is the one that mattered: unplaced, it
+             * kept its authored local position under a root sitting at the rig's world origin,
+             * which is the FLOOR. The first screen of the app was face-down at the cook's feet
+             * while the HUD title floated correctly in front of them -- so the app looked like
+             * it had not changed at all.
+             */
+            Place(Onboarding, LayoutAnchor.Onboarding);
+            Place(StepRail, LayoutAnchor.StepRail);
+            Place(CameraIndicator, LayoutAnchor.CameraIndicator);
         }
 
         void Place(Transform target, LayoutAnchor anchor)

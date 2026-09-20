@@ -65,6 +65,20 @@ namespace IsItDoneYet.Design
         public float LeaderboardPitchDeg = 4f;
         public float LeaderboardDistanceM = 2.2f;
 
+        [Header("Onboarding and rail")]
+        [Tooltip("The first thing a cook sees. Dead ahead, slightly below the eye line, at reading distance.")]
+        public float OnboardingYawDeg = 0f;
+        public float OnboardingPitchDeg = -4f;
+        public float OnboardingDistanceM = 1.0f;
+        [Tooltip("The step rail sits off to the left, out of the way of the hands.")]
+        public float StepRailYawDeg = -26f;
+        public float StepRailPitchDeg = 2f;
+        public float StepRailDistanceM = 1.1f;
+        [Tooltip("The camera indicator rides high and right, always in peripheral vision.")]
+        public float CameraIndicatorYawDeg = 20f;
+        public float CameraIndicatorPitchDeg = 18f;
+        public float CameraIndicatorDistanceM = 1.3f;
+
         [Header("Safe mode")]
         [Tooltip("The HUD collapses to one pill here. Small, calm, out of the way of the hands.")]
         public float SafePillPitchDeg = -8f;
@@ -95,6 +109,9 @@ namespace IsItDoneYet.Design
                 case LayoutAnchor.Timeline:    yaw = TimelineYawDeg;    pitch = TimelinePitchDeg;    distance = PanelDistanceM; break;
                 case LayoutAnchor.Leaderboard: yaw = LeaderboardYawDeg; pitch = LeaderboardPitchDeg; distance = LeaderboardDistanceM; break;
                 case LayoutAnchor.SafePill:    yaw = SafePillYawDeg;    pitch = SafePillPitchDeg;    distance = SafePillDistanceM; break;
+                case LayoutAnchor.Onboarding:  yaw = OnboardingYawDeg;  pitch = OnboardingPitchDeg;  distance = OnboardingDistanceM; break;
+                case LayoutAnchor.StepRail:    yaw = StepRailYawDeg;    pitch = StepRailPitchDeg;    distance = StepRailDistanceM; break;
+                case LayoutAnchor.CameraIndicator: yaw = CameraIndicatorYawDeg; pitch = CameraIndicatorPitchDeg; distance = CameraIndicatorDistanceM; break;
                 default:                       yaw = 0f;                pitch = 0f;                  distance = PanelDistanceM; break;
             }
 
@@ -122,5 +139,6 @@ namespace IsItDoneYet.Design
     public enum LayoutAnchor
     {
         Title, Score, Toast, RecipeBook, Checklist, Timeline, Leaderboard, SafePill,
+        Onboarding, StepRail, CameraIndicator,
     }
 }
