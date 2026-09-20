@@ -183,7 +183,7 @@ export default defineConfig({
     // Object form, not the bare string the IWSDK scaffold used: that one fails the dependency
     // scan outright under Vite 7 (DECISIONS.md #11).
     rollupOptions: {
-      input: { main: 'index.html', xr: 'xr.html', app: 'app.html', homev2: 'homev2.html' },
+      input: { main: 'index.html', xr: 'xr.html', app: 'app.html' },
     },
   },
 

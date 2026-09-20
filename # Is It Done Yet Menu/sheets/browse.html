@@ -1,0 +1,15 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>
+body{margin:0;background:#8fb0ee;font:10px system-ui}
+.g{display:grid;grid-template-columns:repeat(14,1fr);gap:2px;padding:4px}
+.c{text-align:center}img{width:100%;display:block}
+</style></head><body>
+<div class="g" id="out"></div>
+<script>
+const p=new URLSearchParams(location.search);
+const dir=p.get("d")||"Carb/Carb", pre=p.get("p")||"carb", a=+(p.get("a")||1), b=+(p.get("b")||50);
+let h="";
+for(let i=a;i<=b;i++) h+="<div class='c'><img src='../uploads/"+dir+"/"+encodeURIComponent(pre+" ("+i+").png")+"'>"+i+"</div>";
+document.getElementById("out").innerHTML=h;
+</script>
+</body></html>

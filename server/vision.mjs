@@ -6,8 +6,8 @@
  * function's source is in no commit on any ref -- it was deployed from a working tree, the same
  * way the cook-flow page was (entry 27). `server/vision-relay.mjs` arrived from main and is a
  * faithful transport, but it is only a transport: it forwards an OpenRouter-shaped body and has
- * no opinion about ingredients. And `src/home/scan.ts` has always called `api/vision` and
- * handled its absence gracefully. So the client spoke a contract, the transport spoke another,
+ * no opinion about ingredients. And the cook-flow client has always called
+ * `api/vision` and handled its absence gracefully. So the client spoke a contract, the transport spoke another,
  * and nothing in the repository translated between them.
  *
  * This is that translation: prompt in, `RawScanItem[]` out, matching byte-for-byte the shape the

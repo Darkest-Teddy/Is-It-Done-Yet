@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Ranchers&family=Hanken+Grotesk:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#E7D4C0; }
+  a { color:#F5230E; text-decoration:none; }
+  a:hover { color:#3B2A1B; }
+  @keyframes idy-drop {
+    0%   { transform: translateY(-640px) rotate(-16deg) scale(1.05); opacity:0; }
+    5%   { opacity:1; }
+    16%  { transform: translateY(0) rotate(0deg) scale(1.12,.8); }
+    22%  { transform: translateY(-26px) rotate(2deg) scale(.95,1.07); }
+    28%  { transform: translateY(0) rotate(0deg) scale(1.04,.96); }
+    33%,100% { transform: translateY(0) rotate(0deg) scale(1); }
+  }
+  @keyframes idy-s1 { 0%,0%{transform:translateY(-520px) scale(1);opacity:0} 1%{opacity:1} 6%{transform:translateY(0) scale(1.1,.82);opacity:1} 7.5%{transform:translateY(-9px) scale(.96,1.05);opacity:1} 9%,100%{transform:translateY(0) scale(1);opacity:1} }
+  @keyframes idy-s2 { 0%,9%{transform:translateY(-520px) scale(1);opacity:0} 10%{opacity:1} 15%{transform:translateY(0) scale(1.1,.82);opacity:1} 16.5%{transform:translateY(-9px) scale(.96,1.05);opacity:1} 18%,100%{transform:translateY(0) scale(1);opacity:1} }
+  @keyframes idy-s3 { 0%,18%{transform:translateY(-520px) scale(1);opacity:0} 19%{opacity:1} 24%{transform:translateY(0) scale(1.1,.82);opacity:1} 25.5%{transform:translateY(-9px) scale(.96,1.05);opacity:1} 27%,100%{transform:translateY(0) scale(1);opacity:1} }
+  @keyframes idy-s4 { 0%,27%{transform:translateY(-520px) scale(1);opacity:0} 28%{opacity:1} 33%{transform:translateY(0) scale(1.1,.82);opacity:1} 34.5%{transform:translateY(-9px) scale(.96,1.05);opacity:1} 36%,100%{transform:translateY(0) scale(1);opacity:1} }
+  @keyframes idy-s5 { 0%,36%{transform:translateY(-520px) scale(1);opacity:0} 37%{opacity:1} 42%{transform:translateY(0) scale(1.1,.82);opacity:1} 43.5%{transform:translateY(-9px) scale(.96,1.05);opacity:1} 45%,100%{transform:translateY(0) scale(1);opacity:1} }
+  @keyframes idy-s6 { 0%,45%{transform:translateY(-520px) scale(1);opacity:0} 46%{opacity:1} 51%{transform:translateY(0) scale(1.1,.82);opacity:1} 52.5%{transform:translateY(-9px) scale(.96,1.05);opacity:1} 54%,100%{transform:translateY(0) scale(1);opacity:1} }
+  @keyframes idy-fall { 0%{transform:translateY(-180px) rotate(0);opacity:0;} 10%{opacity:.9;} 100%{transform:translateY(1060px) rotate(340deg);opacity:.9;} }
+  @keyframes idy-bob  { 0%,100%{transform:rotate(-7deg) translateY(0);} 50%{transform:rotate(-7deg) translateY(-14px);} }
+  @keyframes idy-bob2 { 0%,100%{transform:rotate(9deg) translateY(0);}  50%{transform:rotate(9deg) translateY(-11px);} }
+  @keyframes idy-bob3 { 0%,100%{transform:rotate(-4deg) translateY(0);} 50%{transform:rotate(4deg) translateY(-9px);} }
+  @keyframes idy-scan { 0%{transform:translateX(-100%);} 100%{transform:translateX(420%);} }
+  @keyframes idy-pulse { 0%,100%{opacity:.3;} 50%{opacity:1;} }
+  @keyframes idy-sizzle { 0%,100%{transform:rotate(-3deg) scale(1);} 50%{transform:rotate(3deg) scale(1.07);} }
+  @keyframes idy-tag { 0%,100%{transform:translateY(0) rotate(-2deg);} 50%{transform:translateY(-7px) rotate(-2deg);} }
+  @keyframes idy-tag2 { 0%,100%{transform:translateY(0) rotate(2.5deg);} 50%{transform:translateY(-6px) rotate(2.5deg);} }
+  @keyframes idy-press { 0%,72%,100%{transform:translateY(0);} 80%{transform:translateY(5px);} 88%{transform:translateY(0);} }
+  @keyframes idy-chop { 0%,100%{transform:rotate(-48deg) translate(0,0);} 42%{transform:rotate(-8deg) translate(-6px,26px);} 52%{transform:rotate(-12deg) translate(-4px,20px);} }
+  @keyframes idy-slice { 0%,42%{transform:translateX(0);opacity:1;} 60%{transform:translateX(-26px) rotate(-12deg);opacity:1;} 100%{transform:translateX(-30px) rotate(-14deg);opacity:1;} }
+  @keyframes idy-pop { 0%{transform:scale(.86) rotate(-2deg);} 60%{transform:scale(1.03) rotate(-1deg);} 100%{transform:scale(1) rotate(-1deg);} }
+  @keyframes idy-tick { 0%,100%{transform:rotate(0);} 50%{transform:rotate(360deg);} }
+</style>
+</helmet>
+
+<section style="display:flex; flex-direction:column; gap:64px; align-items:flex-start; padding:56px 56px 0; font-family:'Hanken Grotesk',system-ui,sans-serif;">
+
+  <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+    <span style="font-family:'Ranchers',system-ui,sans-serif; font-size:34px; color:#F5230E; text-transform:uppercase;">Quest 3 — cook flow</span>
+    <span style="background:#FFF3E4; border:3px solid #46101A; border-radius:999px; padding:7px 16px; font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#46101A;">1 · Count the counter</span>
+    <span style="font-size:18px; color:#46101A;">→</span>
+    <span style="background:#FFF3E4; border:3px solid #46101A; border-radius:999px; padding:7px 16px; font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#46101A;">2 · Chef's pick</span>
+    <span style="font-size:18px; color:#46101A;">→</span>
+    <span style="background:#FFF3E4; border:3px solid #46101A; border-radius:999px; padding:7px 16px; font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#46101A;">3 · Library</span>
+    <span style="font-size:18px; color:#46101A;">→</span>
+    <span style="background:#FFF3E4; border:3px solid #46101A; border-radius:999px; padding:7px 16px; font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#46101A;">4 · Dish card</span>
+    <span style="font-size:18px; color:#46101A;">→</span>
+    <span style="background:#F5230E; border:3px solid #46101A; border-radius:999px; padding:7px 16px; font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#FFF3E4;">5 · Cut &amp; rank</span>
+  </div>
+
+  <div id="2a" style="display:flex; flex-direction:column; gap:14px;">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span style="background:#F5230E; color:#FFF3E4; font-family:'Ranchers',system-ui,sans-serif; font-size:16px; letter-spacing:.06em; padding:3px 12px 5px; border-radius:999px;">2A</span>
+      <span style="font-size:14px; font-weight:700; color:#46101A; letter-spacing:.14em; text-transform:uppercase;">Setup — counter tally (headset view)</span>
+    </div>
+
+    <div data-screen-label="Counter tally" style="position:relative; width:1440px; height:810px; overflow:hidden; background:#2A211C; border:5px solid #46101A; border-radius:26px; box-shadow:inset 0 3px 0 rgba(255,255,255,.14), inset 0 -26px 44px rgba(0,0,0,.34), 0 6px 0 rgba(70,16,26,.3), 14px 18px 0 rgba(70,16,26,.22), 26px 34px 60px rgba(0,0,0,.35);">
+
+      <div style="position:absolute; left:0; right:0; bottom:0; height:300px; background:#4A382E;"></div>
+      <div style="position:absolute; left:0; right:0; bottom:236px; height:30px; background:#7C5B46; border-top:5px solid #46101A; border-bottom:5px solid #46101A;"></div>
+      <div style="position:absolute; left:120px; bottom:96px; width:1200px; height:140px; background:#8E6B52; border:5px solid #46101A; border-radius:14px; box-shadow:inset 0 8px 0 rgba(255,255,255,.12), inset 0 -30px 50px rgba(0,0,0,.3);"></div>
+
+      <div style="position:absolute; left:48px; top:34px; display:flex; align-items:center; gap:12px;">
+        <div style="font-family:'Ranchers',system-ui,sans-serif; font-size:26px; color:#FFF3E4; text-transform:uppercase; letter-spacing:.04em;">Is It Done Yet?</div>
+        <div style="background:#FBD24B; border:3px solid #46101A; border-radius:999px; padding:4px 14px 6px; font-family:'Ranchers',system-ui,sans-serif; font-size:15px; color:#46101A; letter-spacing:.1em;">STEP 1 OF 3</div>
+      </div>
+
+      <div style="position:absolute; left:48px; top:96px; width:430px; background:#FFF3E4; border:5px solid #46101A; border-radius:26px; box-shadow:inset 0 4px 0 rgba(255,255,255,.75), inset 0 -12px 22px rgba(120,74,44,.18), 0 5px 0 rgba(70,16,26,.35), 9px 12px 0 rgba(70,16,26,.5), 18px 26px 38px rgba(0,0,0,.5); padding:22px 22px 24px;">
+        <div style="font-family:'Ranchers',system-ui,sans-serif; font-size:34px; color:#46101A; text-transform:uppercase; line-height:.9;">On your counter</div>
+        <div style="margin-top:6px; font-size:13px; font-weight:700; color:#8A5A3C;">Counted 12 items in 4 groups. Move something and the tally updates.</div>
+
+        <div style="display:flex; flex-direction:column; gap:10px; margin-top:18px;">
+          <div style="display:flex; align-items:center; gap:12px; background:#FBE3A0; border:4px solid #46101A; border-radius:18px; padding:10px 14px; box-shadow:inset 0 3px 0 rgba(255,255,255,.55), inset 0 -8px 14px rgba(70,16,26,.14), 0 3px 0 rgba(70,16,26,.28);">
+            <img src="icons/bun-top.png" alt="" style="width:42px;">
+            <div style="flex:1; min-width:0;">
+              <div style="font-family:'Ranchers',system-ui,sans-serif; font-size:22px; color:#46101A; text-transform:uppercase; line-height:1;">Carbs</div>
+              <div style="font-size:11px; font-weight:800; letter-spacing:.06em; color:#8A6A2E;">Brioche buns, sourdough</div>
+            </div>
+            <div style="font-family:'Ranchers',system-ui,sans-serif; font-size:30px; color:#46101A;">2</div>
+          </div>
+
+          <div style="display:flex; align-items:center; gap:12px; background:#F9C7BE; border:4px solid #46101A; border-radius:18px; padding:10px 14px; box-shadow:inset 0 3px 0 rgba(255,255,255,.55), inset 0 -8px 14px rgba(70,16,26,.14), 0 3px 0 rgba(70,16,26,.28);">
+            <img src="icons/patty.png" alt="" style="width:42px;">
+            <div style="flex:1; min-width:0;">
+              <div style="font-family:'Ranchers',system-ui,sans-serif; font-size:22px; color:#46101A; text-transform:uppercase; line-height:1;">Protein</div>
+              <div style="font-size:11px; font-weight:800; letter-spacing:.06em; color:#9A4E44;">Beef 340g, eggs ×4, cheddar</div>
+            </div>
+            <div style="font-family:'Ranchers',system-ui,sans-serif; font-size:30px; color:#46101A;">3</div>
+          </div>
+
+          <div style="display:flex; align-items:center; gap:12px; background:#CDE6C7; border:4px solid #46101A; border-radius:18px; padding:10px 14px; box-shadow:inset 0 3px 0 rgba(255,255,255,.55), inset 0 -8px 14px rgba(70,16,26,.14), 0 3px 0 rgba(70,16,26,.28);">
+            <img src="icons/lettuce.png" alt="" style="width:42px;">
+            <div style="flex:1; min-width:0;">
+              <div style="font-family:'Ranchers',system-ui,sans-serif; font-size:22px; color:#46101A; text-transform:uppercase; line-height:1;">Greens</div>
+              <div style="font-size:11px; font-weight:800; letter-spacing:.06em; color:#3F6B33;">Tomato ×3, onion ×2, romaine…</div>
+            </div>
+            <div style="font-family:'Ranchers',system-ui,sans-serif; font-size:30px; color:#46101A;">5</div>
+          </div>
+
+          <div style="display:flex; align-items:center; gap:12px; background:#C4DAEE; border:4px solid #46101A; border-radius:18px; padding:10px 14px; box-shadow:inset 0 3px 0 rgba(255,255,255,.55), inset 0 -8px 14px rgba(70,16,26,.14), 0 3px 0 rgba(70,16,26,.28);">
+            <img src="icons/ketchup.png" alt="" style="width:34px;">
+            <div style="flex:1; min-width:0;">
+              <div style="font-family:'Ranchers',system-ui,sans-serif; font-size:22px; color:#46101A; text-transform:uppercase; line-height:1;">Sauce</div>
+              <div style="font-size:11px; font-weight:800; letter-spacing:.06em; color:#3D5C78;">Ketchup, chili crisp</div>
+            </div>
+            <div style="font-family:'Ranchers',system-ui,sans-serif; font-size:30px; color:#46101A;">2</div>
+          </div>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:10px; margin-top:18px; padding-top:16px; border-top:3px dashed #D8BFA4;">
+          <div style="font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#8A5A3C;">Miscounted?</div>
+          <div style="background:#FFF3E4; border:3px solid #46101A; border-radius:999px; padding:7px 16px; font-size:12px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#46101A; cursor:pointer;" style-hover="background:#FBD24B;">Fix by hand</div>
+          <div style="background:#FFF3E4; border:3px solid #46101A; border-radius:999px; padding:7px 16px; font-size:12px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#46101A; cursor:pointer;" style-hover="background:#FBD24B;">Recount</div>
+        </div>
+      </div>
+
+      <div style="position:absolute; right:48px; top:96px; width:330px; display:flex; flex-direction:column; gap:16px;">
+        <div style="background:#F5230E; border:5px solid #46101A; border-radius:26px; box-shadow:inset 0 4px 0 rgba(255,255,255,.75), inset 0 -12px 22px rgba(120,74,44,.18), 0 5px 0 rgba(70,16,26,.35), 9px 12px 0 rgba(70,16,26,.5), 18px 26px 38px rgba(0,0,0,.5); padding:20px 22px 22px;">
+          <div style="font-size:12px; font-weight:800; letter-spacing:.18em; text-transform:uppercase; color:#FFD9C9;">Counted</div>
+          <div style="display:flex; align-items:baseline; gap:10px;">
+            <div style="font-family:'Ranchers',system-ui,sans-serif; font-size:78px; line-height:.9; color:#FFF3E4;">12</div>
+            <div style="font-family:'Ranchers',system-ui,sans-serif; font-size:26px; color:#FBD24B; text-transform:uppercase;">items</div>
+          </div>
+          <div style="margin-top:8px; font-size:13px; font-weight:700; color:#FFD9C9;">Enough for 14 recipes in your library.</div>
+        </div>
+
+        <div style="background:#FBD24B; border:5px solid #46101A; border-radius:26px; box-shadow:inset 0 4px 0 rgba(255,255,255,.75), inset 0 -12px 22px rgba(120,74,44,.18), 0 5px 0 rgba(70,16,26,.35), 9px 12px 0 rgba(70,16,26,.5), 18px 26px 38px rgba(0,0,0,.5); padding:18px 20px 20px; cursor:pointer;" style-hover="transform:translate(-2px,-3px); box-shadow:inset 0 4px 0 rgba(255,255,255,.28), inset 0 -14px 26px rgba(0,0,0,.22), 0 5px 0 rgba(70,16,26,.35), 12px 16px 0 rgba(70,16,26,.5), 24px 32px 46px rgba(0,0,0,.5);">
+          <div style="font-family:'Ranchers',system-ui,sans-serif; font-size:30px; line-height:.92; color:#46101A; text-transform:uppercase;">Cook something<br>for me</div>
+          <div style="margin-top:8px; font-size:12px; font-weight:800; color:#7A5A16; letter-spacing:.04em;">Picks a popular dish you can finish with what is already out.</div>
+          <div style="display:flex; align-items:center; gap:10px; margin-top:14px;">
+            <div style="width:34px; height:34px; border-radius:50%; background:#FFF3E4; border:3px solid #46101A; display:flex; align-items:center; justify-content:center; font-family:'Ranchers',system-ui,sans-serif; font-size:17px; color:#46101A; padding-top:2px; animation:idy-press 2.6s ease-in-out infinite;">B</div>
+            <span style="font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#46101A;">Right controller</span>
+          </div>
+        </div>
+
+        <div style="background:#FFF3E4; border:5px solid #46101A; border-radius:26px; padding:16px 20px 18px;">
+          <div style="font-family:'Ranchers',system-ui,sans-serif; font-size:24px; color:#46101A; text-transform:uppercase; line-height:1;">Browse instead</div>
+          <div style="margin-top:6px; font-size:12px; font-weight:700; color:#8A5A3C;">Open the recipe library and search all 240 dishes.</div>
+        </div>
+      </div>
+
+      <div style="position:absolute; left:516px; bottom:150px;">
+        <div style="background:#CDE6C7; border:4px solid #46101A; border-radius:14px; padding:5px 12px 6px; font-family:'Ranchers',system-ui,sans-serif; font-size:19px; color:#46101A; text-transform:uppercase; animation:idy-tag 3.4s ease-in-out infinite; box-shadow:inset 0 3px 0 rgba(255,255,255,.55), inset 0 -7px 14px rgba(120,74,44,.2), 0 3px 0 rgba(70,16,26,.3), 4px 6px 0 rgba(70,16,26,.5), 9px 14px 20px rgba(0,0,0,.4);">Tomato ×3</div>
+        <img src="icons/tomato.png" alt="" style="display:block; margin:8px auto 0; width:92px;">
+      </div>
+      <div style="position:absolute; left:672px; bottom:150px;">
+        <div style="background:#CDE6C7; border:4px solid #46101A; border-radius:14px; padding:5px 12px 6px; font-family:'Ranchers',system-ui,sans-serif; font-size:19px; color:#46101A; text-transform:uppercase; animation:idy-tag2 3.9s ease-in-out infinite; box-shadow:inset 0 3px 0 rgba(255,255,255,.55), inset 0 -7px 14px rgba(120,74,44,.2), 0 3px 0 rgba(70,16,26,.3), 4px 6px 0 rgba(70,16,26,.5), 9px 14px 20px rgba(0,0,0,.4);">Onion ×2</div>
+        <img src="icons/onion.png" alt="" style="display:block; margin:8px auto 0; width:86px;">
+      </div>
+      <div style="position:absolute; left:818px; bottom:150px;">
+        <div style="background:#F9C7BE; border:4px solid #46101A; border-radius:14px; padding:5px 12px 6px; font-family:'Ranchers',system-ui,sans-serif; font-size:19px; color:#46101A; text-transform:uppercase; animation:idy-tag 4.3s ease-in-out infinite; box-shadow:inset 0 3px 0 rgba(255,255,255,.55), inset 0 -7px 14px rgba(120,74,44,.2), 0 3px 0 rgba(70,16,26,.3), 4px 6px 0 rgba(70,16,26,.5), 9px 14px 20px rgba(0,0,0,.4);">Eggs ×4</div>
+        <img src="icons/egg.png" alt="" style="display:block; margin:8px auto 0; width:76px;">
+      </div>
+      <div style="position:absolute; left:952px; bottom:150px;">
+        <div style="background:#CDE6C7; border:4px solid #46101A; border-radius:14px; padding:5px 12px 6px; font-family:'Ranchers',system-ui,sans-serif; font-size:19px; color:#46101A; text-transform:uppercase; animation:idy-tag2 3.6s ease-in-out infinite; box-shadow:inset 0 3px 0 rgba(255,255,255,.55), inset 0 -7px 14px rgba(120,74,44,.2), 0 3px 0 rgba(70,16,26,.3), 4px 6px 0 rgba(70,16,26,.5), 9px 14px 20px rgba(0,0,0,.4);">Romaine</div>
+        <img src="icons/lettuce.png" alt="" style="display:block; margin:8px auto 0; width:90px;">
+      </div>
+
+      <div style="position:absolute; left:0; right:0; bottom:0; height:62px; background:#46101A; display:flex; align-items:center; gap:34px; padding:0 48px;">
+        <div style="display:flex; align-items:center; gap:9px;">
+          <div style="width:28px; height:28px; border-radius:50%; background:#FFF3E4; border:3px solid #46101A; display:flex; align-items:center; justify-content:center; font-family:'Ranchers',system-ui,sans-serif; font-size:14px; color:#46101A; padding-top:2px;">A</div>
+          <span style="font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#E7C7AE;">Open library</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:9px;">
+          <div style="width:28px; height:28px; border-radius:50%; background:#FBD24B; border:3px solid #46101A; display:flex; align-items:center; justify-content:center; font-family:'Ranchers',system-ui,sans-serif; font-size:14px; color:#46101A; padding-top:2px;">B</div>
+          <span style="font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#FBD24B;">Cook something for me</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:9px;">
+          <div style="width:28px; height:28px; border-radius:50%; background:#FFF3E4; border:3px solid #46101A; display:flex; align-items:center; justify-content:center; font-family:'Ranchers',system-ui,sans-serif; font-size:14px; color:#46101A; padding-top:2px;">X</div>
+          <span style="font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#E7C7AE;">Recount</span>
+        </div>
+        <div style="margin-left:auto; display:flex; align-items:center; gap:9px;">
+          <div style="width:28px; height:28px; border-radius:9px; background:#FFF3E4; border:3px solid #46101A; display:flex; align-items:center; justify-content:center; font-family:'Ranchers',system-ui,sans-serif; font-size:12px; color:#46101A; padding-top:2px;">☰</div>
+          <span style="font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#E7C7AE;">Menu</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="2b" style="display:flex; flex-direction:column; gap:14px;">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span style="background:#F5230E; color:#FFF3E4; font-family:'Ranchers',system-ui,sans-serif; font-size:16px; letter-spacing:.06em; padding:3px 12px 5px; border-radius:999px;">2B</span>
+      <span style="font-size:14px; font-weight:700; color:#46101A; letter-spacing:.14em; text-transform:uppercase;">Chef's pick — result of the B button</span>
+    </div>
+
+    <div data-screen-label="Chefs pick" style="position:relative; width:1440px; height:810px; overflow:hidden; background:#2A211C; border:5px solid #46101A; border-radius:26px; box-shadow:inset 0 3px 0 rgba(255,255,255,.14), inset 0 -26px 44px rgba(0,0,0,.34), 0 6px 0 rgba(70,16,26,.3), 14px 18px 0 rgba(70,16,26,.22), 26px 34px 60px rgba(0,0,0,.35);">
+      <div style="position:absolute; left:0; right:0; bottom:0; height:300px; background:#3E2F27;"></div>
+      <div style="position:absolute; left:0; right:0; bottom:236px; height:30px; background:#5F4536; border-top:5px solid #46101A; border-bottom:5px solid #46101A;"></div>
+
+      <div style="position:absolute; left:50%; top:74px; margin-left:-420px; width:840px; background:#FFF3E4; border:6px solid #46101A; border-radius:34px; box-shadow:inset 0 5px 0 rgba(255,255,255,.72), inset 0 -16px 28px rgba(120,74,44,.18), 0 7px 0 rgba(70,16,26,.4), 14px 18px 0 rgba(70,16,26,.55), 28px 38px 54px rgba(0,0,0,.55); padding:0; overflow:hidden; animation:idy-pop .5s ease-out both; transform:rotate(-1deg);">
+
+        <div style="background:#F5230E; padding:16px 30px 18px; display:flex; align-items:center; justify-content:space-between;">
+          <div style="font-family:'Ranchers',system-ui,sans-serif; font-size:30px; color:#FFF3E4; text-transform:uppercase; letter-spacing:.04em;">You can cook this right now</div>
+          <div style="background:#FBD24B; border:3px solid #46101A; border-radius:999px; padding:4px 14px 6px; font-family:'Ranchers',system-ui,sans-serif; font-size:16px; color:#46101A; letter-spacing:.08em;">POPULAR THIS WEEK</div>
+        </div>
+
+        <div style="display:flex; gap:26px; padding:26px 30px 8px;">
+          <div style="flex:0 0 auto; width:230px; height:230px; background:#FBE3A0; border:5px solid #46101A; border-radius:26px; box-shadow:inset 0 5px 0 rgba(255,255,255,.65), inset 0 -22px 34px rgba(70,16,26,.16); display:flex; align-items:center; justify-content:center;">
+            <img src="icons/patty.png" alt="" style="width:170px;">
+          </div>
+          <div style="flex:1; min-width:0;">
+            <div style="font-family:'Ranchers',system-ui,sans-serif; font-size:64px; line-height:.86; color:#F5230E; text-transform:uppercase;">Smash Burger</div>
+            <p style="margin:12px 0 0; font-size:15px; font-weight:700; line-height:1.4; color:#5A3A22;">Thin patty, hard sear, cheese folded in the last thirty seconds. The whole thing lives or dies on one call: is the crust done yet.</p>
+            <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
+              <div style="background:#CDE6C7; border:3px solid #46101A; border-radius:999px; padding:7px 16px; font-size:12px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#2F5A26;">Uses 9 of your 12 items</div>
+              <div style="background:#C4DAEE; border:3px solid #46101A; border-radius:999px; padding:7px 16px; font-size:12px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#2F4D68;">25 min</div>
+              <div style="background:#F9D3B4; border:3px solid #46101A; border-radius:999px; padding:7px 16px; font-size:12px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#8A4B21;">Cook level 2</div>
+            </div>
+            <div style="display:flex; gap:8px; margin-top:16px;">
+              <img src="icons/bun-top.png" alt="" style="width:46px;">
+              <img src="icons/patty.png" alt="" style="width:46px;">
+              <img src="icons/cheese.png" alt="" style="width:46px;">
+              <img src="icons/tomato.png" alt="" style="width:46px;">
+              <img src="icons/lettuce.png" alt="" style="width:46px;">
+              <img src="icons/onion.png" alt="" style="width:46px;">
+              <img src="icons/ketchup.png" alt="" style="width:34px;">
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:14px; padding:18px 30px 26px;">
+          <div style="flex:1; text-align:center; background:#F5230E; border:5px solid #46101A; border-radius:22px; padding:16px; box-shadow:inset 0 4px 0 rgba(255,255,255,.3), inset 0 -12px 22px rgba(0,0,0,.22), 0 4px 0 #9A2A18, 6px 8px 0 #46101A, 13px 18px 24px rgba(0,0,0,.35); font-family:'Ranchers',system-ui,sans-serif; font-size:30px; color:#FFF3E4; text-transform:uppercase; cursor:pointer;" style-hover="transform:translate(-2px,-3px); box-shadow:inset 0 4px 0 rgba(255,255,255,.3), inset 0 -14px 24px rgba(0,0,0,.22), 0 5px 0 #9A2A18, 9px 12px 0 #46101A, 18px 26px 34px rgba(0,0,0,.4);">See the dish card</div>
+          <div style="flex:0 0 auto; background:#FFF3E4; border:5px solid #46101A; border-radius:22px; padding:16px 26px; font-family:'Ranchers',system-ui,sans-serif; font-size:30px; color:#46101A; text-transform:uppercase; cursor:pointer;" style-hover="background:#FBD24B;">Pick another</div>
+        </div>
+      </div>
+
+      <div style="position:absolute; left:50%; bottom:96px; margin-left:-300px; width:600px; text-align:center; font-size:13px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; color:#C9A98E;">Three more dishes fit your counter — swipe the thumbstick to flip through</div>
+
+      <div style="position:absolute; left:0; right:0; bottom:0; height:62px; background:#46101A; display:flex; align-items:center; gap:34px; padding:0 48px;">
+        <div style="display:flex; align-items:center; gap:9px;">
+          <div style="width:28px; height:28px; border-radius:50%; background:#FFF3E4; border:3px solid #46101A; display:flex; align-items:center; justify-content:center; font-family:'Ranchers',system-ui,sans-serif; font-size:14px; color:#46101A; padding-top:2px;">A</div>
+          <span style="font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#E7C7AE;">See the dish card</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:9px;">
+          <div style="width:28px; height:28px; border-radius:50%; background:#FBD24B; border:3px solid #46101A; display:flex; align-items:center; justify-content:center; font-family:'Ranchers',system-ui,sans-serif; font-size:14px; color:#46101A; padding-top:2px;">B</div>
+          <span style="font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#FBD24B;">Pick another dish</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:9px;">
+          <div style="width:28px; height:28px; border-radius:50%; background:#FFF3E4; border:3px solid #46101A; display:flex; align-items:center; justify-content:center; font-family:'Ranchers',system-ui,sans-serif; font-size:14px; color:#46101A; padding-top:2px;">Y</div>
+          <span style="font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#E7C7AE;">Back to the counter</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="2c" style="display:flex; flex-direction:column; gap:14px;">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span style="background:#F5230E; color:#FFF3E4; font-family:'Ranchers',system-ui,sans-serif; font-size:16px; letter-spacing:.06em; padding:3px 12px 5px; border-radius:999px;">2C</span>
+      <span style="font-size:14px; font-weight:700; color:#46101A; letter-spacing:.14em; text-transform:uppercase;">Recipe library — search and filter</span>
+    </div>
+
+    <div data-screen-label="Recipe library" style="position:relative; width:1440px; height:810px; overflow:hidden; background:#2A211C; border:5px solid #46101A; border-radius:26px; box-shadow:inset 0 3px 0 rgba(255,255,255,.14), inset 0 -26px 44px rgba(0,0,0,.34), 0 6px 0 rgba(70,16,26,.3), 14px 18px 0 rgba(70,16,26,.22), 26px 34px 60px rgba(0,0,0,.35);">
+
+      <div style="position:absolute; left:40px; top:34px; right:40px; display:flex; align-items:center; gap:16px;">
+        <div style="font-family:'Ranchers',system-ui,sans-serif; font-size:38px; color:#FFF3E4; text-transform:uppercase; letter-spacing:.03em;">Recipe library</div>
+        <div style="flex:1; display:flex; align-items:center; gap:12px; background:#FFF3E4; border:5px solid #46101A; border-radius:999px; padding:10px 20px; box-shadow:inset 0 3px 0 rgba(255,255,255,.7), inset 0 -9px 18px rgba(120,74,44,.16), 0 4px 0 rgba(70,16,26,.3), 6px 8px 0 rgba(70,16,26,.5), 12px 18px 26px rgba(0,0,0,.4);">
+          <div style="width:20px; height:20px; border:4px solid #46101A; border-radius:50%;"></div>
+          <span style="font-size:17px; font-weight:700; color:#46101A;">tomato</span>
+          <span style="width:2px; height:22px; background:#46101A;"></span>
+          <span style="font-size:15px; font-weight:700; color:#B08C6E;">say it or type it on the pinned keyboard</span>
+          <span style="margin-left:auto; background:#FBD24B; border:3px solid #46101A; border-radius:999px; padding:4px 14px 5px; font-size:12px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#46101A;">32 hits</span>
+        </div>
+      </div>
+
+      <div style="position:absolute; left:40px; top:108px; display:flex; gap:10px; flex-wrap:wrap;">
+        <div style="background:#F5230E; border:4px solid #46101A; border-radius:999px; padding:8px 20px; font-size:13px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#FFF3E4; cursor:pointer;">Cook with what I have</div>
+        <div style="background:#FFF3E4; border:4px solid #46101A; border-radius:999px; padding:8px 20px; font-size:13px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#46101A; cursor:pointer;" style-hover="background:#FBD24B;">Under 20 min</div>
+        <div style="background:#FFF3E4; border:4px solid #46101A; border-radius:999px; padding:8px 20px; font-size:13px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#46101A; cursor:pointer;" style-hover="background:#FBD24B;">Knife work</div>
+        <div style="background:#FFF3E4; border:4px solid #46101A; border-radius:999px; padding:8px 20px; font-size:13px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#46101A; cursor:pointer;" style-hover="background:#FBD24B;">Breakfast</div>
+        <div style="background:#FFF3E4; border:4px solid #46101A; border-radius:999px; padding:8px 20px; font-size:13px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#46101A; cursor:pointer;" style-hover="background:#FBD24B;">No knife</div>
+        <div style="background:#FFF3E4; border:4px solid #46101A; border-radius:999px; padding:8px 20px; font-size:13px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#46101A; cursor:pointer;" style-hover="background:#FBD24B;">Level 3+</div>
+      </div>
+
+      <div style="position:absolute; left:40px; top:176px; width:980px; display:grid; grid-template-columns:repeat(3,1fr); gap:18px;">
+        <sc-for list="{{ recipes }}" as="r" hint-placeholder-count="6">
+          <div style="background:#FFF3E4; border:5px solid #46101A; border-radius:24px; box-shadow:inset 0 4px 0 rgba(255,255,255,.7), inset 0 -10px 20px rgba(120,74,44,.16), 0 4px 0 rgba(70,16,26,.3), 7px 9px 0 rgba(70,16,26,.5), 14px 20px 30px rgba(0,0,0,.45); padding:16px 16px 18px; cursor:pointer;" style-hover="transform:translate(-3px,-4px); box-shadow:inset 0 4px 0 rgba(255,255,255,.7), inset 0 -12px 22px rgba(120,74,44,.16), 0 5px 0 rgba(70,16,26,.35), 11px 15px 0 rgba(70,16,26,.5), 22px 30px 44px rgba(0,0,0,.5);">
+            <div style="height:124px; border:4px solid #46101A; border-radius:18px; display:flex; align-items:center; justify-content:center; background:{{ r.tint }}; box-shadow:inset 0 4px 0 rgba(255,255,255,.6), inset 0 -16px 26px rgba(70,16,26,.16);">
+              <img src="{{ r.icon }}" alt="" style="width:88px;">
+            </div>
+            <div style="margin-top:12px; font-family:'Ranchers',system-ui,sans-serif; font-size:27px; line-height:.94; color:#46101A; text-transform:uppercase;">{{ r.name }}</div>
+            <div style="display:flex; align-items:center; gap:8px; margin-top:8px;">
+              <span style="background:#C4DAEE; border:3px solid #46101A; border-radius:999px; padding:3px 11px 4px; font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:#2F4D68;">{{ r.mins }}</span>
+              <span style="background:#F9D3B4; border:3px solid #46101A; border-radius:999px; padding:3px 11px 4px; font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:#8A4B21;">Level {{ r.diff }}</span>
+            </div>
+            <div style="margin-top:10px; font-size:12px; font-weight:800; color:#7A5638; letter-spacing:.03em;">{{ r.have }}</div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="position:absolute; right:40px; top:176px; width:340px; background:#FFF3E4; border:5px solid #46101A; border-radius:26px; box-shadow:inset 0 4px 0 rgba(255,255,255,.75), inset 0 -12px 22px rgba(120,74,44,.18), 0 5px 0 rgba(70,16,26,.35), 9px 12px 0 rgba(70,16,26,.5), 18px 26px 38px rgba(0,0,0,.5); padding:20px 20px 22px;">
+        <div style="font-family:'Ranchers',system-ui,sans-serif; font-size:28px; color:#46101A; text-transform:uppercase; line-height:.95;">Your counter</div>
+        <div style="margin-top:4px; font-size:12px; font-weight:700; color:#8A5A3C;">Filters every card above.</div>
+        <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:16px;">
+          <div style="background:#CDE6C7; border:3px solid #46101A; border-radius:14px; padding:8px 2px; box-shadow:inset 0 2px 0 rgba(255,255,255,.55), inset 0 -6px 12px rgba(70,16,26,.13); display:flex; flex-direction:column; align-items:center; gap:2px;"><img src="icons/tomato.png" alt="" style="width:36px;"><span style="font-size:10px; font-weight:800; color:#46101A;">×3</span></div>
+          <div style="background:#CDE6C7; border:3px solid #46101A; border-radius:14px; padding:8px 2px; box-shadow:inset 0 2px 0 rgba(255,255,255,.55), inset 0 -6px 12px rgba(70,16,26,.13); display:flex; flex-direction:column; align-items:center; gap:2px;"><img src="icons/onion.png" alt="" style="width:36px;"><span style="font-size:10px; font-weight:800; color:#46101A;">×2</span></div>
+          <div style="background:#F9C7BE; border:3px solid #46101A; border-radius:14px; padding:8px 2px; box-shadow:inset 0 2px 0 rgba(255,255,255,.55), inset 0 -6px 12px rgba(70,16,26,.13); display:flex; flex-direction:column; align-items:center; gap:2px;"><img src="icons/egg.png" alt="" style="width:32px;"><span style="font-size:10px; font-weight:800; color:#46101A;">×4</span></div>
+          <div style="background:#F9C7BE; border:3px solid #46101A; border-radius:14px; padding:8px 2px; box-shadow:inset 0 2px 0 rgba(255,255,255,.55), inset 0 -6px 12px rgba(70,16,26,.13); display:flex; flex-direction:column; align-items:center; gap:2px;"><img src="icons/patty.png" alt="" style="width:36px;"><span style="font-size:10px; font-weight:800; color:#46101A;">340g</span></div>
+          <div style="background:#CDE6C7; border:3px solid #46101A; border-radius:14px; padding:8px 2px; box-shadow:inset 0 2px 0 rgba(255,255,255,.55), inset 0 -6px 12px rgba(70,16,26,.13); display:flex; flex-direction:column; align-items:center; gap:2px;"><img src="icons/lettuce.png" alt="" style="width:36px;"><span style="font-size:10px; font-weight:800; color:#46101A;">×1</span></div>
+          <div style="background:#CDE6C7; border:3px solid #46101A; border-radius:14px; padding:8px 2px; box-shadow:inset 0 2px 0 rgba(255,255,255,.55), inset 0 -6px 12px rgba(70,16,26,.13); display:flex; flex-direction:column; align-items:center; gap:2px;"><img src="icons/mushroom.png" alt="" style="width:34px;"><span style="font-size:10px; font-weight:800; color:#46101A;">×6</span></div>
+          <div style="background:#FBE3A0; border:3px solid #46101A; border-radius:14px; padding:8px 2px; box-shadow:inset 0 2px 0 rgba(255,255,255,.55), inset 0 -6px 12px rgba(70,16,26,.13); display:flex; flex-direction:column; align-items:center; gap:2px;"><img src="icons/bun-top.png" alt="" style="width:36px;"><span style="font-size:10px; font-weight:800; color:#46101A;">×2</span></div>
+          <div style="background:#C4DAEE; border:3px solid #46101A; border-radius:14px; padding:8px 2px; box-shadow:inset 0 2px 0 rgba(255,255,255,.55), inset 0 -6px 12px rgba(70,16,26,.13); display:flex; flex-direction:column; align-items:center; gap:2px;"><img src="icons/ketchup.png" alt="" style="width:26px;"><span style="font-size:10px; font-weight:800; color:#46101A;">×2</span></div>
+        </div>
+
+        <div style="margin-top:20px; padding-top:16px; border-top:3px dashed #D8BFA4;">
+          <div style="font-family:'Ranchers',system-ui,sans-serif; font-size:24px; color:#46101A; text-transform:uppercase; line-height:1;">Missing a lot?</div>
+          <div style="margin-top:6px; font-size:12px; font-weight:700; color:#8A5A3C;">Show recipes that need three items or fewer from the shop.</div>
+          <div style="margin-top:12px; background:#FBD24B; border:4px solid #46101A; border-radius:16px; padding:10px; text-align:center; font-size:13px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#46101A; cursor:pointer;">Almost-there list</div>
+        </div>
+      </div>
+
+      <div style="position:absolute; left:0; right:0; bottom:0; height:62px; background:#46101A; display:flex; align-items:center; gap:34px; padding:0 48px;">
+        <div style="display:flex; align-items:center; gap:9px;">
+          <div style="width:28px; height:28px; border-radius:50%; background:#FFF3E4; border:3px solid #46101A; display:flex; align-items:center; justify-content:center; font-family:'Ranchers',system-ui,sans-serif; font-size:14px; color:#46101A; padding-top:2px;">A</div>
+          <span style="font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#E7C7AE;">Open dish card</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:9px;">
+          <div style="width:28px; height:28px; border-radius:50%; background:#FBD24B; border:3px solid #46101A; display:flex; align-items:center; justify-content:center; font-family:'Ranchers',system-ui,sans-serif; font-size:14px; color:#46101A; padding-top:2px;">B</div>
+          <span style="font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#FBD24B;">Cook something for me</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:9px;">
+          <div style="width:40px; height:28px; border-radius:9px; background:#FFF3E4; border:3px solid #46101A; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; color:#46101A;">GRIP</div>
+          <span style="font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#E7C7AE;">Pull a card off the shelf</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="2d" style="display:flex; flex-direction:column; gap:14px;">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span style="background:#F5230E; color:#FFF3E4; font-family:'Ranchers',system-ui,sans-serif; font-size:16px; letter-spacing:.06em; padding:3px 12px 5px; border-radius:999px;">2D</span>
+      <span style="font-size:14px; font-weight:700; color:#46101A; letter-spacing:.14em; text-transform:uppercase;">Dish card — the level preview</span>
+    </div>
+
+    <div data-screen-label="Dish card" style="position:relative; width:1440px; height:810px; overflow:hidden; background:#2A211C; border:5px solid #46101A; border-radius:26px; box-shadow:inset 0 3px 0 rgba(255,255,255,.14), inset 0 -26px 44px rgba(0,0,0,.34), 0 6px 0 rgba(70,16,26,.3), 14px 18px 0 rgba(70,16,26,.22), 26px 34px 60px rgba(0,0,0,.35);">
+
+      <div style="position:absolute; left:48px; top:34px; display:flex; align-items:center; gap:12px;">
+        <div style="background:#FFF3E4; border:3px solid #46101A; border-radius:999px; padding:6px 18px; font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#46101A; cursor:pointer;">← Library</div>
+        <div style="font-size:12px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; color:#C9A98E;">Dish 1 of 240 · beef</div>
+      </div>
+
+      <div style="position:absolute; left:48px; top:92px; width:820px; background:#FFF3E4; border:6px solid #46101A; border-radius:32px; box-shadow:inset 0 5px 0 rgba(255,255,255,.72), inset 0 -14px 26px rgba(120,74,44,.18), 0 6px 0 rgba(70,16,26,.4), 12px 16px 0 rgba(70,16,26,.55), 24px 32px 46px rgba(0,0,0,.5); overflow:hidden;">
+        <div style="background:#FBE3A0; height:250px; box-shadow:inset 0 6px 0 rgba(255,255,255,.6), inset 0 -30px 46px rgba(70,16,26,.16); display:flex; align-items:center; justify-content:center; border-bottom:6px solid #46101A; position:relative;">
+          <img src="icons/patty.png" alt="" style="width:180px; animation:idy-bob3 4.2s ease-in-out infinite;">
+          <img src="icons/bun-top.png" alt="" style="position:absolute; left:130px; bottom:26px; width:104px; transform:rotate(-8deg);">
+          <img src="icons/cheese.png" alt="" style="position:absolute; right:150px; top:34px; width:96px; transform:rotate(11deg);">
+          <div style="position:absolute; right:22px; bottom:20px; background:#F5230E; border:4px solid #46101A; border-radius:999px; padding:6px 18px 8px; font-family:'Ranchers',system-ui,sans-serif; font-size:20px; color:#FFF3E4; letter-spacing:.06em;">+180 XP</div>
+        </div>
+
+        <div style="padding:24px 30px 28px;">
+          <div style="font-family:'Ranchers',system-ui,sans-serif; font-size:70px; line-height:.84; color:#F5230E; text-transform:uppercase;">Smash Burger</div>
+          <p style="margin:14px 0 0; font-size:16px; font-weight:700; line-height:1.45; color:#5A3A22; max-width:690px;">Press the ball flat on a screaming pan and leave it alone. You are learning one thing here: reading the crust. The headset calls the flip, you make the call on the cheese.</p>
+
+          <div style="display:flex; gap:12px; margin-top:20px; flex-wrap:wrap;">
+            <div style="background:#F9D3B4; border:4px solid #46101A; border-radius:18px; padding:12px 18px; box-shadow:inset 0 3px 0 rgba(255,255,255,.55), inset 0 -9px 16px rgba(70,16,26,.14), 0 3px 0 rgba(70,16,26,.28); min-width:150px;">
+              <div style="font-size:11px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; color:#8A4B21;">Difficulty</div>
+              <div style="display:flex; align-items:center; gap:6px; margin-top:6px;">
+                <svg viewBox="0 0 24 24" style="width:22px; height:22px;" xmlns="http://www.w3.org/2000/svg"><path d="M4 19 L15 8 L19 4 L21 6 L17 10 L6 21 Z" fill="#F5230E" stroke="#46101A" stroke-width="2.4" stroke-linejoin="round"></path></svg>
+                <svg viewBox="0 0 24 24" style="width:22px; height:22px;" xmlns="http://www.w3.org/2000/svg"><path d="M4 19 L15 8 L19 4 L21 6 L17 10 L6 21 Z" fill="#F5230E" stroke="#46101A" stroke-width="2.4" stroke-linejoin="round"></path></svg>
+                <svg viewBox="0 0 24 24" style="width:22px; height:22px;" xmlns="http://www.w3.org/2000/svg"><path d="M4 19 L15 8 L19 4 L21 6 L17 10 L6 21 Z" fill="#E4CBB2" stroke="#46101A" stroke-width="2.4" stroke-linejoin="round"></path></svg>
+                <span style="font-family:'Ranchers',system-ui,sans-serif; font-size:22px; color:#46101A; margin-left:4px;">LEVEL 2</span>
+              </div>
+            </div>
+            <div style="background:#C4DAEE; border:4px solid #46101A; border-radius:18px; padding:12px 18px; box-shadow:inset 0 3px 0 rgba(255,255,255,.55), inset 0 -9px 16px rgba(70,16,26,.14), 0 3px 0 rgba(70,16,26,.28); min-width:150px;">
+              <div style="font-size:11px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; color:#2F4D68;">Average time</div>
+              <div style="font-family:'Ranchers',system-ui,sans-serif; font-size:30px; color:#46101A; line-height:1.1;">25 MIN</div>
+            </div>
+            <div style="background:#CDE6C7; border:4px solid #46101A; border-radius:18px; padding:12px 18px; box-shadow:inset 0 3px 0 rgba(255,255,255,.55), inset 0 -9px 16px rgba(70,16,26,.14), 0 3px 0 rgba(70,16,26,.28); min-width:150px;">
+              <div style="font-size:11px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; color:#2F5A26;">Knife work</div>
+              <div style="font-family:'Ranchers',system-ui,sans-serif; font-size:30px; color:#46101A; line-height:1.1;">2 CUTS</div>
+            </div>
+            <div style="background:#FBE3A0; border:4px solid #46101A; border-radius:18px; padding:12px 18px; box-shadow:inset 0 3px 0 rgba(255,255,255,.55), inset 0 -9px 16px rgba(70,16,26,.14), 0 3px 0 rgba(70,16,26,.28); min-width:150px;">
+              <div style="font-size:11px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; color:#8A6A2E;">Your best</div>
+              <div style="font-family:'Ranchers',system-ui,sans-serif; font-size:30px; color:#46101A; line-height:1.1;">NOT COOKED</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="position:absolute; right:48px; top:92px; width:474px; display:flex; flex-direction:column; gap:16px;">
+        <div style="background:#FFF3E4; border:5px solid #46101A; border-radius:26px; box-shadow:inset 0 4px 0 rgba(255,255,255,.75), inset 0 -12px 22px rgba(120,74,44,.18), 0 5px 0 rgba(70,16,26,.35), 9px 12px 0 rgba(70,16,26,.5), 18px 26px 38px rgba(0,0,0,.5); padding:20px 22px 22px;">
+          <div style="display:flex; align-items:baseline; justify-content:space-between;">
+            <div style="font-family:'Ranchers',system-ui,sans-serif; font-size:30px; color:#46101A; text-transform:uppercase; line-height:1;">Ingredients</div>
+            <div style="font-size:12px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:#2F5A26;">9 of 9 on the counter</div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:8px; margin-top:14px;">
+            <div style="display:flex; align-items:center; gap:12px; background:#CDE6C7; border:3px solid #46101A; border-radius:14px; padding:8px 14px; box-shadow:inset 0 2px 0 rgba(255,255,255,.5), inset 0 -6px 12px rgba(70,16,26,.12);">
+              <img src="icons/patty.png" alt="" style="width:34px;">
+              <span style="flex:1; font-size:14px; font-weight:800; color:#46101A;">Ground beef, 80/20</span>
+              <span style="font-size:13px; font-weight:800; color:#2F5A26;">340 g ✓</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:12px; background:#CDE6C7; border:3px solid #46101A; border-radius:14px; padding:8px 14px; box-shadow:inset 0 2px 0 rgba(255,255,255,.5), inset 0 -6px 12px rgba(70,16,26,.12);">
+              <img src="icons/bun-top.png" alt="" style="width:34px;">
+              <span style="flex:1; font-size:14px; font-weight:800; color:#46101A;">Brioche buns</span>
+              <span style="font-size:13px; font-weight:800; color:#2F5A26;">2 ✓</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:12px; background:#CDE6C7; border:3px solid #46101A; border-radius:14px; padding:8px 14px; box-shadow:inset 0 2px 0 rgba(255,255,255,.5), inset 0 -6px 12px rgba(70,16,26,.12);">
+              <img src="icons/cheese.png" alt="" style="width:34px;">
+              <span style="flex:1; font-size:14px; font-weight:800; color:#46101A;">Cheddar slices</span>
+              <span style="font-size:13px; font-weight:800; color:#2F5A26;">4 ✓</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:12px; background:#CDE6C7; border:3px solid #46101A; border-radius:14px; padding:8px 14px; box-shadow:inset 0 2px 0 rgba(255,255,255,.5), inset 0 -6px 12px rgba(70,16,26,.12);">
+              <img src="icons/onion.png" alt="" style="width:34px;">
+              <span style="flex:1; font-size:14px; font-weight:800; color:#46101A;">Onion — sliced thin</span>
+              <span style="font-size:13px; font-weight:800; color:#2F5A26;">1 ✓</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:12px; background:#CDE6C7; border:3px solid #46101A; border-radius:14px; padding:8px 14px; box-shadow:inset 0 2px 0 rgba(255,255,255,.5), inset 0 -6px 12px rgba(70,16,26,.12);">
+              <img src="icons/tomato.png" alt="" style="width:34px;">
+              <span style="flex:1; font-size:14px; font-weight:800; color:#46101A;">Tomato — 4 mm rounds</span>
+              <span style="font-size:13px; font-weight:800; color:#2F5A26;">2 ✓</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:12px; background:#F3E2CE; border:3px dashed #B98C6E; border-radius:14px; padding:8px 14px;">
+              <img src="icons/ketchup.png" alt="" style="width:26px;">
+              <span style="flex:1; font-size:14px; font-weight:800; color:#8A5A3C;">Burger sauce — optional</span>
+              <span style="font-size:13px; font-weight:800; color:#B08C6E;">skip</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="background:#F5230E; border:5px solid #46101A; border-radius:26px; box-shadow:inset 0 4px 0 rgba(255,255,255,.75), inset 0 -12px 22px rgba(120,74,44,.18), 0 5px 0 rgba(70,16,26,.35), 9px 12px 0 rgba(70,16,26,.5), 18px 26px 38px rgba(0,0,0,.5); padding:20px 22px 22px; cursor:pointer;" style-hover="transform:translate(-2px,-3px); box-shadow:inset 0 4px 0 rgba(255,255,255,.28), inset 0 -14px 26px rgba(0,0,0,.22), 0 5px 0 rgba(70,16,26,.35), 12px 16px 0 rgba(70,16,26,.5), 24px 32px 46px rgba(0,0,0,.5);">
+          <div style="font-family:'Ranchers',system-ui,sans-serif; font-size:44px; line-height:.9; color:#FFF3E4; text-transform:uppercase;">Start cooking</div>
+          <div style="display:flex; align-items:center; gap:10px; margin-top:12px;">
+            <div style="width:44px; height:30px; border-radius:10px; background:#FFF3E4; border:3px solid #46101A; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; color:#46101A; letter-spacing:.06em; animation:idy-press 2.4s ease-in-out infinite;">HOLD</div>
+            <span style="font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#FFD9C9;">Right trigger to begin</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="position:absolute; left:0; right:0; bottom:0; height:62px; background:#46101A; display:flex; align-items:center; gap:34px; padding:0 48px;">
+        <div style="display:flex; align-items:center; gap:9px;">
+          <div style="width:44px; height:28px; border-radius:9px; background:#FFF3E4; border:3px solid #46101A; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; color:#46101A;">TRIG</div>
+          <span style="font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#FBD24B;">Start cooking</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:9px;">
+          <div style="width:28px; height:28px; border-radius:50%; background:#FFF3E4; border:3px solid #46101A; display:flex; align-items:center; justify-content:center; font-family:'Ranchers',system-ui,sans-serif; font-size:14px; color:#46101A; padding-top:2px;">X</div>
+          <span style="font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#E7C7AE;">Practise the knife work first</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:9px;">
+          <div style="width:28px; height:28px; border-radius:50%; background:#FFF3E4; border:3px solid #46101A; display:flex; align-items:center; justify-content:center; font-family:'Ranchers',system-ui,sans-serif; font-size:14px; color:#46101A; padding-top:2px;">Y</div>
+          <span style="font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#E7C7AE;">Back</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="2e" style="display:flex; flex-direction:column; gap:14px;">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span style="background:#F5230E; color:#FFF3E4; font-family:'Ranchers',system-ui,sans-serif; font-size:16px; letter-spacing:.06em; padding:3px 12px 5px; border-radius:999px;">2E</span>
+      <span style="font-size:14px; font-weight:700; color:#46101A; letter-spacing:.14em; text-transform:uppercase;">Competitive cutting — run and leaderboard</span>
+    </div>
+
+    <div data-screen-label="Competitive cutting" style="position:relative; width:1440px; height:810px; overflow:hidden; background:#2A211C; border:5px solid #46101A; border-radius:26px; box-shadow:inset 0 3px 0 rgba(255,255,255,.14), inset 0 -26px 44px rgba(0,0,0,.34), 0 6px 0 rgba(70,16,26,.3), 14px 18px 0 rgba(70,16,26,.22), 26px 34px 60px rgba(0,0,0,.35);">
+
+      <div style="position:absolute; left:0; right:0; bottom:0; height:280px; background:#4A382E;"></div>
+      <div style="position:absolute; left:0; right:0; bottom:236px; height:26px; background:#7C5B46; border-top:5px solid #46101A; border-bottom:5px solid #46101A;"></div>
+
+      <div style="position:absolute; left:48px; top:34px; display:flex; align-items:center; gap:14px;">
+        <div style="font-family:'Ranchers',system-ui,sans-serif; font-size:36px; color:#FFF3E4; text-transform:uppercase;">Competitive cutting</div>
+        <div style="background:#F5230E; border:3px solid #46101A; border-radius:999px; padding:5px 16px 7px; font-family:'Ranchers',system-ui,sans-serif; font-size:17px; color:#FFF3E4; letter-spacing:.08em;">ROUND 2 · BRUNOISE</div>
+      </div>
+
+      <div style="position:absolute; left:50%; top:104px; margin-left:-150px; width:300px; background:#FFF3E4; border:5px solid #46101A; border-radius:22px; box-shadow:7px 8px 0 rgba(70,16,26,.5); padding:12px 20px 14px; text-align:center;">
+        <div style="font-size:11px; font-weight:800; letter-spacing:.18em; text-transform:uppercase; color:#8A5A3C;">Time left</div>
+        <div style="font-family:'Ranchers',system-ui,sans-serif; font-size:56px; line-height:.95; color:#F5230E;">0:38</div>
+        <div style="margin-top:8px; height:14px; background:#EBD5BC; border:3px solid #46101A; border-radius:999px; overflow:hidden;">
+          <div style="width:62%; height:100%; background:#FBD24B;"></div>
+        </div>
+      </div>
+
+      <div style="position:absolute; left:352px; bottom:110px; width:520px; height:170px; background:#C98F62; border:6px solid #46101A; border-radius:20px; box-shadow:inset 0 7px 0 rgba(255,255,255,.3), inset 0 -26px 40px rgba(70,16,26,.3), 0 10px 0 rgba(70,16,26,.45), 18px 26px 40px rgba(0,0,0,.5);">
+        <div style="position:absolute; left:26px; top:22px; right:26px; height:6px; background:#B47B50;"></div>
+        <div style="position:absolute; left:26px; bottom:22px; right:26px; height:6px; background:#B47B50;"></div>
+        <img src="icons/carrot.png" alt="" style="position:absolute; left:210px; top:30px; width:150px; animation:idy-slice 1.6s ease-in-out infinite;">
+        <div style="position:absolute; left:120px; top:56px; display:flex; gap:7px;">
+          <div style="width:20px; height:52px; background:#F2A33C; border:4px solid #46101A; border-radius:5px;"></div>
+          <div style="width:20px; height:52px; background:#F2A33C; border:4px solid #46101A; border-radius:5px;"></div>
+          <div style="width:20px; height:52px; background:#F2A33C; border:4px solid #46101A; border-radius:5px;"></div>
+        </div>
+        <div style="position:absolute; right:64px; top:-96px; width:26px; height:140px; background:#DCE2E8; border:5px solid #46101A; border-radius:6px 6px 3px 3px; transform-origin:50% 100%; animation:idy-chop 1.6s ease-in-out infinite;">
+          <div style="position:absolute; left:-4px; right:-4px; bottom:-34px; height:38px; background:#46101A; border-radius:5px;"></div>
+        </div>
+      </div>
+
+      <div style="position:absolute; left:352px; bottom:44px; width:520px; display:flex; gap:10px;">
+        <div style="flex:1; background:#CDE6C7; border:4px solid #46101A; border-radius:16px; padding:8px 14px; box-shadow:inset 0 3px 0 rgba(255,255,255,.5), inset 0 -7px 13px rgba(70,16,26,.13), 0 3px 0 rgba(70,16,26,.26);">
+          <div style="font-size:10px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; color:#2F5A26;">Even cuts</div>
+          <div style="font-family:'Ranchers',system-ui,sans-serif; font-size:24px; color:#46101A; line-height:1.1;">94%</div>
+        </div>
+        <div style="flex:1; background:#FBE3A0; border:4px solid #46101A; border-radius:16px; padding:8px 14px; box-shadow:inset 0 3px 0 rgba(255,255,255,.5), inset 0 -7px 13px rgba(70,16,26,.13), 0 3px 0 rgba(70,16,26,.26);">
+          <div style="font-size:10px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; color:#8A6A2E;">Pace</div>
+          <div style="font-family:'Ranchers',system-ui,sans-serif; font-size:24px; color:#46101A; line-height:1.1;">2.4 / sec</div>
+        </div>
+        <div style="flex:1; background:#F9C7BE; border:4px solid #46101A; border-radius:16px; padding:8px 14px; box-shadow:inset 0 3px 0 rgba(255,255,255,.5), inset 0 -7px 13px rgba(70,16,26,.13), 0 3px 0 rgba(70,16,26,.26);">
+          <div style="font-size:10px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; color:#9A4E44;">Knuckle guard</div>
+          <div style="font-family:'Ranchers',system-ui,sans-serif; font-size:24px; color:#46101A; line-height:1.1;">SAFE</div>
+        </div>
+      </div>
+
+      <div style="position:absolute; right:48px; top:104px; width:420px; background:#FFF3E4; border:5px solid #46101A; border-radius:26px; box-shadow:inset 0 4px 0 rgba(255,255,255,.75), inset 0 -12px 22px rgba(120,74,44,.18), 0 5px 0 rgba(70,16,26,.35), 9px 12px 0 rgba(70,16,26,.5), 18px 26px 38px rgba(0,0,0,.5); padding:20px 20px 22px;">
+        <div style="display:flex; align-items:baseline; justify-content:space-between;">
+          <div style="font-family:'Ranchers',system-ui,sans-serif; font-size:32px; color:#46101A; text-transform:uppercase; line-height:1;">Leaderboard</div>
+          <div style="font-size:11px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#8A5A3C;">This week</div>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:8px; margin-top:16px;">
+          <sc-for list="{{ board }}" as="p" hint-placeholder-count="5">
+            <div style="display:flex; align-items:center; gap:12px; background:#F3E2CE; border:3px solid #46101A; border-radius:16px; padding:9px 14px; box-shadow:inset 0 2px 0 rgba(255,255,255,.5), inset 0 -6px 12px rgba(70,16,26,.12);">
+              <span style="font-family:'Ranchers',system-ui,sans-serif; font-size:24px; color:#46101A; width:38px;">{{ p.pos }}</span>
+              <div style="flex:1; min-width:0;">
+                <div style="font-size:15px; font-weight:800; color:#46101A;">{{ p.name }}</div>
+                <div style="font-size:10px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#8A5A3C;">{{ p.tag }}</div>
+              </div>
+              <span style="font-family:'Ranchers',system-ui,sans-serif; font-size:24px; color:#F5230E;">{{ p.score }}</span>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="margin-top:18px; padding-top:16px; border-top:3px dashed #D8BFA4;">
+          <div style="font-family:'Ranchers',system-ui,sans-serif; font-size:26px; color:#46101A; text-transform:uppercase; line-height:1;">Beat 9,215 to take second</div>
+          <div style="margin-top:6px; font-size:12px; font-weight:700; color:#8A5A3C;">Score is evenness first, speed second. Nicked knuckles cost 400.</div>
+          <div style="display:flex; gap:10px; margin-top:14px;">
+            <div style="flex:1; text-align:center; background:#F5230E; border:4px solid #46101A; border-radius:16px; padding:11px; font-family:'Ranchers',system-ui,sans-serif; font-size:22px; color:#FFF3E4; text-transform:uppercase; cursor:pointer;">Run it again</div>
+            <div style="flex:1; text-align:center; background:#FBD24B; border:4px solid #46101A; border-radius:16px; padding:11px; font-family:'Ranchers',system-ui,sans-serif; font-size:22px; color:#46101A; text-transform:uppercase; cursor:pointer;">Challenge</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="position:absolute; left:0; right:0; bottom:0; height:62px; background:#46101A; display:flex; align-items:center; gap:34px; padding:0 48px;">
+        <div style="display:flex; align-items:center; gap:9px;">
+          <div style="width:44px; height:28px; border-radius:9px; background:#FFF3E4; border:3px solid #46101A; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; color:#46101A;">GRIP</div>
+          <span style="font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#FBD24B;">Hold the knife</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:9px;">
+          <div style="width:28px; height:28px; border-radius:50%; background:#FFF3E4; border:3px solid #46101A; display:flex; align-items:center; justify-content:center; font-family:'Ranchers',system-ui,sans-serif; font-size:14px; color:#46101A; padding-top:2px;">A</div>
+          <span style="font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#E7C7AE;">Submit the board</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:9px;">
+          <div style="width:28px; height:28px; border-radius:50%; background:#FFF3E4; border:3px solid #46101A; display:flex; align-items:center; justify-content:center; font-family:'Ranchers',system-ui,sans-serif; font-size:14px; color:#46101A; padding-top:2px;">Y</div>
+          <span style="font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#E7C7AE;">Quit the round</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="display:flex; flex-direction:column; gap:70px; align-items:flex-start; padding:56px; font-family:'Hanken Grotesk',system-ui,sans-serif;">
+
+  <div id="1a" style="display:flex; flex-direction:column; gap:14px;">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span style="background:#F5230E; color:#FFF3E4; font-family:'Ranchers',system-ui,sans-serif; font-size:16px; letter-spacing:.06em; padding:3px 12px 5px; border-radius:999px;">1A</span>
+      <span style="font-size:14px; font-weight:700; color:#3B2A1B; letter-spacing:.14em; text-transform:uppercase;">Title screen — 1600 × 900</span>
+    </div>
+
+    <div data-screen-label="Title screen" style="position:relative; width:1600px; height:900px; overflow:hidden; background:#F7E3CC; border:5px solid #3B2A1B; border-radius:18px; box-shadow:inset 0 4px 0 rgba(255,255,255,.6), inset 0 -30px 60px rgba(150,96,54,.2), 0 8px 0 rgba(59,42,27,.22), 16px 20px 0 rgba(59,42,27,.2), 30px 40px 60px rgba(59,42,27,.28);">
+
+      <div style="position:absolute; inset:0; background-image:repeating-linear-gradient(135deg, rgba(59,42,27,.035) 0 2px, transparent 2px 18px);"></div>
+
+      <img src="icons/tomato.png" alt="" style="position:absolute; left:132px; top:206px; width:132px; animation:idy-bob 3.6s ease-in-out infinite; filter:drop-shadow(0 4px 0 rgba(59,42,27,.22)) drop-shadow(7px 12px 12px rgba(59,42,27,.35));">
+      <img src="icons/lettuce.png" alt="" style="position:absolute; left:44px; top:452px; width:150px; animation:idy-bob2 4.3s ease-in-out infinite; filter:drop-shadow(0 4px 0 rgba(59,42,27,.22)) drop-shadow(7px 12px 12px rgba(59,42,27,.35));">
+      <img src="icons/chili.png" alt="" style="position:absolute; left:214px; top:648px; width:104px; animation:idy-bob3 3.9s ease-in-out infinite; filter:drop-shadow(0 4px 0 rgba(59,42,27,.22)) drop-shadow(7px 12px 12px rgba(59,42,27,.35));">
+      <img src="icons/cheese.png" alt="" style="position:absolute; right:126px; top:212px; width:138px; animation:idy-bob2 4.1s ease-in-out infinite; filter:drop-shadow(0 4px 0 rgba(59,42,27,.22)) drop-shadow(7px 12px 12px rgba(59,42,27,.35));">
+      <img src="icons/patty.png" alt="" style="position:absolute; right:58px; top:462px; width:146px; animation:idy-bob 3.4s ease-in-out infinite; filter:drop-shadow(0 4px 0 rgba(59,42,27,.22)) drop-shadow(7px 12px 12px rgba(59,42,27,.35));">
+      <img src="icons/mushroom.png" alt="" style="position:absolute; right:222px; top:656px; width:104px; animation:idy-bob3 4.6s ease-in-out infinite; filter:drop-shadow(0 4px 0 rgba(59,42,27,.22)) drop-shadow(7px 12px 12px rgba(59,42,27,.35));">
+
+      <div style="position:absolute; left:34px; top:28px; display:flex; align-items:center; gap:10px; background:#FFF3E4; border:3px solid #3B2A1B; border-radius:999px; padding:6px 16px 6px 6px; box-shadow:inset 0 3px 0 rgba(255,255,255,.6), inset 0 -7px 14px rgba(120,74,44,.18), 0 3px 0 #A97A54, 4px 6px 0 #3B2A1B, 9px 13px 16px rgba(59,42,27,.28);">
+        <div style="width:38px; height:38px; border-radius:50%; background:#F5230E; border:2px solid #3B2A1B; display:flex; align-items:center; justify-content:center; color:#FFF3E4; font-family:'Ranchers',system-ui,sans-serif; font-size:20px; padding-top:2px;">3</div>
+        <div style="display:flex; flex-direction:column; line-height:1.1;">
+          <span style="font-size:9px; font-weight:800; letter-spacing:.18em; color:#9A6A50;">RANK 3</span>
+          <span style="font-size:14px; font-weight:800; color:#3B2A1B;">Line Cook</span>
+        </div>
+      </div>
+
+      <div style="position:absolute; right:34px; top:28px; display:flex; gap:10px;">
+        <div style="width:46px; height:46px; border-radius:14px; background:#FFF3E4; border:3px solid #3B2A1B; box-shadow:inset 0 3px 0 rgba(255,255,255,.6), inset 0 -7px 14px rgba(120,74,44,.18), 0 3px 0 #A97A54, 4px 6px 0 #3B2A1B, 9px 13px 16px rgba(59,42,27,.28); display:flex; align-items:center; justify-content:center; gap:3px; cursor:pointer;">
+          <div style="width:3px; height:11px; background:#3B2A1B; border-radius:2px;"></div>
+          <div style="width:3px; height:19px; background:#3B2A1B; border-radius:2px;"></div>
+          <div style="width:3px; height:14px; background:#3B2A1B; border-radius:2px;"></div>
+        </div>
+        <div style="width:46px; height:46px; border-radius:14px; background:#FFF3E4; border:3px solid #3B2A1B; box-shadow:inset 0 3px 0 rgba(255,255,255,.6), inset 0 -7px 14px rgba(120,74,44,.18), 0 3px 0 #A97A54, 4px 6px 0 #3B2A1B, 9px 13px 16px rgba(59,42,27,.28); display:flex; align-items:center; justify-content:center; cursor:pointer;">
+          <div style="width:17px; height:17px; border-radius:50%; border:3px solid #3B2A1B;"></div>
+        </div>
+      </div>
+
+      <div style="position:relative; z-index:3; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0; padding:0 0 12px;">
+
+        <div style="position:relative; display:flex; flex-direction:column; align-items:center;">
+          <div style="position:absolute; top:-6px; right:-104px; transform:rotate(11deg); background:#3B2A1B; color:#FBD24B; font-family:'Ranchers',system-ui,sans-serif; font-size:22px; letter-spacing:.14em; padding:6px 16px 8px; border-radius:8px;">AR</div>
+          <div style="font-family:'Ranchers',system-ui,sans-serif; color:#F5230E; text-transform:uppercase; line-height:.8; text-align:center;">
+            <div style="font-size:132px; transform:rotate(-1.6deg); text-shadow:0 8px 0 #FFF3E4, 8px 0 0 #FFF3E4, -8px 0 0 #FFF3E4, 0 -8px 0 #FFF3E4, 7px 7px 0 #FFF3E4, -7px 7px 0 #FFF3E4, 12px 15px 0 rgba(59,42,27,.14);">Is it done</div>
+            <div style="font-size:132px; margin-top:12px; transform:rotate(1deg); text-shadow:0 8px 0 #FFF3E4, 8px 0 0 #FFF3E4, -8px 0 0 #FFF3E4, 0 -8px 0 #FFF3E4, 7px 7px 0 #FFF3E4, -7px 7px 0 #FFF3E4, 12px 15px 0 rgba(59,42,27,.14);">yet?</div>
+          </div>
+        </div>
+
+        <p style="margin:28px 0 0; font-size:17px; font-weight:700; line-height:1.4; color:#5A3A22; max-width:540px; text-align:center;">Real knife, real counter. The camera watches your board and calls the doneness.</p>
+
+        <div style="display:flex; gap:26px; margin-top:40px; align-items:stretch;">
+
+          <div onClick="{{ pickCutting }}" style="cursor:pointer; position:relative; width:336px; background:#F5230E; border:5px solid #3B2A1B; border-radius:26px; padding:22px 24px 20px; box-shadow:inset 0 4px 0 rgba(255,255,255,.3), inset 0 -14px 26px rgba(0,0,0,.2), 0 6px 0 #8A5230, 8px 11px 0 #3B2A1B, 16px 22px 30px rgba(59,42,27,.35); transform:rotate(-1deg);" style-hover="transform:rotate(-1deg) translate(-3px,-4px); box-shadow:0 7px 0 #8A5230, 12px 17px 0 #3B2A1B, 22px 30px 40px rgba(59,42,27,.4);" style-active="transform:rotate(-1deg) translate(5px,6px); box-shadow:3px 3px 0 #3B2A1B;">
+            <div style="position:absolute; top:-16px; right:16px; background:#FBD24B; border:3px solid #3B2A1B; border-radius:999px; padding:3px 12px 5px; font-family:'Ranchers',system-ui,sans-serif; font-size:15px; color:#3B2A1B; letter-spacing:.06em; animation:idy-sizzle 1.8s ease-in-out infinite;">LIVE · 412</div>
+            <div style="display:flex; align-items:center; gap:16px;">
+              <div style="flex:0 0 auto; width:78px; height:78px; border-radius:20px; background:#FFF3E4; border:3px solid #3B2A1B; box-shadow:inset 0 4px 0 rgba(255,255,255,.9), inset 0 -10px 18px rgba(120,74,44,.22); display:flex; align-items:center; justify-content:center;">
+                <img src="icons/carrot.png" alt="" style="width:62px; transform:rotate(-14deg);">
+              </div>
+              <div style="font-family:'Ranchers',system-ui,sans-serif; font-size:40px; line-height:.86; color:#FFF3E4; text-transform:uppercase;">Competitive<br>Cutting</div>
+            </div>
+            <div style="margin-top:14px; font-size:13px; font-weight:700; color:#FFD9C9;">1v1 knife work · 90 seconds · ranked</div>
+          </div>
+
+          <div onClick="{{ pickSandbox }}" style="cursor:pointer; position:relative; width:336px; background:#FBD24B; border:5px solid #3B2A1B; border-radius:26px; padding:22px 24px 20px; box-shadow:inset 0 4px 0 rgba(255,255,255,.3), inset 0 -14px 26px rgba(0,0,0,.2), 0 6px 0 #8A5230, 8px 11px 0 #3B2A1B, 16px 22px 30px rgba(59,42,27,.35); transform:rotate(1deg);" style-hover="transform:rotate(1deg) translate(-3px,-4px); box-shadow:0 7px 0 #8A5230, 12px 17px 0 #3B2A1B, 22px 30px 40px rgba(59,42,27,.4);" style-active="transform:rotate(1deg) translate(5px,6px); box-shadow:3px 3px 0 #3B2A1B;">
+            <div style="display:flex; align-items:center; gap:16px;">
+              <div style="flex:0 0 auto; width:78px; height:78px; border-radius:20px; background:#FFF3E4; border:3px solid #3B2A1B; box-shadow:inset 0 4px 0 rgba(255,255,255,.9), inset 0 -10px 18px rgba(120,74,44,.22); display:flex; align-items:center; justify-content:center;">
+                <img src="icons/ketchup.png" alt="" style="width:54px; transform:rotate(10deg);">
+              </div>
+              <div style="font-family:'Ranchers',system-ui,sans-serif; font-size:40px; line-height:.86; color:#3B2A1B; text-transform:uppercase;">Recipe<br>Sandbox</div>
+            </div>
+            <div style="margin-top:14px; font-size:13px; font-weight:700; color:#6B4427;">No timer · free-roam · 437 ingredients</div>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:14px; margin-top:26px;">
+          <div style="background:#FFF3E4; border:3px dashed #B98C6E; border-radius:999px; padding:10px 24px; font-size:12px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; color:#8A5A3C; cursor:pointer;" style-hover="border-style:solid; color:#3B2A1B;">How to play</div>
+          <div style="background:#FFF3E4; border:3px dashed #B98C6E; border-radius:999px; padding:10px 24px; font-size:12px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; color:#8A5A3C; cursor:pointer;" style-hover="border-style:solid; color:#3B2A1B;">My kitchen</div>
+          <div style="background:#FFF3E4; border:3px dashed #B98C6E; border-radius:999px; padding:10px 24px; font-size:12px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; color:#8A5A3C; cursor:pointer;" style-hover="border-style:solid; color:#3B2A1B;">Leaderboard</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="1b" style="display:flex; flex-direction:column; gap:14px;">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span style="background:#F5230E; color:#FFF3E4; font-family:'Ranchers',system-ui,sans-serif; font-size:16px; letter-spacing:.06em; padding:3px 12px 5px; border-radius:999px;">1B</span>
+      <span style="font-size:14px; font-weight:700; color:#3B2A1B; letter-spacing:.14em; text-transform:uppercase;">Loading — gravity build</span>
+    </div>
+
+    <div data-screen-label="Loading" style="position:relative; width:1600px; height:900px; overflow:hidden; background:#F5230E; border:5px solid #3B2A1B; border-radius:18px; box-shadow:inset 0 4px 0 rgba(255,255,255,.6), inset 0 -30px 60px rgba(150,96,54,.2), 0 8px 0 rgba(59,42,27,.22), 16px 20px 0 rgba(59,42,27,.2), 30px 40px 60px rgba(59,42,27,.28);">
+
+
+      <div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+
+        <div style="position:relative; width:420px; height:372px;">
+          <div style="position:absolute; left:50%; bottom:-8px; margin-left:-118px; width:236px; height:22px; border-radius:50%; background:rgba(59,42,27,.26); filter:blur(3px);"></div>
+
+          <div style="position:absolute; left:50%; bottom:0px; margin-left:-140px; width:280px; transform-origin:50% 100%; animation:idy-s1 2.8s cubic-bezier(.3,1.5,.5,1) infinite;">
+            <svg viewBox="0 0 280 84" style="width:100%; display:block; overflow:visible;" xmlns="http://www.w3.org/2000/svg"><g stroke="#46101A" stroke-width="7" stroke-linejoin="round" stroke-linecap="round"><path d="M6 10 H274 V44 C274 66 244 78 140 78 C36 78 6 66 6 44 Z" fill="#F79B3E"/>
+            <path d="M30 62 C60 74 220 74 250 62 C236 74 196 78 140 78 C84 78 44 74 30 62 Z" fill="#E8862C" stroke="none"/></g></svg>
+          </div>
+
+          <div style="position:absolute; left:50%; bottom:56px; margin-left:-146px; width:292px; transform-origin:50% 100%; animation:idy-s2 2.8s cubic-bezier(.3,1.5,.5,1) infinite;">
+            <svg viewBox="0 0 292 76" style="width:100%; display:block; overflow:visible;" xmlns="http://www.w3.org/2000/svg"><g stroke="#46101A" stroke-width="7" stroke-linejoin="round" stroke-linecap="round"><path d="M8 30 C8 16 22 8 44 8 H248 C270 8 284 16 284 30 V46 C284 60 270 68 248 68 H44 C22 68 8 60 8 46 Z" fill="#A8555C"/>
+            <path d="M14 46 C30 60 60 66 146 66 C232 66 262 60 278 46 C278 60 262 68 248 68 H44 C30 68 14 60 14 46 Z" fill="#8E4348" stroke="none"/></g></svg>
+          </div>
+
+          <div style="position:absolute; left:50%; bottom:112px; margin-left:-150px; width:300px; transform-origin:50% 100%; animation:idy-s3 2.8s cubic-bezier(.3,1.5,.5,1) infinite;">
+            <svg viewBox="0 0 300 48" style="width:100%; display:block; overflow:visible;" xmlns="http://www.w3.org/2000/svg"><g stroke="#46101A" stroke-width="7" stroke-linejoin="round" stroke-linecap="round"><path d="M6 8 H294 V20 C294 27 288 31 279 31 H268 C267 41 259 45 251 45 C243 45 236 40 235 31 H121 C120 42 112 46 103 46 C94 46 87 41 86 31 H21 C12 31 6 27 6 20 Z" fill="#F6B93B"/>
+            <path d="M18 12 H282 V19 H18 Z" fill="#FCD268" stroke="none"/></g></svg>
+          </div>
+
+          <div style="position:absolute; left:50%; bottom:138px; margin-left:-144px; width:288px; transform-origin:50% 100%; animation:idy-s4 2.8s cubic-bezier(.3,1.5,.5,1) infinite;">
+            <svg viewBox="0 0 288 56" style="width:100%; display:block; overflow:visible;" xmlns="http://www.w3.org/2000/svg"><g stroke="#46101A" stroke-width="7" stroke-linejoin="round" stroke-linecap="round"><path d="M10 28 C10 14 24 8 44 8 H244 C264 8 278 14 278 28 C278 42 264 48 244 48 H44 C24 48 10 42 10 28 Z" fill="#E8342A"/>
+            <path d="M40 20 C40 16 48 15 58 15 H150 C160 15 166 17 166 20 C166 24 158 25 148 25 H58 C48 25 40 24 40 20 Z" fill="#F4685C" stroke="none"/></g></svg>
+          </div>
+
+          <div style="position:absolute; left:50%; bottom:152px; margin-left:-150px; width:300px; transform-origin:50% 100%; animation:idy-s5 2.8s cubic-bezier(.3,1.5,.5,1) infinite;">
+            <svg viewBox="0 0 300 58" style="width:100%; display:block; overflow:visible;" xmlns="http://www.w3.org/2000/svg"><g stroke="#46101A" stroke-width="7" stroke-linejoin="round" stroke-linecap="round"><path d="M8 10 H292 V26 q -17.75 30 -35.5 0 q -17.75 30 -35.5 0 q -17.75 30 -35.5 0 q -17.75 30 -35.5 0 q -17.75 30 -35.5 0 q -17.75 30 -35.5 0 q -17.75 30 -35.5 0 q -17.75 30 -35.5 0 Z" fill="#6FC13C"/>
+            <path d="M8 13 H292 V21 H8 Z" fill="#8AD455" stroke="none"/></g></svg>
+          </div>
+
+          <div style="position:absolute; left:50%; bottom:186px; margin-left:-145px; width:290px; transform-origin:50% 100%; animation:idy-s6 2.8s cubic-bezier(.3,1.5,.5,1) infinite;">
+            <svg viewBox="0 0 290 152" style="width:100%; display:block; overflow:visible;" xmlns="http://www.w3.org/2000/svg"><g stroke="#46101A" stroke-width="7" stroke-linejoin="round" stroke-linecap="round"><path d="M6 138 C6 62 68 10 145 10 C222 10 284 62 284 138 C284 145 277 148 268 148 H22 C13 148 6 145 6 138 Z" fill="#F79B3E"/>
+            <ellipse cx="112" cy="64" rx="66" ry="36" fill="#FCC077" stroke="none" opacity=".85"/>
+            <path d="M232 46 C262 74 276 108 276 138 C276 145 271 148 264 148 H222 C240 120 246 80 232 46 Z" fill="#EE8A2A" stroke="none"/>
+            <g fill="#FFFFFF" stroke="none">
+            <ellipse cx="108" cy="72" rx="4.5" ry="8" transform="rotate(-22 108 72)"/>
+            <ellipse cx="146" cy="58" rx="4.5" ry="8" transform="rotate(10 146 58)"/>
+            <ellipse cx="186" cy="66" rx="4.5" ry="8" transform="rotate(-14 186 66)"/>
+            <ellipse cx="128" cy="94" rx="4.5" ry="8" transform="rotate(18 128 94)"/>
+            <ellipse cx="172" cy="96" rx="4.5" ry="8" transform="rotate(-8 172 96)"/>
+            <ellipse cx="214" cy="88" rx="4.5" ry="8" transform="rotate(24 214 88)"/>
+            </g></g></svg>
+          </div>
+        </div>
+
+        <div style="margin-top:58px; text-align:center;">
+          <div style="font-family:'Ranchers',system-ui,sans-serif; font-size:38px; letter-spacing:.06em; color:#FFF3E4; text-transform:uppercase;">{{ caption }}</div>
+          <div style="margin:26px auto 0; width:340px; height:18px; background:rgba(59,42,27,.3); border:4px solid #3B2A1B; border-radius:999px; overflow:hidden;">
+            <div style="height:100%; width:{{ progressPct }}; background:#FBD24B;"></div>
+          </div>
+          <div style="margin-top:14px; font-size:13px; font-weight:800; letter-spacing:.18em; text-transform:uppercase; color:#FFD9C9;">{{ modeLabel }}</div>
+        </div>
+      </div>
+
+      <div style="position:absolute; left:40px; top:34px; font-size:12px; font-weight:800; letter-spacing:.2em; color:#FFD9C9; text-transform:uppercase;">Tip · curl your fingers, knuckles guide the blade</div>
+      <div style="position:absolute; left:0; right:0; bottom:0; height:30px; background:repeating-linear-gradient(90deg,#3B2A1B 0 30px,#FFF3E4 30px 60px);"></div>
+    </div>
+  </div>
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;loadingCaption&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Loading&quot;}}">
+class Component extends DCLogic {
+  state = { i: 0, mode: "Recipe Sandbox" };
+  captions = [
+    "Slicing ripe red tomatoes...",
+    "Waking up the flat top...",
+    "Calibrating your countertop...",
+    "Stacking it while gravity watches...",
+  ];
+  componentDidMount() {
+    this.t = setInterval(() => this.setState(s => ({ i: s.i + 1 })), 2300);
+  }
+  componentWillUnmount() { clearInterval(this.t); }
+  recipes = [
+    { id:"burger", name:"Smash Burger",      icon:"icons/patty.png",    tint:"#FBE3A0", mins:"25 min", diff:2, have:"9 / 9 on counter", ready:true },
+    { id:"brunoise", name:"Drill: Brunoise", icon:"icons/onion.png",    tint:"#CDE6C7", mins:"10 min", diff:3, have:"3 / 3 on counter", ready:true },
+    { id:"shakshuka", name:"Shakshuka",      icon:"icons/egg.png",      tint:"#F9D3B4", mins:"30 min", diff:2, have:"6 / 7 — missing cumin", ready:false },
+    { id:"chilioil", name:"Chili Oil Noodles", icon:"icons/chili.png",  tint:"#F9C7BE", mins:"20 min", diff:1, have:"4 / 6 — missing 2", ready:false },
+    { id:"omelette", name:"Mushroom Omelette", icon:"icons/mushroom.png", tint:"#C4DAEE", mins:"15 min", diff:2, have:"5 / 5 on counter", ready:true },
+    { id:"salad", name:"Knife-Work Salad",   icon:"icons/lettuce.png",  tint:"#CDE6C7", mins:"12 min", diff:1, have:"6 / 6 on counter", ready:true },
+  ];
+  board = [
+    { pos:"01", name:"Ramona Cruz",  tag:"MISE",   score:"9,840", me:false },
+    { pos:"02", name:"Teddy Okafor", tag:"BRUNOISE", score:"9,215", me:false },
+    { pos:"03", name:"Hana Lindqvist", tag:"CHIFF", score:"8,977", me:false },
+    { pos:"04", name:"You",         tag:"LINE COOK", score:"8,640", me:true },
+    { pos:"05", name:"Marco Deleon", tag:"JULIENNE", score:"8,402", me:false },
+  ];
+  renderVals() {
+    const i = this.state.i;
+    return {
+      recipes: this.recipes,
+      board: this.board,
+      caption: this.props.loadingCaption || this.captions[i % this.captions.length],
+      progressPct: (16 + ((i * 21) % 80)) + "%",
+      modeLabel: "Loading · " + this.state.mode,
+      pickCutting: () => this.setState({ mode: "Competitive Cutting" }),
+      pickSandbox: () => this.setState({ mode: "Recipe Sandbox" }),
+    };
+  }
+}
+</script>
+</body>
+</html>
