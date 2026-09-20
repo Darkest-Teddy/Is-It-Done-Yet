@@ -70,7 +70,12 @@ export default defineConfig({
     // Sourcemaps locally, never in a deployed build: ~60MB here (OpenCV and the font bundles
     // dominate), and a headset pulling them over venue wifi is the slowest possible first
     // load, for a debugging aid nobody uses on the device.
-    sourcemap: process.env['VITE_BASE'] === undefined,
+    //
+    // `VITE_SOURCEMAP=0` is the explicit switch, used by `npm run build:deploy`. The
+    // `VITE_BASE` clause is kept because the GitHub Pages build has always relied on it, but
+    // deploying to a root domain needs a way to turn maps off that is not a side effect of
+    // setting a base path.
+    sourcemap: process.env['VITE_SOURCEMAP'] !== '0' && process.env['VITE_BASE'] === undefined,
     target: 'esnext',
     // Every page is a real entry point. Without listing them Vite builds only index.html and
     // the others silently never reach the bundle -- the app appears to deploy, then 404s.

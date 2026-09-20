@@ -75,6 +75,35 @@ On the headset: `npm run headset`, then open `http://localhost:8081/app.html` in
 `localhost` reached through `adb reverse` is a secure context, which is what makes the camera
 available without wrestling a self-signed certificate.
 
+### On the headset
+
+Quest Browser needs a **secure context** or `getUserMedia` hides the cameras and the failure
+reads as "no cameras" rather than "insecure origin". Three ways to get one, best first:
+
+| Route | Command | Notes |
+|---|---|---|
+| **Deployed** | see below | Real certificate, no warning, works off any network. The easy one. |
+| **USB** | `npm run headset` | `adb reverse` makes the laptop `http://localhost:8081` to the headset, and `localhost` **is** a secure context. Needs `adb` on PATH. |
+| **LAN** | `npm run dev` | `https://<laptop-ip>:8081/app.html`. Self-signed, so Quest Browser shows an interstitial you must accept by hand. Fails outright on networks with client isolation — most university and venue wifi. |
+
+### Deploying
+
+The build is static, so any host works. `railway.json` and `server/static.mjs` are set up for
+Railway specifically:
+
+```bash
+npm run build:deploy    # production build, no sourcemaps (~45MB vs ~118MB)
+npm start               # serves dist/ on $PORT, / -> app.html
+npm run serve:dist      # both, for checking a deploy build locally
+```
+
+`server/static.mjs` has no dependencies and exists mainly for three things the default static
+hosts get wrong here: `.wasm` must be served as `application/wasm` or the vision engine fails
+to instantiate with a misleading error; `/assets/*` is fingerprinted and immutable while HTML
+must never be cached; and `/` serves **`app.html`**, because `index.html` is the laptop debug
+app and not what anyone opening the deployed URL on a headset wants. Every other page stays
+reachable at its own path.
+
 ### The rig
 
 1. **DJI Osmo Pocket 3 over USB-C, in Webcam Mode.** It enumerates as a standard UVC device and

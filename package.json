@@ -19,7 +19,10 @@
     "test": "npm run check:purity && npm run typecheck && vitest run",
     "dev:usb": "node -e \"process.env.VITE_HTTPS='0';require('child_process').spawn('npx',['vite'],{stdio:'inherit',env:process.env,shell:true})\"",
     "adb:reverse": "adb reverse tcp:8081 tcp:8081",
-    "build:pages": "node -e \"process.env.VITE_BASE='/Is-It-Done-Yet/';require('child_process').spawn('npx',['vite','build'],{stdio:'inherit',env:process.env,shell:true})\""
+    "build:pages": "node -e \"process.env.VITE_BASE='/Is-It-Done-Yet/';require('child_process').spawn('npx',['vite','build'],{stdio:'inherit',env:process.env,shell:true})\"",
+    "start": "node server/static.mjs",
+    "build:deploy": "node -e \"process.env.VITE_SOURCEMAP='0';require('child_process').spawn('npx',['vite','build'],{stdio:'inherit',env:process.env,shell:true})\"",
+    "serve:dist": "npm run build:deploy && node server/static.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.6.1",
