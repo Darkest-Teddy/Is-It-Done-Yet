@@ -28,6 +28,7 @@ import { createServer } from 'node:http';
 import { extname, join, normalize, resolve, sep } from 'node:path';
 
 import { guidanceConfig, handleGuidance } from './guidance.mjs';
+import { handleVision, visionConfig } from './vision.mjs';
 import { handleSpeech, speechConfig } from './speech.mjs';
 
 const ROOT = resolve(process.env['STATIC_ROOT'] ?? 'dist');
@@ -93,6 +94,7 @@ function cacheFor(pathname, file) {
 
 /** The two non-static routes, and they hold the keys. See `guidance.mjs` and `speech.mjs`. */
 const GUIDANCE_PATH = process.env['GUIDANCE_PATH'] ?? '/api/guidance';
+const VISION_PATH = process.env['VISION_PATH'] ?? '/api/vision';
 const SPEECH_PATH = process.env['SPEECH_PATH'] ?? '/api/speech';
 
 const server = createServer((req, res) => {
@@ -102,6 +104,13 @@ const server = createServer((req, res) => {
   // Checked before the method guard: both relays are POSTs, and the guard below rejects those.
   if (pathname === GUIDANCE_PATH) {
     void handleGuidance(req, res);
+    return;
+  }
+
+  // GET as well as POST: the client asks GET first to decide whether it can honestly offer the
+  // "Identify everything" control, rather than presenting one that fails under a finger.
+  if (pathname === VISION_PATH) {
+    void handleVision(req, res);
     return;
   }
 
@@ -162,6 +171,11 @@ server.listen(PORT, HOST, () => {
     guidanceConfig() === null
       ? `[static] ${GUIDANCE_PATH} is mounted but QWEN_BASE_URL is unset -- guidance stays local`
       : `[static] ${GUIDANCE_PATH} -> ${guidanceConfig().baseUrl} (${guidanceConfig().model})`,
+  );
+  console.log(
+    visionConfig() === null
+      ? `[static] ${VISION_PATH} is mounted but OPENROUTER_API_KEY is unset -- identify is off`
+      : `[static] ${VISION_PATH} -> ${visionConfig().model}`,
   );
   // Worth saying out loud for the same reason, and more urgently: with no voice configured the
   // headset has none at all. DECISIONS.md entry 19 -- Quest Browser ships no `speechSynthesis`,

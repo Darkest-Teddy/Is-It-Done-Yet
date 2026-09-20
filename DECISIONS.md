@@ -1263,3 +1263,58 @@ the pre-written barks and the on-demand answers become two renderings of one voi
 is audible. `ELEVENLABS_OUTPUT_FORMAT` is likewise unverified and is left unset by default so the
 API picks the format the bank is known to decode. None of this is exercised until somebody sets
 a real key and a real voice id and presses Unsure once.
+
+---
+
+## 29. Three pieces of ingredient detection existed and two of the connections did not
+
+The deployed site has answered `/api/vision` since before this branch, and it works: a photograph
+goes in and named ingredients come out, open-vocabulary, from Qwen3-VL. That is why the claim
+"eight of the ten required ingredients can never be seen" — true of the local classifier, which
+knows six things by hue and shape — was wrong as a statement about the app. It was right about
+one layer and wrong about the product.
+
+What was actually missing was plumbing, and it was missing in a way that is easy to walk past
+because each piece looks finished on its own.
+
+**The client was ready.** `src/home/scan.ts` has always called `api/vision`, asked `GET` first to
+decide whether it could honestly offer the control, and disabled the button with a real reason
+when the answer was no.
+
+**A transport arrived from main.** `server/vision-relay.mjs` is a careful piece of work and its
+header is explicit that the headset should not know which model is answering. But it is only a
+transport: it forwards an OpenRouter-shaped body with a `model` field and has no opinion about
+ingredients.
+
+**The thing in between was in no commit on any ref.** The function that builds the prompt and
+narrows the reply into `RawScanItem[]` exists only on Vercel, deployed from somebody's working
+tree — the same way the cook-flow page in entry 27 was. So the client spoke one contract, the
+transport spoke another, and nothing in the repository translated.
+
+`server/vision.mjs` is that translation, mounted at `/api/vision` by both the dev server and
+`static.mjs`, the same way `/api/guidance` and `/api/speech` already were.
+
+**The prompt lives here and not in the relay**, which is the only structural decision in this
+entry. Teaching the relay about ingredients would turn a transport into a cooking component, and
+then pointing it at a local Ollama for some other task would mean editing prompt text in a file
+about HTTP. Keeping it here means the relay stays swappable and this file is the only thing that
+changes when the model's habits change.
+
+**Verified live, not asserted.** A real Qwen3-VL call through this endpoint identified five
+ingredients from one frame in 6.7s — tomato, lettuce, cheese, egg, carrot — each with the right
+category. The first call, against crude coloured shapes, returned an empty list, and that is the
+behaviour the prompt asks for: it forbids inventing, and a model confidently naming red circles
+"tomatoes" would be the worse outcome. Both paths now coexist for the reason CLAUDE.md §5 gives:
+the local classifier is instant and offline and follows an ingredient as it moves, the model is
+slower and can name anything, and neither replaces the other.
+
+**A bug worth recording because the error message lied.** `VISION_UPSTREAM=openrouter` is main's
+convention for *selecting* an upstream, not a URL. Read as a URL it produced a 502 saying the
+vision model could not be reached, which blamed the model for a config string. Only an explicit
+`http(s)://` now overrides the default, and a test pins it.
+
+**What a model says is still a proposal.** Items enter the pantry with the confidence the model
+reported, clamped, and the counter panel's "fix by hand" is what turns a proposal into fact. A
+fabricated confidence of 1.0 would present a guess as a certainty, which is the failure the whole
+confidence column exists to prevent — and it is the same line entry 26 draws: the asked-for path
+may consult a model, the unprompted path never does.

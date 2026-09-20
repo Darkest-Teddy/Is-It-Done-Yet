@@ -91,6 +91,35 @@ function guidanceRelay(): Plugin {
  * is nothing (DECISIONS.md entry 19) and the subtitle carries the answer alone -- which is the
  * behaviour this repo shipped before the relay existed, not a regression introduced by it.
  */
+/**
+ * `/api/vision` in dev, mirroring the deployed endpoint so `scan.ts` needs no branch.
+ *
+ * GET as well as POST, because the client asks GET first to decide whether the "Identify
+ * everything" control can honestly be offered.
+ */
+function visionRelay(): Plugin {
+  return {
+    name: 'vision-relay',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use('/api/vision', (req, res, next) => {
+        if (req.method !== 'GET' && req.method !== 'POST') {
+          next();
+          return;
+        }
+        void import('./server/vision.mjs')
+          .then((module) => (module as { handleVision: (a: unknown, b: unknown) => Promise<void> })
+            .handleVision(req, res))
+          .catch((error: unknown) => {
+            server.config.logger.error(`[vision] ${(error as Error).message}`);
+            res.statusCode = 500;
+            res.end('{"error":"relay unavailable"}');
+          });
+      });
+    },
+  };
+}
+
 function speechRelay(): Plugin {
   return {
     name: 'speech-relay',
@@ -131,8 +160,8 @@ const useHttps = process.env['VITE_HTTPS'] !== '0';
 
 export default defineConfig({
   plugins: useHttps
-    ? [questResults(), guidanceRelay(), speechRelay(), basicSsl()]
-    : [questResults(), guidanceRelay(), speechRelay()],
+    ? [questResults(), guidanceRelay(), speechRelay(), visionRelay(), basicSsl()]
+    : [questResults(), guidanceRelay(), speechRelay(), visionRelay()],
 
   // 0.0.0.0 so the headset, a phone, or the Beam Pro on the same LAN can open it.
   server: { host: '0.0.0.0', port: 8081, open: false },
