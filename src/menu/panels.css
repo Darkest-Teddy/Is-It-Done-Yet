@@ -1,0 +1,796 @@
+/*
+  Per-screen layout.
+
+  `theme.css` carries the look; this carries the composition. Each block below mirrors one
+  artboard, with its absolute coordinates replaced by a grid that reflows -- same arrangement,
+  same reading order, no fixed 1440x810 frame.
+
+  The rule every screen obeys: three rows, header / body / rail, the body is `minmax(0, 1fr)`,
+  and anything inside it that could grow past its share scrolls in its own box. That is what
+  keeps the page itself from ever scrolling, which is the single most important thing about a
+  layout somebody drives with a pointer ray.
+*/
+
+/* ================================================================ 1A  title */
+
+.title { grid-template-rows: minmax(0, 1fr) auto; }
+
+.title__body {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1.6rem 2.2rem;
+  min-height: 0;
+}
+
+.title__scatter {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.55;
+}
+
+.title__scatter-item { position: absolute; }
+
+.title__panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  max-width: 52rem;
+  justify-self: center;
+  min-width: 0;
+}
+
+.title__mark { display: flex; align-items: center; gap: 1rem; }
+
+.title__ar {
+  display: grid;
+  place-items: center;
+  width: 4.4rem;
+  height: 4.4rem;
+  border-radius: 1.1rem;
+  background: var(--red);
+  color: var(--cream);
+  font-size: 1.9rem;
+  border: 0.28rem solid var(--ink-warm);
+  box-shadow: 0 0.3rem 0 rgb(59 42 27 / 0.35);
+}
+
+.title__mark .d-xl { color: var(--ink-warm); }
+.title__mark-red { color: var(--red); }
+
+.title__lede { max-width: 34rem; font-size: 1.05rem; }
+
+.title__modes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.1rem;
+}
+
+.title__mode { position: relative; border-color: var(--ink-warm); }
+.title__mode:first-child { background: var(--cream); }
+
+.title__flag {
+  position: absolute;
+  top: -0.85rem;
+  left: 1rem;
+  border-color: var(--ink-warm);
+}
+
+.title__mode-head { display: flex; align-items: center; gap: 0.8rem; }
+
+.title__mode-icon {
+  display: grid;
+  place-items: center;
+  width: 5rem;
+  height: 5rem;
+  border-radius: 1rem;
+  border: 0.22rem solid var(--ink-warm);
+  flex: 0 0 auto;
+}
+
+.title__mode .display { color: var(--ink-warm); }
+.title__mode-blurb { margin-top: 0.7rem; }
+
+.title__links { display: flex; flex-wrap: wrap; gap: 0.7rem; }
+.title__links .btn { border-color: var(--ink-warm); }
+
+.title__rank {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  width: 20rem;
+  border-color: var(--ink-warm);
+  align-self: start;
+  margin-top: 1rem;
+}
+
+.title__rank-badge {
+  display: grid;
+  place-items: center;
+  width: 3.6rem;
+  height: 3.6rem;
+  border-radius: 50%;
+  border: 0.24rem solid var(--ink-warm);
+  font-size: 1.8rem;
+  color: var(--ink-warm);
+  flex: 0 0 auto;
+}
+
+.title__rank .display { color: var(--ink-warm); }
+.title__rank-meter { margin-top: 0.45rem; border-color: var(--ink-warm); }
+
+/* ================================================================ 1B  loading */
+
+.loading {
+  grid-template-rows: minmax(0, 1fr) auto;
+  background: var(--red);
+}
+
+.loading__body {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(1.5rem, 4vw, 4rem);
+  padding: 1.5rem 3rem;
+  min-height: 0;
+}
+
+.loading__stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: clamp(9rem, 17vw, 15rem);
+}
+
+/* Negative margins so the layers nest the way a burger does rather than floating apart. The
+   SVGs carry their own outline, so overlapping them reads as a stack. */
+.loading__layer + .loading__layer { margin-top: -4%; }
+
+.loading__layer {
+  width: 100%;
+  /* Still loading. A white silhouette rather than a faded colour one: faded colour on this red
+     ground turns every pending layer a slightly different red, which is unreadable. A pale
+     ghost says "not yet" at a glance, and holding the layer's full height means the stack
+     never jumps as steps complete. */
+  filter: brightness(0) invert(1) opacity(0.24);
+}
+
+.loading__layer.is-done { filter: none; }
+.loading__layer svg { width: 100%; height: 100%; display: block; overflow: visible; }
+
+.loading__readout { display: flex; flex-direction: column; gap: 0.9rem; width: min(26rem, 44vw); }
+.loading__caption { color: var(--cream); }
+.loading__meter { width: 100%; border-color: var(--ink-warm); }
+
+.loading__steps {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.3rem 1rem;
+}
+
+.loading__step {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: rgb(255 243 228 / 0.55);
+}
+
+.loading__step.is-done { color: var(--cream); }
+
+.loading__tick {
+  display: grid;
+  place-items: center;
+  width: 1.2rem;
+  height: 1.2rem;
+  border-radius: 50%;
+  background: rgb(255 243 228 / 0.18);
+  font-size: 0.7rem;
+}
+
+.loading__step.is-done .loading__tick { background: var(--yellow); color: var(--ink); }
+
+.loading__mode { color: rgb(255 243 228 / 0.7); }
+
+.loading__tip {
+  padding: 0 2rem 1.3rem;
+  color: rgb(255 243 228 / 0.8);
+  text-align: center;
+}
+
+/* ================================================================ 2A  counter */
+
+.counter__head { color: var(--cream); }
+.counter__wordmark { color: var(--cream); }
+
+.counter__camera-state {
+  margin-left: auto;
+  background: rgb(255 243 228 / 0.12);
+  color: var(--cream);
+  border-color: rgb(255 243 228 / 0.45);
+}
+
+.counter__camera-state.pill--leaf { background: var(--leaf); color: var(--ink); border-color: var(--ink); }
+
+.counter__body {
+  grid-template-columns: minmax(24rem, 34rem) minmax(18rem, 24rem);
+  align-content: start;
+  align-items: start;
+}
+
+/* The card owns its height and the editor inside it does the scrolling. Without `overflow:
+   hidden` here the "add something" grid pushes the card straight off the bottom of the screen
+   the moment it opens, and the page itself cannot scroll to reveal it. */
+.counter__tally {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  max-height: 100%;
+  overflow: hidden;
+}
+
+.counter__groups { display: flex; flex-direction: column; gap: 0.45rem; }
+
+.counter__group {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.5rem 0.75rem;
+  border: 0.2rem solid var(--ink);
+  border-radius: 0.9rem;
+  box-shadow: inset 0 2px 0 rgb(255 255 255 / 0.55), inset 0 -6px 12px rgb(70 16 26 / 0.13);
+}
+
+/* An empty group is muted with colour, not with opacity: this panel floats over a live camera,
+   and a faded row would show the counter straight through it. */
+.counter__group.is-empty { filter: saturate(0.35) brightness(0.94); }
+.counter__group.is-empty .display, .counter__group.is-empty .counter__group-names { opacity: 0.65; }
+.counter__group-names { font-size: 0.78rem; font-weight: 800; letter-spacing: 0.04em; }
+
+.counter__fix { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; padding-top: 0.7rem; }
+
+.counter__editor { display: none; }
+
+.counter__editor.is-open {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  /* One scroller, not three. Nesting a scrollable list inside a scrollable panel is miserable
+     with a controller ray -- the ray lands in whichever box it happens to be over. */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ink) transparent;
+  padding-right: 0.3rem;
+}
+
+.counter__editor.is-open::-webkit-scrollbar { width: 0.55rem; }
+.counter__editor.is-open::-webkit-scrollbar-thumb { background: var(--ink); border-radius: 999px; }
+
+.counter__edit-list { display: flex; flex-direction: column; gap: 0.4rem; }
+
+.counter__edit-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.35rem 0.5rem;
+  border: 0.18rem solid var(--ink);
+  border-radius: 0.8rem;
+}
+
+.counter__edit-row.is-unsure { border-style: dashed; }
+.counter__edit-name { font-size: 0.92rem; font-weight: 800; }
+.counter__edit-conf { font-size: 0.7rem; font-weight: 700; color: var(--brown); }
+.counter__edit-count { min-width: 1.6rem; text-align: center; }
+
+.counter__step {
+  display: grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  flex: 0 0 auto;
+  border: 0.18rem solid var(--ink);
+  border-radius: 0.55rem;
+  background: var(--cream);
+  font-size: 1.1rem;
+  font-weight: 800;
+  line-height: 1;
+  transition: background-color 90ms ease-out;
+}
+
+.counter__step:hover, .counter__step:focus-visible { background: var(--yellow); outline: none; }
+.counter__step--drop:hover { background: var(--red); color: var(--cream); }
+
+.counter__add {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+  gap: 0.4rem;
+}
+
+.counter__add-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.5rem;
+  background: var(--cream-deep);
+  border: 0.16rem solid var(--ink);
+  border-radius: 0.7rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-align: left;
+  min-width: 0;
+  transition: background-color 90ms ease-out;
+}
+
+.counter__add-chip.is-wanted { background: var(--leaf); }
+.counter__add-chip:hover, .counter__add-chip:focus-visible { background: var(--yellow); outline: none; }
+
+.counter__rail { display: flex; flex-direction: column; gap: 0.9rem; min-height: 0; }
+
+.counter__total-row { align-items: baseline; gap: 0.6rem; }
+.counter__total-unit { color: var(--yellow); }
+.counter__total-note { color: #ffd9c9; margin-top: 0.4rem; }
+
+/* The press card stacks its two display lines; without this they run together on one line
+   because `.press` is a flat block and its children are inline spans. */
+.counter__cook { display: flex; flex-direction: column; align-items: flex-start; }
+.counter__cook-note { margin-top: 0.5rem; }
+.counter__cook.is-blocked { background: #d9c6b2; }
+.counter__cook.is-blocked .display, .counter__cook.is-blocked .note { color: #8a7866; }
+.counter__browse { display: flex; flex-direction: column; align-items: flex-start; }
+.counter__browse .note { margin-top: 0.35rem; }
+
+/* ================================================================ 2B  chef's pick */
+
+.pick__head-note { color: rgb(231 199 174 / 0.85); }
+
+.pick__stage {
+  grid-template-rows: minmax(0, 1fr) auto;
+  justify-items: center;
+  align-content: center;
+}
+
+.pick__card {
+  width: min(62rem, 100%);
+  /* Height from content, not from the row. A grid item stretches by default, which left the
+     card with a foot of empty cream under the buttons. */
+  align-self: center;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: 100%;
+}
+
+.pick__banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.8rem 1.4rem 0.9rem;
+  background: var(--red);
+  color: var(--cream);
+}
+
+.pick__banner .pill { color: var(--ink); }
+
+.pick__body {
+  display: flex;
+  gap: 1.3rem;
+  padding: 1.2rem 1.4rem;
+  min-height: 0;
+}
+
+.pick__hero {
+  display: grid;
+  place-items: center;
+  width: 10rem;
+  height: 10rem;
+  flex: 0 0 auto;
+  background: var(--yellow-soft);
+  border: 0.24rem solid var(--ink);
+  border-radius: 1.1rem;
+  box-shadow: inset 0 3px 0 rgb(255 255 255 / 0.55);
+}
+
+.pick__blurb { margin-top: 0.5rem; max-width: 38rem; }
+.pick__meta { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: 0.8rem; }
+.pick__strip { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: 0.8rem; }
+
+.pick__chip {
+  display: grid;
+  place-items: center;
+  width: 3.4rem;
+  height: 3.4rem;
+  background: var(--leaf);
+  border: 0.18rem solid var(--ink);
+  border-radius: 0.8rem;
+}
+
+.pick__chip.is-missing { background: var(--cream-deep); opacity: 0.55; border-style: dashed; }
+.pick__missing { margin-top: 0.6rem; }
+
+.pick__actions {
+  display: flex;
+  gap: 0.8rem;
+  padding: 0 1.4rem 1.3rem;
+}
+
+.pick__go { flex: 1 1 auto; }
+.pick__footer { color: rgb(231 199 174 / 0.85); text-align: center; margin-top: 0.9rem; }
+
+/* ================================================================ 2C  library */
+
+.library__head { gap: 1rem; }
+.library__title { color: var(--cream); flex: 0 0 auto; }
+
+.library__search {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  background: var(--cream);
+  border: 0.24rem solid var(--ink);
+  border-radius: 999px;
+  padding: 0 1rem;
+  height: 3rem;
+}
+
+.library__search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+  color: var(--ink);
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.library__search-input::placeholder { color: #b08f75; font-weight: 600; }
+
+.library__hits {
+  flex: 0 0 auto;
+  background: rgb(255 243 228 / 0.12);
+  color: var(--cream);
+  border-color: rgb(255 243 228 / 0.45);
+}
+
+.library__body {
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 21rem);
+  align-items: stretch;
+}
+
+.library__main { gap: 0.75rem; }
+
+.library__filters { display: flex; flex-wrap: wrap; gap: 0.45rem; flex: 0 0 auto; }
+.library__chip { min-height: 2.5rem; padding: 0.4rem 1rem; font-size: 0.74rem; }
+.library__chip.is-on { background: var(--yellow); }
+
+.library__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 0.8rem;
+  align-content: start;
+  padding-right: 0.4rem;
+  padding-bottom: 0.4rem;
+}
+
+.library__card { display: flex; flex-direction: column; gap: 0.45rem; }
+
+.library__card-tile {
+  display: grid;
+  place-items: center;
+  height: 6.5rem;
+  border: 0.2rem solid var(--ink);
+  border-radius: 0.9rem;
+  box-shadow: inset 0 3px 0 rgb(255 255 255 / 0.5);
+}
+
+.library__card-name { line-height: 1.02; }
+.library__card-meta { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+.library__card-status { font-size: 0.75rem; font-weight: 800; color: var(--brown); }
+.library__card-status.is-ready { color: #3f6b33; }
+
+.library__empty {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 1.4rem;
+  border: 0.22rem dashed rgb(255 243 228 / 0.3);
+  border-radius: 1.2rem;
+  color: var(--cream);
+}
+
+.library__empty .note { color: rgb(231 199 174 / 0.85); }
+
+.library__counter { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
+
+.library__counter-chips {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.4rem;
+  padding-right: 0.3rem;
+  min-height: 0;
+}
+
+.library__counter-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  padding: 0.35rem 0.1rem;
+  border: 0.16rem solid var(--ink);
+  border-radius: 0.7rem;
+  box-shadow: inset 0 2px 0 rgb(255 255 255 / 0.55);
+}
+
+.library__counter-count { font-size: 0.68rem; font-weight: 800; }
+.library__close-btn { width: 100%; }
+
+/* ================================================================ 2D  dish card */
+
+.dish__head { gap: 0.8rem; }
+.dish__index { color: rgb(231 199 174 / 0.85); }
+.dish__back { flex: 0 0 auto; }
+.dish__head .pill:last-child { margin-left: auto; }
+
+.dish__body { grid-template-rows: auto minmax(0, 1fr); align-content: start; }
+
+.dish__hero { display: flex; gap: 1.3rem; align-items: flex-start; }
+
+.dish__hero-art { display: flex; flex: 0 0 auto; padding-right: 1.2rem; }
+
+.dish__hero-chip {
+  display: grid;
+  place-items: center;
+  width: 6.2rem;
+  height: 6.2rem;
+  background: var(--cream-deep);
+  border: 0.24rem solid var(--ink);
+  border-radius: 1.1rem;
+  box-shadow: inset 0 3px 0 rgb(255 255 255 / 0.55);
+}
+
+.dish__hero-chip + .dish__hero-chip { margin-left: -1.6rem; }
+
+.dish__blurb { margin-top: 0.5rem; max-width: 46rem; }
+
+.dish__stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.7rem;
+  margin-top: 0.9rem;
+}
+
+.dish__stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.55rem 0.7rem;
+  background: var(--cream-deep);
+  border: 0.18rem solid var(--ink);
+  border-radius: 0.8rem;
+}
+
+.dish__chevrons { display: flex; align-items: center; gap: 0.15rem; }
+.dish__level { margin-left: 0.4rem; color: var(--brown); }
+
+.dish__lower {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 22rem);
+  gap: 1.1rem;
+  min-height: 0;
+}
+
+.dish__ingredients { display: flex; flex-direction: column; gap: 0.6rem; min-height: 0; }
+.dish__ing-head { gap: 0.8rem; }
+.dish__ing-list { display: flex; flex-direction: column; gap: 0.4rem; padding-right: 0.3rem; }
+
+.dish__ing {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.35rem 0.6rem;
+  background: var(--cream-deep);
+  border: 0.18rem solid var(--ink);
+  border-radius: 0.75rem;
+  opacity: 0.62;
+}
+
+.dish__ing.is-ok { opacity: 1; background: var(--leaf); }
+.dish__ing-name { font-size: 0.92rem; font-weight: 800; }
+.dish__ing-amount { font-size: 0.8rem; font-weight: 800; color: var(--brown); }
+.dish__ing-amount.is-ok { color: #3f6b33; }
+
+.dish__start-col { gap: 0.7rem; }
+.dish__start { display: flex; flex-direction: column; gap: 0.7rem; }
+/* Blocked, but still solid and still readable: it has to say WHY it cannot be pressed, and a
+   faded card makes the reason the hardest thing on screen to read. */
+.dish__start.is-blocked { background: #d9c6b2; box-shadow: var(--gloss), var(--lift); }
+.dish__start.is-blocked .display { color: #6f5b49; }
+.dish__start.is-blocked .label { color: #6f5b49; }
+.dish__start.is-blocked .pill { background: #c7b29c; color: #6f5b49; border-color: #8a7866; }
+.dish__start-hint { display: flex; align-items: center; gap: 0.5rem; }
+.dish__start-hint .label { color: rgb(255 243 228 / 0.85); }
+.dish__start-note { color: rgb(231 199 174 / 0.85); }
+
+.dish__missing { place-content: center; justify-items: center; }
+.dish__missing .card { display: flex; flex-direction: column; gap: 0.7rem; align-items: flex-start; max-width: 34rem; }
+
+/* ================================================================ 2E  cutting */
+
+.cut__head { color: var(--cream); }
+.cut__title { color: var(--cream); }
+
+.cut__cam {
+  margin-left: auto;
+  background: rgb(255 243 228 / 0.12);
+  color: var(--cream);
+  border-color: rgb(255 243 228 / 0.45);
+}
+
+.cut__cam.pill--leaf { background: var(--leaf); color: var(--ink); border-color: var(--ink); }
+
+.cut__body {
+  grid-template-columns: minmax(20rem, 28rem) minmax(0, 1fr);
+  align-items: stretch;
+}
+
+/* The left column holds the readouts; the right holds the board. The middle of the screen is
+   deliberately left empty -- that is where the real board is, and covering it with a panel
+   would be covering the thing being measured. */
+.cut__left { gap: 0.8rem; justify-content: flex-start; }
+
+.cut__clock-card { display: flex; flex-direction: column; gap: 0.2rem; }
+.cut__clock { line-height: 0.9; }
+.cut__clock-meter { margin-top: 0.5rem; }
+
+.cut__stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.6rem; }
+.cut__stat { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.6rem 0.7rem; }
+
+.cut__controls { display: flex; flex-direction: column; gap: 0.7rem; }
+.cut__control-row { gap: 0.6rem; }
+.cut__control-row .btn { flex: 1 1 auto; }
+.cut__hint { min-height: 2.6rem; }
+
+/* The leaderboard owns the right-hand third all the way to the rail, so the camera's fault
+   band has to centre in what is left of the screen rather than behind it. */
+.cut { --fault-right: 30rem; }
+
+.cut__board {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  min-height: 0;
+  justify-self: end;
+  width: min(26rem, 100%);
+}
+
+.cut__board-head { gap: 0.7rem; }
+.cut__board-rows { display: flex; flex-direction: column; gap: 0.35rem; padding-right: 0.3rem; }
+
+.cut__board-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.35rem 0.6rem;
+  background: var(--cream-deep);
+  border: 0.18rem solid transparent;
+  border-radius: 0.75rem;
+}
+
+.cut__board-row.is-mine { border-color: var(--red); background: var(--yellow-soft); }
+.cut__pos { min-width: 1.4rem; color: var(--brown); }
+.cut__badge { font-size: 1.15rem; }
+.cut__who { font-size: 0.92rem; font-weight: 800; }
+.cut__detail { font-size: 0.72rem; font-weight: 700; color: var(--brown); }
+
+.cut__post { display: flex; align-items: center; gap: 0.6rem; }
+
+.cut__name-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  background: var(--cream-deep);
+  border: 0.2rem solid var(--ink);
+  border-radius: 999px;
+  padding: 0 0.8rem 0 0.5rem;
+  height: 2.9rem;
+}
+
+.cut__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-weight: 800;
+  color: var(--ink);
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* ================================================================ fatal banner */
+
+#fatal {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 99;
+  padding: 0.9rem 1.2rem;
+  background: var(--red);
+  color: var(--cream);
+  font-size: 0.9rem;
+  font-weight: 800;
+  border-top: 0.24rem solid var(--ink);
+}
+
+/* ================================================================ narrow windows
+
+   A Quest Browser window can be dragged down to something closer to a phone than a monitor.
+   Below ~64rem the two-column screens stack, and the side panels that are context rather than
+   content give up their space first. */
+
+@media (max-width: 64rem) {
+  .counter__body,
+  .library__body,
+  .dish__lower,
+  .cut__body { grid-template-columns: minmax(0, 1fr); }
+
+  /* Stacked, the second column becomes a second ROW, and without explicit row sizing the two
+     share the height evenly -- which clips the list that matters to make room for the context
+     panel that does not. So: the list takes what is left, the context panel takes what it
+     needs, and its own inner list is capped. */
+  .counter__body,
+  .library__body,
+  .dish__lower { grid-template-rows: minmax(0, 1fr) auto; }
+
+  .counter__tally { max-height: none; }
+  .library__counter-chips { max-height: 8rem; }
+  .library__counter { max-height: 17rem; overflow: hidden; }
+  .dish__ing-list { max-height: 12rem; }
+  .cut__body { grid-template-rows: auto minmax(0, 1fr); }
+  .cut__board-rows { max-height: 14rem; }
+  /* Stacked, nothing owns the right-hand side any more. */
+  .cut { --fault-right: 2rem; }
+
+  .title__body { grid-template-columns: minmax(0, 1fr); align-content: center; }
+  .title__rank { width: 100%; max-width: 30rem; justify-self: center; }
+  .title__modes { grid-template-columns: minmax(0, 1fr); }
+
+  .loading__body { grid-template-columns: minmax(0, 1fr); gap: 1.4rem; justify-items: center; }
+  .loading__stack { width: min(16rem, 46vw); }
+
+  .dish__stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pick__body { flex-direction: column; }
+  .pick__hero { width: 100%; height: 8rem; }
+  .cut__board { width: 100%; justify-self: stretch; }
+  .library__counter-chips { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+
+@media (max-height: 40rem) {
+  /* Short window: the decorative scatter is the first thing to go. */
+  .title__scatter { display: none; }
+  .loading__steps { display: none; }
+}

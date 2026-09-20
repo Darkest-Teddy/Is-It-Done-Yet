@@ -62,6 +62,19 @@ npm test       # purity + typecheck + 136 tests
 npm run dev    # http://localhost:8081
 ```
 
+### The four pages
+
+| Page | What it is |
+|---|---|
+| `/app.html` | **The menu.** Title, loading, counter tally, chef's pick, recipe library, dish card and the competitive cutting round — the seven screens from the design document. Built for the Quest Browser window; the counter and the cutting round sit on the passthrough camera. See DECISIONS #22. |
+| `/index.html` | The laptop debug app: one camera, the full cut pipeline, and a slider for every threshold. |
+| `/lab.html` | The feature test rig, sized for the Quest Browser window. Times every stage of the pipeline on the headset itself (DECISIONS #21). |
+| `/xr.html` | The `immersive-ar` session and the spatial UIKitML panels. `menu.html` previews those panels in plain DOM on a laptop. |
+
+On the headset: `npm run headset`, then open `http://localhost:8081/app.html` in Quest Browser.
+`localhost` reached through `adb reverse` is a secure context, which is what makes the camera
+available without wrestling a self-signed certificate.
+
 ### The rig
 
 1. **DJI Osmo Pocket 3 over USB-C, in Webcam Mode.** It enumerates as a standard UVC device and

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <!--
+      `viewport-fit=cover` and no user scaling. A pinch-zoom on a headset is almost always an
+      accident -- a two-handed ray gesture, or a stray pinch while reaching for a button -- and
+      recovering from a zoomed page with a controller is genuinely hard. Every screen already
+      fits its window, so there is nothing zoom would reveal.
+    -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <title>Is It Done Yet</title>
+    <meta name="description" content="Mixed reality cooking trainer for Meta Quest 3S. Counts what is on your counter, picks a dish, and scores how even your knife cuts are." />
+
+    <!-- PWA. Quest offers "Install" only when the manifest, a service worker with a fetch
+         handler, and a secure origin are all present; any one missing and the option silently
+         never appears. -->
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <meta name="theme-color" content="#f5230e" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <link rel="icon" href="./icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+
+    <!-- The two faces are self-hosted and preloaded. Preloading matters more than usual here:
+         the whole design is set in them, so a late arrival re-flows every screen at once. -->
+    <link rel="preload" href="./menu/fonts/ranchers-400.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="./menu/fonts/hanken-grotesk.woff2" as="font" type="font/woff2" crossorigin />
+
+    <style>
+      /* Only the pre-boot ground, so a slow module load is the brand colour rather than white.
+         Everything else lives in src/menu/theme.css. */
+      html, body { height: 100%; margin: 0; background: #2a211c; overflow: hidden; }
+      #boot {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-content: center;
+        gap: 10px;
+        justify-items: center;
+        color: #fff3e4;
+        font: 700 16px/1.4 system-ui, sans-serif;
+        text-align: center;
+        padding: 24px;
+      }
+      #boot.gone { display: none; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <!-- Removed by the module once it has mounted. If it is still on screen, the bundle did
+         not load, and saying so beats a black rectangle. -->
+    <div id="boot">
+      <div>Is It Done Yet</div>
+      <div style="opacity: 0.7; font-weight: 400">starting…</div>
+    </div>
+
+    <script type="module">
+      import '/src/menu/main.ts';
+      document.getElementById('boot')?.classList.add('gone');
+
+      // Production only, and the guard is load-bearing rather than tidy. `public/sw.js` caches
+      // everything but navigations cache-first, which is right for a built bundle because Vite
+      // fingerprints asset filenames -- and completely wrong in dev, where module URLs are
+      // stable, so every edit is served from the cache and the app silently stops updating.
+      //
+      // Registered but never awaited: a failed registration must not stop the app, and on an
+      // insecure origin it always fails. Only the Install option and offline launch depend on it.
+      if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+        navigator.serviceWorker
+          .register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL })
+          .catch((err) => console.info('[menu] service worker not registered (needs https or localhost)', err));
+      }
+
+      // A worker registered by an earlier dev session outlives the guard above, and it will go
+      // on serving stale modules until something removes it. This is that something.
+      if (import.meta.env.DEV && 'serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations?.().then((regs) => {
+          for (const reg of regs) void reg.unregister();
+        }).catch(() => {});
+      }
+    </script>
+  </body>
+</html>

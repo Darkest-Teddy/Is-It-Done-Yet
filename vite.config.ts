@@ -72,11 +72,11 @@ export default defineConfig({
     // load, for a debugging aid nobody uses on the device.
     sourcemap: process.env['VITE_BASE'] === undefined,
     target: 'esnext',
-    // Both pages are real entry points. Without listing them Vite builds only index.html and
-    // xr.html silently never reaches the bundle -- the app appears to deploy, then 404s.
+    // Every page is a real entry point. Without listing them Vite builds only index.html and
+    // the others silently never reach the bundle -- the app appears to deploy, then 404s.
     // Object form, not the bare string the IWSDK scaffold used: that one fails the dependency
     // scan outright under Vite 7 (DECISIONS.md #11).
-    rollupOptions: { input: { main: 'index.html', xr: 'xr.html' } },
+    rollupOptions: { input: { main: 'index.html', xr: 'xr.html', app: 'app.html' } },
   },
 
   esbuild: { target: 'esnext' },

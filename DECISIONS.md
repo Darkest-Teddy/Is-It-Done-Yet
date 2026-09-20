@@ -620,3 +620,114 @@ piece of work, not a flag, and it must be budgeted before anyone commits to anch
 
 Recorded now because the panel demo is available immediately and the session demo is not, and
 the difference is one measurement rather than an opinion.
+
+---
+
+## 22. The menu design document is a canvas export, so it was ported rather than converted
+
+`# Is It Done Yet Menu.zip` holds seven finished screens — 1A title, 1B loading, 2A counter
+tally, 2B chef's pick, 2C recipe library, 2D dish card, 2E competitive cutting — plus two asset
+sets and a webfont pairing. They are now a real app at `app.html` (`src/menu/`), reachable in
+Quest Browser over `adb reverse` alongside `index.html`, `lab.html` and `xr.html`.
+
+**Nothing in the document runs in a browser, and that is not a criticism of it.** It is a
+`.dc.html` canvas export. Interaction lives in `style-hover` / `style-active` attributes, lists
+are `<sc-for list="{{ recipes }}">`, values are `{{ bindings }}`, and buttons are
+`<div style="cursor:pointer">`. Every screen is a fixed 1440x810 or 1600x900 box with every
+element absolutely positioned inside it. Opened in Chrome it renders as a picture and does
+nothing. So the visual language was kept and the mechanics were rebuilt.
+
+**Four things changed structurally.**
+
+*Fluid, not fixed.* One rem is sized off the viewport (`clamp(15px, 1.15vw, 21px)`) and every
+screen is a grid that reflows. A Quest Browser window is resizable and arrives at a size nobody
+chose; scaling a 1440-wide artboard down to fit would put the design's 11px labels at eight real
+pixels. Type is also bigger than the artboard throughout, matching the sizing `quest-check.html`
+and `lab.html` already settled on for reading at arm's length through a lens.
+
+*The page never scrolls.* Driving a scrollbar with a controller ray is miserable. Each screen
+fits its window; the three lists that genuinely can overflow scroll inside their own box.
+
+*Every control is a real `<button>`.* Focusable, announced, and at least 3rem tall so a ray that
+jitters with your head can land on it.
+
+*The controller rail is the control, not a legend.* The artboard drew A / B / X / Y badges along
+the bottom of every 2x screen. A page in a Quest Browser tab is a 2D window: it receives a
+pointer ray and a keyboard, and does **not** receive controller face buttons — those reach a
+page only inside an immersive WebXR session, which this deliberately is not (entry 18). Printing
+a legend for buttons the page cannot receive would be a lie on every screen, so each badge is
+now a button you can point at, and its letter is also its keyboard shortcut. Everything on the
+rail is also reachable from a large target inside the screen.
+
+**2A and 2E sit on the passthrough camera.** Both artboards painted a kitchen — brown worktop,
+wooden rail, ingredients at fixed coordinates with name tags floating above them. That was
+standing in for the entire point of the project. The ground is now `getUserMedia` (entry 18's
+route, not WebXR `camera-access`), the video is a plain DOM element under the panels so the
+compositor drives it at the camera's own rate regardless of what the analysis loop is doing, and
+tags are drawn only where the scan actually found something. Overlay markers are positioned
+through the video's `object-fit: cover` box rather than by naive percentage, or they slide off
+their ingredient the moment the window is not the camera's aspect ratio — which on a resizable
+window is nearly always. The other five screens keep the artboard's dark ground, which also
+keeps the camera closed while somebody is only browsing.
+
+**Every animation is gone.** The document carried 23 `@keyframes`: ingredients raining down the
+title screen, tags bobbing over the counter, a knife chopping on a loop, and a burger dropping
+into place on a 2.8s cycle behind the loading bar. All decorative, all looping, none carrying
+information. What replaced the loading animation is the useful half of it: there are six layers
+in that burger and six things that must happen before a camera screen works (fonts, recipes,
+art, OpenCV, camera, ready), so a layer goes from ghost to solid when its step finishes and the
+stack *is* the progress bar. A slow step is now identifiable by which layer is still hollow.
+What is left anywhere else is a 90ms press response, which is latency feedback rather than
+decoration.
+
+**Four numbers on the artboard were not real, and are not invented here.**
+
+| Artboard | Why it could not ship | What it says now |
+|---|---|---|
+| "LIVE · 412" beside competitive mode | No matchmaking service exists | Runs actually on the board |
+| "POPULAR THIS WEEK" on the chef's pick | No popularity data exists | How much of the dish your counter covers |
+| "+180 XP" on the dish card | No XP system exists | Removed; difficulty chevrons stay |
+| "Knuckle guard: SAFE" in the cutting round | Needs 26 hand joints from an immersive session | Pieces in shot |
+
+That last one is the important one. A green safety light wired to nothing is worse than no
+light: somebody trusts it. "437 ingredients" on the title screen, by contrast, stayed — it is
+the literal count of files in `menu/ingredients/`.
+
+**The competitive round scores evenness, not millimetres.** Each blob's oriented rect gives a
+short side and the short side of a slice is its thickness, but millimetres need
+pixels-per-millimetre and therefore a calibration step — and ninety seconds with a judge wearing
+the headset is the worst possible place for one. The coefficient of variation cancels the
+unknown scale out entirely, so "94% even" is a true statement about the cutting where a
+millimetre figure off an uncalibrated camera would not be. A round that measured fewer than
+three pieces posts nothing at all, because zero evenness and zero measurements both produce a
+total of 0 and only one of them is a score.
+
+**Assets.** The zip ships 12 hand-drawn hero icons and 437 categorised ingredient icons that
+arrived unnamed (`carb (1).png` … `Protein (117).png`). Both are in `public/menu/`, renamed to
+URL-safe `carb-001.png` form. `src/menu/art.ts` resolves an ingredient to a hero icon first,
+then to one of ~70 library icons identified by eye, then to a *stable* hash-pick within the
+right category — stable so the same ingredient is the same picture on the counter, in the
+library and on the dish card, because a picture that changes between panels reads as a different
+ingredient. A fallback icon is a category and never an identification, so the name travels with
+it in the `alt` text and the tooltip. Ranchers and Hanken Grotesk are self-hosted (latin
+subsets, 59KB total); a webfont arriving late over venue wifi reflows every screen at once.
+
+**Two bugs found while building this, both worth keeping written down.**
+
+*The service worker ate every edit in dev.* `public/sw.js` is cache-first for everything but
+navigations, which is correct for a built bundle because Vite fingerprints asset filenames — and
+completely wrong under `vite dev`, where module URLs are stable. The page silently stopped
+picking up changes and kept serving a version from an earlier session. `app.html` now registers
+it only under `import.meta.env.PROD`, and actively unregisters any stale worker in dev.
+`index.html` and `xr.html` still register unconditionally and have the same trap.
+
+*The loading screen hung on the camera prompt.* `getUserMedia` does not resolve until a person
+answers the permission dialog, so awaiting it plainly means a loading screen stuck at 80% behind
+a prompt the wearer may not have noticed. It is raced against a 4s timeout now; the camera keeps
+opening in the background and the two camera screens report its real state themselves.
+
+**What this is not.** It is the front of house — the flow from title through to a round starting.
+The cooking loop itself (`src/main.ts`, `src/app/session.ts`) is untouched, and so are the
+`public/ui/*.uikitml` panels and `menu.html`, which are the in-session spatial layout and its
+preview. Two visual languages coexist in the repo on purpose: this one is the menu the wearer
+navigates, that one is the coaching panel that floats beside the board while they cook.

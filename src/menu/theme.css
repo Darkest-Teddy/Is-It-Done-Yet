@@ -1,0 +1,555 @@
+/*
+  The "Is It Done Yet" front-of-house design system.
+
+  Ported from the menu design document (the .dc.html in the design zip) rather than copied from
+  it. That document is a canvas export: every screen is a fixed 1440x810 box, every element is
+  absolutely positioned inside it, and interaction lives in `style-hover` / `style-active` /
+  `{{ binding }}` attributes that only the design tool understands. None of that survives
+  contact with a Quest Browser window, which is resizable, arrives at an unpredictable size,
+  and is read at arm's length through a lens.
+
+  So the visual language is kept exactly -- 4-6px maroon outlines, hard offset shadows, Ranchers
+  display caps over Hanken Grotesk body, the cream/red/yellow/pastel palette -- and the layout
+  mechanics are rebuilt:
+
+  - FLUID, NOT FIXED. One rem is sized off the viewport, everything else is in rem, and screens
+    are grids that reflow. A 1440x810 artboard scaled down to a small headset window would put
+    the design's 11px labels at 8 real pixels.
+  - BIGGER TYPE THAN THE ARTBOARD. Matching `public/quest-check.html` and `lab.html`: ~20px
+    body, 3rem minimum targets. The artboard's 11-13px labels are desktop sizes.
+  - NEVER SCROLLS THE PAGE. Scrolling with a controller ray is miserable and with hand tracking
+    worse, so each screen fits its viewport and the few genuinely long lists scroll inside
+    their own box.
+  - NO KEYFRAME ANIMATION. Every `@keyframes` in the design document was placeholder motion
+    (ingredients raining, tags bobbing, a burger dropping into place on a loop). They are gone.
+    What is left is instant state change plus a 90ms press feedback, which is latency feedback
+    rather than decoration.
+*/
+
+/* Self-hosted: venue wifi is the assumption, and a webfont that arrives late reflows the whole
+   screen in front of a judge. Latin subsets only; Hanken Grotesk is variable, so one file
+   covers 400-900. */
+@font-face {
+  font-family: 'Ranchers';
+  src: url('/menu/fonts/ranchers-400.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Hanken Grotesk';
+  src: url('/menu/fonts/hanken-grotesk.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+:root {
+  /* palette, straight from the design document */
+  --ink: #46101a;
+  --ink-warm: #3b2a1b;
+  --cream: #fff3e4;
+  --cream-deep: #f7e3cc;
+  --paper: #e7d4c0;
+  --red: #f5230e;
+  --red-dark: #9a2a18;
+  --yellow: #fbd24b;
+  --yellow-soft: #fbe3a0;
+  --pink: #f9c7be;
+  --leaf: #cde6c7;
+  --sky: #c4daee;
+  --brown: #8a5a3c;
+  --dash: #d8bfa4;
+  --night: #2a211c;
+
+  /* the signature chunky lift: inner gloss, then two hard offsets, then a soft drop */
+  --gloss: inset 0 4px 0 rgb(255 255 255 / 0.75), inset 0 -12px 22px rgb(120 74 44 / 0.18);
+  --lift: 0 5px 0 rgb(70 16 26 / 0.35), 9px 12px 0 rgb(70 16 26 / 0.5), 18px 26px 38px rgb(0 0 0 / 0.5);
+  --lift-sm: 0 3px 0 rgb(70 16 26 / 0.3), 4px 6px 0 rgb(70 16 26 / 0.5), 9px 14px 20px rgb(0 0 0 / 0.4);
+
+  --display: 'Ranchers', 'Hanken Grotesk', system-ui, sans-serif;
+  --body: 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
+
+  /* One rem tracks the window but never drops below 15px: that is the floor at which the
+     smallest label in this UI is still legible through a 3S lens at arm's length. */
+  font-size: clamp(15px, 1.15vw, 21px);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+body {
+  background: var(--night);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 1.0625rem;
+  line-height: 1.4;
+  /* A ray drag on a headset should never rubber-band the page or select text. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+img { display: block; max-width: 100%; }
+
+/* ---------------------------------------------------------------- screen shell */
+
+#app {
+  position: relative;
+  width: 100vw;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.screen {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+}
+
+/* The dark "inside the headset" ground the artboard drew behind every 2x screen. Screens that
+   put the passthrough camera behind them leave this transparent instead. */
+.screen--night { background: var(--night); }
+.screen--paper { background: var(--cream-deep); color: var(--ink-warm); }
+
+/* Content sits above the passthrough backdrop.
+
+   Not optional, and not obvious: `.pass` is absolutely positioned and the header, body and rail
+   are not, and a positioned element paints above static siblings regardless of DOM order. With
+   no z-index the camera -- and worse, the camera's fault card -- covers the entire screen. */
+.screen > .screen__head,
+.screen > .screen__body,
+.screen > .rail {
+  position: relative;
+  z-index: 1;
+}
+
+.screen__head {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 1.1rem 1.9rem 0.3rem;
+  min-height: 0;
+}
+
+.screen__body {
+  display: grid;
+  gap: 1.1rem;
+  padding: 0.8rem 1.9rem 1rem;
+  min-height: 0;
+}
+
+/* ---------------------------------------------------------------- type */
+
+.display {
+  font-family: var(--display);
+  text-transform: uppercase;
+  font-weight: 400;
+  line-height: 0.95;
+  letter-spacing: 0.02em;
+  margin: 0;
+}
+
+.d-xs { font-size: 1.05rem; letter-spacing: 0.08em; }
+.d-sm { font-size: 1.4rem; }
+.d-md { font-size: 1.95rem; }
+.d-lg { font-size: 2.5rem; }
+.d-xl { font-size: 3.3rem; }
+.d-hero { font-size: 4.4rem; line-height: 0.85; }
+
+.label {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.note {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--brown);
+  line-height: 1.35;
+  margin: 0;
+}
+
+.prose {
+  font-size: 0.98rem;
+  font-weight: 600;
+  line-height: 1.45;
+  color: #6d4a33;
+  margin: 0;
+}
+
+.tabular { font-variant-numeric: tabular-nums; }
+
+.stack { display: flex; flex-direction: column; min-height: 0; }
+.row { display: flex; align-items: center; min-width: 0; }
+.grow { flex: 1 1 auto; min-width: 0; min-height: 0; }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---------------------------------------------------------------- primitives */
+
+.card {
+  background: var(--cream);
+  border: 0.28rem solid var(--ink);
+  border-radius: 1.4rem;
+  box-shadow: var(--gloss), var(--lift);
+  padding: 1rem 1.15rem 1.1rem;
+  min-height: 0;
+}
+
+.card--flat { box-shadow: none; }
+.card--red { background: var(--red); color: var(--cream); }
+.card--yellow { background: var(--yellow); }
+
+/* Pill: the artboard's repeated chip. A chip that DOES something is a <button>, so it gets a
+   target size; a chip that only labels something stays a <span> and does not. */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: var(--cream);
+  border: 0.17rem solid var(--ink);
+  border-radius: 999px;
+  padding: 0.34rem 0.85rem;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.pill--hot { background: var(--red); color: var(--cream); }
+.pill--sun { background: var(--yellow); }
+.pill--leaf { background: var(--leaf); }
+.pill--display {
+  font-family: var(--display);
+  font-size: 0.95rem;
+  letter-spacing: 0.06em;
+  padding: 0.18rem 0.75rem 0.3rem;
+}
+
+/* ---------------------------------------------------------------- interaction
+
+   Every interactive thing here is a real <button>, for three reasons that all bite in a
+   headset: it is focusable (so the keyboard fallback works when a controller does not), it is
+   announced, and it gets a 3rem minimum box so a jittering ray can land on it. The design
+   document used <div style="cursor:pointer"> with a `style-hover` attribute, which is neither
+   clickable nor reachable outside the design tool. */
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  margin: 0;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  min-height: 2.9rem;
+  padding: 0.55rem 1.3rem;
+  background: var(--cream);
+  border: 0.2rem solid var(--ink);
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink);
+  box-shadow: 0 0.2rem 0 rgb(70 16 26 / 0.35);
+  /* 90ms, and only on press. Fast enough to read as the button responding rather than as an
+     animation playing. */
+  transition: transform 90ms ease-out, box-shadow 90ms ease-out, background-color 90ms ease-out;
+}
+
+.btn:hover, .btn:focus-visible { background: var(--yellow); outline: none; }
+.btn:active { transform: translateY(0.2rem); box-shadow: 0 0 0 rgb(70 16 26 / 0.35); }
+/* Muted, NOT translucent. These screens sit over a live camera, and an `opacity` fade lets the
+   backdrop show straight through a disabled control -- which reads as a rendering fault rather
+   than as a disabled button. Flat colours instead, so a blocked control still looks solid. */
+.btn[disabled] {
+  cursor: default;
+  box-shadow: none;
+  background: #d9c6b2;
+  color: #8a7866;
+  border-color: #8a7866;
+}
+
+.btn[disabled]:hover { background: #d9c6b2; }
+
+.btn--hot { background: var(--red); color: var(--cream); box-shadow: 0 0.2rem 0 var(--red-dark); }
+.btn--hot:hover, .btn--hot:focus-visible { background: #ff3a22; }
+.btn--hot:active { box-shadow: 0 0 0 var(--red-dark); }
+.btn--hot[disabled], .btn--hot[disabled]:hover { background: #d9c6b2; color: #8a7866; }
+
+.btn--sun { background: var(--yellow); }
+.btn--sun:hover, .btn--sun:focus-visible { background: #ffdf6d; }
+
+.btn--big {
+  min-height: 3.6rem;
+  font-size: 0.95rem;
+  padding: 0.7rem 1.7rem;
+}
+
+/* The big pressable cards (mode select, "cook something for me", a recipe card). Same press
+   feedback as .btn so nothing in the UI responds two different ways. */
+.press {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: var(--cream);
+  border: 0.28rem solid var(--ink);
+  border-radius: 1.4rem;
+  box-shadow: var(--gloss), var(--lift);
+  padding: 0.95rem 1.1rem 1rem;
+  transition: transform 90ms ease-out, box-shadow 90ms ease-out;
+}
+
+.press:hover, .press:focus-visible {
+  outline: none;
+  transform: translate(-0.12rem, -0.18rem);
+  box-shadow: var(--gloss), 0 0.35rem 0 rgb(70 16 26 / 0.35),
+    0.75rem 1rem 0 rgb(70 16 26 / 0.5), 1.5rem 2rem 2.8rem rgb(0 0 0 / 0.5);
+}
+
+.press:active {
+  transform: translate(0.25rem, 0.3rem);
+  box-shadow: var(--gloss), 0 0 0 rgb(70 16 26 / 0.35), 0.2rem 0.25rem 0 rgb(70 16 26 / 0.5);
+}
+
+.press--sun { background: var(--yellow); }
+.press--red { background: var(--red); color: var(--cream); }
+.press[aria-pressed='true'] { background: var(--yellow); }
+
+/* ---------------------------------------------------------------- controller rail
+
+   The strip along the bottom of every 2x screen in the artboard. There it was a legend. Here
+   each entry IS the control, because a Quest Browser tab is a 2D window: controller buttons
+   are not delivered to the page, only a pointer ray and a keyboard. Drawing a legend for
+   buttons the page cannot receive would be a lie, so the legend is the button, and the letter
+   on it doubles as its keyboard shortcut. */
+
+.rail {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 1rem;
+  height: 3.4rem;
+  background: var(--ink);
+}
+
+.rail__end { margin-left: auto; }
+
+.rail__btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 2.5rem;
+  padding: 0 0.8rem 0 0.35rem;
+  background: transparent;
+  border: 0.14rem solid transparent;
+  border-radius: 999px;
+  color: #e7c7ae;
+  transition: background-color 90ms ease-out, border-color 90ms ease-out;
+}
+
+.rail__btn:hover, .rail__btn:focus-visible {
+  outline: none;
+  background: rgb(255 243 228 / 0.12);
+  border-color: rgb(255 243 228 / 0.4);
+}
+
+.rail__btn:active { background: rgb(255 243 228 / 0.22); }
+.rail__btn[disabled] { opacity: 0.4; cursor: default; }
+.rail__btn[disabled]:hover { background: transparent; border-color: transparent; }
+
+.rail__key {
+  display: grid;
+  place-items: center;
+  min-width: 1.8rem;
+  height: 1.8rem;
+  padding: 0.12rem 0.38rem 0;
+  border-radius: 999px;
+  background: var(--cream);
+  border: 0.16rem solid var(--ink);
+  font-family: var(--display);
+  font-size: 0.92rem;
+  color: var(--ink);
+  line-height: 1;
+}
+
+.rail__key--sun { background: var(--yellow); }
+.rail__key--wide { border-radius: 0.5rem; }
+
+.rail__text {
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.rail__btn--accent .rail__text { color: var(--yellow); }
+
+/* ---------------------------------------------------------------- scrolling boxes
+
+   The lists that genuinely can exceed their box. Everything else is sized to fit. */
+
+.scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ink) transparent;
+  min-height: 0;
+}
+
+.scroll::-webkit-scrollbar { width: 0.55rem; }
+.scroll::-webkit-scrollbar-thumb { background: var(--ink); border-radius: 999px; }
+.scroll::-webkit-scrollbar-track { background: transparent; }
+
+/* ---------------------------------------------------------------- passthrough backdrop
+
+   2A and 2E sit on the real counter, so their ground is the headset's own camera rather than
+   the artboard's painted kitchen. The video is a plain DOM element under the panels: the
+   compositor drives it, so it stays smooth at the camera's own frame rate no matter what the
+   analysis loop is doing on the main thread. */
+
+.pass {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background: #17120f;
+}
+
+.pass__video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Panels over a bright kitchen counter need the counter knocked back, or cream-on-daylight is
+   unreadable. A flat scrim, not a gradient: a gradient hides the bottom of the frame, which is
+   exactly where the board is. */
+.pass__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgb(23 18 15 / 0.42);
+}
+
+.pass__overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Shown over the camera when it cannot be opened. Says WHICH failure it was, because "denied"
+   and "no camera on this device" need completely different fixes.
+
+   Anchored low and centre rather than filling the frame: both camera screens deliberately leave
+   their middle-bottom clear -- that is where the real board is -- so this lands in empty space
+   instead of behind the panels. `pointer-events` is off on the wrapper and back on for the card,
+   so the dead area around it never swallows a ray aimed at a panel. */
+.pass__fault {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  /* Bottom padding clears the controller rail. `.pass` spans the whole screen, rail included,
+     so a card anchored to the true bottom is half-hidden behind it. 3.4rem is the rail.
+     `--fault-right` is how much of the right-hand side a screen has already spent on a panel;
+     the band centres in what is left rather than sliding underneath it. */
+  padding: 2rem var(--fault-right, 2rem) 4.6rem 2rem;
+  pointer-events: none;
+}
+
+/* Wide and short rather than tall and centred. Both camera screens keep panels down the sides
+   and along the bottom of their column, so a tall card collides with one of them; a single low
+   band does not. */
+.pass__fault-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  max-width: 44rem;
+  padding: 0.7rem 0.9rem 0.75rem 1.2rem;
+  background: rgb(23 18 15 / 0.94);
+  border: 0.24rem solid rgb(255 243 228 / 0.35);
+  border-radius: 1.1rem;
+  color: var(--cream);
+  pointer-events: auto;
+}
+
+.pass__fault-text { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.pass__fault-card .btn { flex: 0 0 auto; }
+
+.pass__fault .note { color: #d8b9a0; text-align: left; }
+
+/* A detection tag pinned over the thing it names. Positioned by the analysis, never by hand. */
+.tag {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  background: var(--leaf);
+  border: 0.16rem solid var(--ink);
+  border-radius: 0.6rem;
+  padding: 0.14rem 0.5rem 0.22rem;
+  font-family: var(--display);
+  font-size: 0.9rem;
+  color: var(--ink);
+  text-transform: uppercase;
+  box-shadow: var(--lift-sm);
+  white-space: nowrap;
+}
+
+.tag--protein { background: var(--pink); }
+.tag--pantry { background: var(--sky); }
+.tag--grain { background: var(--yellow-soft); }
+
+/* ---------------------------------------------------------------- misc */
+
+.divider {
+  border: 0;
+  border-top: 0.16rem dashed var(--dash);
+  margin: 0.85rem 0 0;
+}
+
+.meter {
+  height: 0.85rem;
+  border: 0.2rem solid var(--ink);
+  border-radius: 999px;
+  background: rgb(59 42 27 / 0.3);
+  overflow: hidden;
+}
+
+.meter__fill {
+  height: 100%;
+  background: var(--yellow);
+  /* Width is progress, not motion: it only ever changes when a real step completes. */
+  transition: width 140ms linear;
+}
+
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
