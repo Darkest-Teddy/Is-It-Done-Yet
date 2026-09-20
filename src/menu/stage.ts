@@ -54,6 +54,10 @@ export interface Stage {
  */
 export const MIN_LEGIBLE_PX = 12;
 
+/** How many times to retry the first fit before giving up, and how long to wait between. */
+const MAX_FIT_ATTEMPTS = 20;
+const FIT_RETRY_MS = 32;
+
 export function createStage(options: StageOptions): Stage {
   const { width, height, allowUpscale = true } = options;
 
@@ -64,33 +68,57 @@ export function createStage(options: StageOptions): Stage {
 
   const node = h('div', { class: 'stage' }, board);
 
-  function fit(): void {
+  /** Returns false when the element has no box yet, so the caller can try again. */
+  function fit(): boolean {
     const box = node.getBoundingClientRect();
-    if (box.width === 0 || box.height === 0) return;
+    if (box.width === 0 || box.height === 0) return false;
 
     const raw = Math.min(box.width / width, box.height / height);
     const scale = allowUpscale ? raw : Math.min(1, raw);
     board.style.transform = `scale(${scale})`;
+    return true;
   }
 
-  // Three triggers, and all three earn their place. The stage is built DETACHED -- the caller
-  // fills the board and appends the screen afterwards -- so the synchronous call below always
-  // measures a zero box and bails. A ResizeObserver alone proved not to be enough either: it
-  // does not reliably deliver a callback for the detached-to-attached transition, which left
-  // the board sitting at 1:1 and overflowing the window. The rAF pass is the one that actually
-  // lands the first fit, and the observer and the resize listener keep it right afterwards.
-  const observer = new ResizeObserver(fit);
+  // Getting the FIRST fit to land is the whole difficulty here, and it is worth writing down
+  // because two obvious approaches both fail silently.
+  //
+  // The stage is built DETACHED: a panel calls `createStage`, fills the board, and only then is
+  // the screen appended. So the synchronous call below measures a zero box and bails. A
+  // ResizeObserver does not reliably deliver a callback for the detached-to-attached transition
+  // either. And `requestAnimationFrame` -- the obvious fix -- DOES NOT RUN AT ALL IN A HIDDEN
+  // TAB, so a build opened in a background tab would render every board at 1:1, overflowing the
+  // window, and stay that way until something else happened to resize it. That failure looks
+  // like a cropped design rather than like a missing transform, which is what makes it
+  // expensive to find.
+  //
+  // A timer fires either way, throttled but reliable. So: retry on a short timeout until the
+  // element actually has a box. Bounded, because a stage that never gets one is a bug to see
+  // rather than a loop to run forever.
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let attempts = 0;
+
+  const tryFit = (): void => {
+    timer = null;
+    if (fit() || attempts >= MAX_FIT_ATTEMPTS) return;
+    attempts += 1;
+    timer = setTimeout(tryFit, FIT_RETRY_MS);
+  };
+
+  // Named, not an inline arrow: `removeEventListener` compares by reference, and a fresh arrow
+  // in the remove call would leave the listener attached for the life of the page.
+  const onResize = (): void => void fit();
+
+  const observer = new ResizeObserver(onResize);
   observer.observe(node);
-  window.addEventListener('resize', fit);
-  const frame = requestAnimationFrame(fit);
-  fit();
+  window.addEventListener('resize', onResize);
+  tryFit();
 
   return {
     node,
     board,
     destroy: () => {
-      cancelAnimationFrame(frame);
-      window.removeEventListener('resize', fit);
+      if (timer !== null) clearTimeout(timer);
+      window.removeEventListener('resize', onResize);
       observer.disconnect();
     },
   };
