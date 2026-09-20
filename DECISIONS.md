@@ -582,3 +582,41 @@ trivial WebGL clear. It contains no OpenCV. `README.md` puts segmentation at rou
 megapixel in WASM — about 8fps at 720p on a laptop — and the XR2 Gen 2 is a mobile part already
 driving a stereo compositor. Nothing here licenses the assumption that the measurement pipeline
 fits in the remaining budget. Measure it before designing around it.
+
+## 21. Segmentation costs 87ms on the headset. That is fine for a panel and fatal for a session
+
+**Open question from entry 20:** the 71fps measured inside an immersive session contained no
+OpenCV. This is that number.
+
+**Reality:** the built app, served over `adb reverse` and read out of the live page over the
+DevTools bridge, on Quest 3S:
+
+```
+5 blobs · 0 produce · uncalibrated · cv 87.1ms · frame 129.5ms (8fps) · 1280x720
+```
+
+Segmentation costs **87.1ms per frame**, for a whole-frame rate of about **8fps**.
+
+The surprise is that this is roughly what `README.md` measures on a laptop. The XR2 Gen 2 is
+holding its own against a desktop CPU on this WASM workload, so no headset-specific penalty
+needs accounting for. The cost is the pixel count, as the README already says.
+
+**Decision, and it splits by presentation mode.**
+
+*As a 2D panel, 8fps ships as-is.* Entry 13's whole argument is that a cucumber does not move
+between frames, and §5.1 of the master spec designs the perception layer around ~1Hz detection.
+8fps is eight times faster than the architecture asks for. Nothing needs optimising to demo
+this today.
+
+*In an `immersive-ar` session, 87ms of main-thread work is disqualifying.* A 72Hz session has a
+13.9ms budget per frame. Blocking it for 87ms drops the session to ~8fps, and a headset running
+at 8fps is not merely ugly, it is nauseating — the one failure mode that ends a judge's turn
+early and is remembered afterwards.
+
+**So the immersive path has a prerequisite that the panel path does not: move segmentation into
+a Web Worker before entering a session.** `src/vision/segment.ts` is already the only file that
+touches OpenCV and everything downstream takes plain numbers, so the seam exists. It is a real
+piece of work, not a flag, and it must be budgeted before anyone commits to anchored overlays.
+
+Recorded now because the panel demo is available immediately and the session demo is not, and
+the difference is one measurement rather than an opinion.
