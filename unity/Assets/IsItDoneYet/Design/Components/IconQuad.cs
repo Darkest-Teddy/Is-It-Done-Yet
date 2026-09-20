@@ -60,14 +60,14 @@ namespace IsItDoneYet.Design
         static Material Shared()
         {
             if (_shared != null) return _shared;
-            var shader = Shader.Find("Universal Render Pipeline/Unlit");
+            // Our own shader, not URP/Unlit. URP/Unlit's transparency is configured by its
+            // material INSPECTOR -- setting _Surface and _Blend from code changes nothing,
+            // because the blend state, queue and keyword are applied by the shader GUI's
+            // callback. A material built in code stays opaque, and every icon renders with a
+            // white box behind it.
+            var shader = Shader.Find("IsItDoneYet/Icon");
+            if (shader == null) shader = Shader.Find("Universal Render Pipeline/Unlit");
             _shared = new Material(shader) { name = "IsItDoneYet/Icon (shared)", enableInstancing = true };
-            _shared.SetFloat("_Surface", 1f);      // transparent
-            _shared.SetFloat("_Blend", 0f);        // alpha
-            _shared.SetFloat("_ZWrite", 0f);
-            _shared.renderQueue = 3000;
-            _shared.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-            _shared.SetOverrideTag("RenderType", "Transparent");
             return _shared;
         }
 

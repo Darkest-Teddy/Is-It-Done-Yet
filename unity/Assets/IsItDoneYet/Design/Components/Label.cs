@@ -20,6 +20,23 @@ namespace IsItDoneYet.Design
     [RequireComponent(typeof(TextMeshPro))]
     public class Label : MonoBehaviour
     {
+        /// <summary>
+        /// The angular size above which WCAG's large-text threshold (3:1) applies instead of
+        /// the body threshold (4.5:1).
+        ///
+        /// WCAG defines large text as 18pt, which at a 40cm reading distance subtends the same
+        /// angle as roughly 16 dmm. Meta's own floor for body text in a headset is 24 dmm --
+        /// half again as large -- so every label in this app that respects the floor is already
+        /// "large text" in the only sense the criterion is about, which is angular size.
+        ///
+        /// That is why the reference gets away with an 11px uppercase chip label on a fill
+        /// measuring 3.97:1: on a monitor it is marginal, and at 24 dmm in a headset it is not.
+        /// The guard below therefore checks the EFFECTIVE size, and still fires for anything
+        /// that opts out of the floor.
+        /// </summary>
+        public const float LargeTextDmm = 16f;
+
+
         [Header("Content")]
         [TextArea] public string Text = "Label";
 
@@ -111,15 +128,26 @@ namespace IsItDoneYet.Design
             if (theme != null) _text.outlineColor = Srgb.ForText(theme.Color(OutlineColor));
 
 #if UNITY_EDITOR
-            // A contrast violation is a warning in the Editor and silent in a build. It is a
-            // design error, not a runtime one, and the place to catch it is the Design Gallery.
-            if (theme != null && !role.Display && !theme.AllowsBodyText(OnFill))
-            {
-                Debug.LogWarning(
-                    $"[Design] '{name}' sets body-sized type on {OnFill}, which measured below 4.5:1. " +
-                    "Use a display role or a different fill -- see design/DEVIATIONS.md #10.", this);
-            }
+            WarnIfUnreadable(theme, role, heightM);
 #endif
         }
+
+#if UNITY_EDITOR
+        void WarnIfUnreadable(ThemeManager theme, TypeRole role, float heightM)
+        {
+            if (theme == null || role.Display) return;
+
+            var dmm = Core.AngularLayout.MetresToDmm(heightM, Mathf.Max(ViewDistanceM, 0.05f));
+            if (dmm >= LargeTextDmm) return;
+
+            var ratio = Core.Srgb.ContrastRatio(theme.Color(OnFill), theme.Color(Color));
+            if (ratio >= 4.5f) return;
+
+            Debug.LogWarning(
+                $"[Design] '{name}' sets {dmm:0} dmm type on {OnFill} at {ratio:0.00}:1, below 4.5:1 " +
+                "for text this small. Raise the size, change the fill, or use a display role -- " +
+                "see design/DEVIATIONS.md #10.", this);
+        }
+#endif
     }
 }

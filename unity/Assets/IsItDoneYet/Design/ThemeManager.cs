@@ -18,6 +18,14 @@ namespace IsItDoneYet.Design
     /// cache -- a cached colour makes the crossfade skip that element, which looks like a bug in
     /// that element rather than in the theme system.
     /// </summary>
+    /// <remarks>
+    /// [ExecuteAlways] is load-bearing, not a convenience. Without it Awake never runs outside
+    /// play mode, so <see cref="Instance"/> stays null in the Editor -- and every component
+    /// that asks the theme for a colour quietly falls back to white. The first Design Gallery
+    /// capture came out as a page of white rectangles for exactly this reason, which is the
+    /// whole argument for having a capture.
+    /// </remarks>
+    [ExecuteAlways]
     [DefaultExecutionOrder(-100)]
     public class ThemeManager : MonoBehaviour
     {
@@ -180,6 +188,9 @@ namespace IsItDoneYet.Design
         /// <summary>Lets the Design Gallery drive the theme without a running app.</summary>
         public void EditorBind(DesignTokens tokens, ThemeName theme)
         {
+            // Claimed explicitly: a component created with AddComponent in edit mode may not
+            // have had Awake run yet, and the gallery binds the theme immediately after.
+            _instance = this;
             _tokens = tokens;
             _to = null;
             Apply(theme, immediate: true);
