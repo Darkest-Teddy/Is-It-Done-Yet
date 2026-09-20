@@ -150,3 +150,45 @@ palette would have been the wrong kind of calm.
 
 Filled in from the Design Gallery contact sheet — see `design/previews/`. Anything not yet
 compared says so rather than claiming a match.
+
+### 13. What the gallery capture actually showed
+
+Compared `design/previews/gallery-normal.png` against `design/reference/*.png`.
+
+**Matches the reference:**
+
+- The panel treatment. Cream fill, ink border, the two hard offset shadow copies plus the blur,
+  the bright top lip and darkened foot. Side by side with 2A's "ON YOUR COUNTER" panel this is
+  the same object.
+- The chip system. All seven tones, each with the reference's own fill/ink pairing — the mint,
+  butter, pink, blue and peach are pixel-matched to the CSS values.
+- Corner radii and border weights scaling with the element, which is most of what makes this
+  design look like itself.
+- Ranchers for display, Hanken Grotesk for body, with the reference's uppercase transform and
+  wide tracking on labels.
+- The button states. Hover and pressed take the gold fill the reference's `style-hover` uses.
+
+**Differs, on purpose:**
+
+- **The timer is a ring, not a bar.** 2E draws a horizontal progress bar. A ring reads at a
+  glance from any angle in a headset and a thin horizontal bar does not.
+- **Every label is larger than its reference size**, because of the 24 dmm floor (§3). Most
+  visible on the chips, whose 11px labels come up roughly 40% larger relative to the pill.
+- **The gauges show an uncertainty band**, which the reference has no equivalent for. It exists
+  because nothing here measures temperature.
+- **The status marks are drawn, not typeset** (§8).
+
+**Differs, and is not yet as good as the reference:**
+
+- **The display type is slightly soft at large sizes.** 90pt SDF sampling holds up at chip and
+  body size and is visibly softer than the reference at `screenTitle` and above. Fixable by
+  sampling the display face at a higher point size into its own atlas; not done.
+- **The panel's inner glow is subtler than the CSS inset highlight** at small sizes, because the
+  glow width is a fixed 8 reference px rather than scaling with the panel.
+- **No paper texture.** 1A has a 135° hairline stripe over its ground. Not reproduced — it
+  belongs to a screen that has no background in XR.
+
+**Not compared:** anything involving passthrough, real lighting, or a headset. These captures
+are an orthographic render against a flat dark ground. They say the design system is faithful;
+they say nothing about legibility over a real kitchen, which is the thing that actually matters
+and which has not been tested.
