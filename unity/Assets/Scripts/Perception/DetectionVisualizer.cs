@@ -30,7 +30,6 @@ namespace MRPerception
         private TextMesh _label;
         private Transform _labelTransform;
         private Camera _mainCamera;
-        private secondcam _secondcam;
 
         /// <summary>
         /// Builds one visualizer under <paramref name="parent"/>.

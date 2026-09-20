@@ -1,0 +1,645 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:," />
+    <title>mise · measure your knife cuts</title>
+    <meta
+      name="description"
+      content="A mixed reality cooking trainer that measures your real knife cuts to the millimetre."
+    />
+    <style>
+      /* Tokens are lifted verbatim from index.html. One accent on a dark ground; see
+         frontend.md §4. Nothing here introduces a second palette. */
+      :root {
+        --bg: #0d0f12;
+        --panel: #161a20;
+        --line: #262c35;
+        --ink: #e8ecf1;
+        --dim: #8b95a1;
+        --accent: #8ee06a;
+
+        --gutter: 132px;
+        --sans: ui-sans-serif, system-ui, -apple-system, sans-serif;
+        --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+        color-scheme: dark;
+      }
+
+      * { box-sizing: border-box; }
+
+      html, body { height: 100%; }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font: 400 15px/1.6 var(--sans);
+        overflow-x: hidden;
+      }
+
+      /* Three columns: the two gutters are the falling lanes, the hero sits between them.
+         Grid rather than absolute positioning so the hero can never be overlapped. */
+      #page {
+        display: grid;
+        grid-template-columns: var(--gutter) minmax(0, 1fr) var(--gutter);
+        min-height: 100%;
+      }
+
+      /* ---------- falling lanes ---------- */
+
+      .lane {
+        position: relative;
+        overflow: hidden;
+        border-inline: 1px solid var(--line);
+        background:
+          linear-gradient(180deg, var(--bg) 0%, #10131800 12%, #10131800 88%, var(--bg) 100%),
+          var(--panel);
+      }
+      .lane:first-child { border-left: 0; }
+      .lane:last-child { border-right: 0; }
+
+      /* Every falling item is transform-only in the loop (rule #10). */
+      .food {
+        position: absolute;
+        top: 0;
+        left: 0;
+        display: block;
+        padding: 0;
+        margin: 0;
+        border: 0;
+        background: none;
+        cursor: crosshair;
+        will-change: transform;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .food svg, .food img { display: block; width: 100%; height: 100%; pointer-events: none; }
+
+      /* The phantom cut line: the target the player is aiming at. */
+      .food .target {
+        position: absolute;
+        left: -6px;
+        right: -6px;
+        height: 0;
+        border-top: 1px dashed var(--accent);
+        opacity: 0.55;
+        pointer-events: none;
+      }
+      .food:hover .target,
+      .food:focus-visible .target { opacity: 1; border-top-style: solid; }
+
+      /* The live blade line follows the pointer so the cut is never a surprise. */
+      .food .blade {
+        position: absolute;
+        left: -10px;
+        right: -10px;
+        height: 0;
+        border-top: 2px solid var(--ink);
+        opacity: 0;
+        pointer-events: none;
+      }
+      .food:hover .blade { opacity: 0.9; }
+
+      .food:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+
+      /* Halves fly apart after a cut, then get pulled from the DOM. */
+      .half {
+        position: absolute;
+        top: 0; left: 0;
+        pointer-events: none;
+        will-change: transform, opacity;
+        animation: part 620ms cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+      }
+      @keyframes part {
+        to { transform: translate3d(var(--dx), var(--dy), 0) rotate(var(--dr)); opacity: 0; }
+      }
+
+      /* The measurement that floats up out of the cut. */
+      .chip {
+        position: absolute;
+        font: 500 12px/1 var(--mono);
+        font-variant-numeric: tabular-nums;
+        color: var(--accent);
+        background: #0d0f12e6;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        padding: 3px 6px;
+        white-space: nowrap;
+        pointer-events: none;
+        animation: rise 900ms ease-out forwards;
+      }
+      .chip.miss { color: var(--dim); }
+      @keyframes rise {
+        0%   { transform: translate3d(0, 0, 0); opacity: 0; }
+        18%  { opacity: 1; }
+        100% { transform: translate3d(0, -34px, 0); opacity: 0; }
+      }
+
+      /* ---------- hero ---------- */
+
+      main {
+        display: grid;
+        align-content: center;
+        justify-items: start;
+        gap: 22px;
+        padding: 64px clamp(24px, 5vw, 76px);
+        max-width: 780px;
+        margin: 0 auto;
+      }
+
+      .eyebrow {
+        font: 500 11px/1 var(--mono);
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--dim);
+      }
+
+      .wordmark {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 0;
+        font: 600 clamp(44px, 8vw, 76px)/0.9 var(--sans);
+        letter-spacing: -0.045em;
+      }
+      /* A blade mark, not a logo download. Two rules of CSS. */
+      .wordmark::after {
+        content: "";
+        width: 3px;
+        height: clamp(34px, 6vw, 58px);
+        background: var(--accent);
+        transform: skewX(-18deg);
+      }
+
+      h1 {
+        margin: 0;
+        max-width: 17ch;
+        font: 600 clamp(26px, 4.2vw, 42px)/1.15 var(--sans);
+        letter-spacing: -0.02em;
+      }
+      h1 em { font-style: normal; color: var(--accent); }
+
+      .lede { margin: 0; max-width: 56ch; color: var(--dim); }
+
+      /* The readout is the house style: a sentence of plain millimetres, at a size somebody
+         reads over your shoulder. Never a 0-100 score. frontend.md §5. */
+      #readout {
+        width: 100%;
+        display: grid;
+        gap: 6px;
+        padding: 18px 20px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-left: 2px solid var(--accent);
+        border-radius: 8px;
+      }
+      #score {
+        margin: 0;
+        font: 600 clamp(20px, 2.8vw, 27px)/1.25 var(--sans);
+        font-variant-numeric: tabular-nums;
+        letter-spacing: -0.01em;
+      }
+      #detail {
+        margin: 0;
+        font: 400 12px/1.55 var(--mono);
+        font-variant-numeric: tabular-nums;
+        color: var(--dim);
+      }
+      #cuts {
+        list-style: none;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin: 2px 0 0;
+        padding: 0;
+        max-height: 52px;
+        overflow-y: auto;
+      }
+      #cuts li {
+        font: 400 11px/1 var(--mono);
+        font-variant-numeric: tabular-nums;
+        padding: 4px 7px;
+        border-radius: 4px;
+        background: var(--bg);
+        border: 1px solid var(--line);
+        color: var(--ink);
+      }
+      #cuts li.wide { color: var(--dim); border-style: dashed; }
+
+      .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+
+      .btn {
+        padding: 10px 16px;
+        border-radius: 6px;
+        border: 1px solid var(--line);
+        background: var(--panel);
+        color: var(--ink);
+        font: 500 14px var(--sans);
+        cursor: pointer;
+        text-decoration: none;
+        transition: border-color 120ms, color 120ms, background 120ms;
+      }
+      .btn:hover { border-color: var(--accent); color: var(--accent); }
+      .btn.primary { background: var(--accent); color: #0d0f12; border-color: var(--accent); font-weight: 600; }
+      .btn.primary:hover { background: #a2ec84; color: #0d0f12; }
+      .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+      .hint {
+        margin: 0;
+        font: 400 12px/1.5 var(--mono);
+        color: var(--dim);
+      }
+      .hint kbd {
+        font: inherit;
+        border: 1px solid var(--line);
+        border-bottom-width: 2px;
+        border-radius: 3px;
+        padding: 1px 5px;
+        color: var(--ink);
+      }
+
+      .facts {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 28px;
+        margin: 4px 0 0;
+        padding: 0;
+        list-style: none;
+      }
+      .facts div {
+        font: 600 17px/1.2 var(--mono);
+        font-variant-numeric: tabular-nums;
+        color: var(--ink);
+      }
+      .facts span { font: 400 11px/1.4 var(--sans); color: var(--dim); }
+
+      /* ---------- responsive ---------- */
+
+      @media (max-width: 900px) { :root { --gutter: 92px; } }
+      @media (max-width: 680px) {
+        :root { --gutter: 60px; }
+        main { padding: 48px 20px; gap: 18px; }
+      }
+      @media (max-width: 420px) { :root { --gutter: 44px; } }
+
+      /* Reduced motion stops the fall outright rather than slowing it — the lanes become a
+         static arrangement that is still fully sliceable. frontend.md §8. */
+      @media (prefers-reduced-motion: reduce) {
+        .half { animation-duration: 1ms; }
+        .chip { animation: none; opacity: 1; }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="page">
+      <div class="lane" id="laneL" aria-hidden="true"></div>
+
+      <main>
+        <p class="eyebrow">Hack the North 2026 · Quest 3S · mixed reality</p>
+
+        <p class="wordmark">mise</p>
+
+        <h1>It measures your real knife cuts <em>to the millimetre</em>.</h1>
+
+        <p class="lede">
+          A real cucumber, a real board, a blunt blade. The passthrough camera tracks the uncut
+          stub and reports the thickness of every slice you take — cut by cut, in millimetres,
+          while you are still holding the knife.
+        </p>
+
+        <section id="readout" aria-live="polite">
+          <p id="score">No cuts yet.</p>
+          <p id="detail">Slice an ingredient in either lane to start measuring.</p>
+          <ol id="cuts"></ol>
+        </section>
+
+        <div class="row">
+          <a class="btn primary" href="/index.html">Open the detector</a>
+          <button class="btn" id="reset" type="button">Reset session</button>
+        </div>
+
+        <p class="hint">
+          Click an ingredient to slice it — aim for the dashed line. Keyboard:
+          <kbd>Tab</kbd> to an ingredient, then <kbd>Enter</kbd> for a guided cut.
+        </p>
+
+        <ul class="facts">
+          <li><div>±0.5<span style="font-size:11px">mm</span></div><span>target tolerance</span></li>
+          <li><div>6</div><span>tuned ingredients</span></li>
+          <li><div>263</div><span>tests passing</span></li>
+          <li><div>0</div><span>network calls</span></li>
+        </ul>
+      </main>
+
+      <div class="lane" id="laneR" aria-hidden="true"></div>
+    </div>
+
+    <script>
+      'use strict';
+
+      /* Every magic number on this page lives in one block (spec rule #11). Tweak here, not
+         inline — the loop reads these live, so edits take effect without a reload in devtools. */
+      const TUNABLES = {
+        spawnMs: 1150,      // gap between spawns, per lane
+        maxPerLane: 7,      // hard cap on concurrent items
+        fallPxPerSec: 62,   // base descent rate
+        fallJitter: 0.45,   // +/- fraction applied to fall speed
+        swayPx: 9,          // horizontal drift amplitude
+        swayHz: 0.22,       // drift frequency
+        spinDegPerSec: 7,   // idle rotation
+        pxPerMm: 3.2,       // click-offset -> millimetres
+        targetMm: 3.0,      // the cut everyone is aiming for
+        toleranceMm: 0.5,   // what counts as on-target
+        maxCutsShown: 14,   // chips kept in the readout
+      };
+
+      /* The six ingredients the detector is actually tuned for, with the hue it looks for.
+         `src` points at the Recraft vector art in public/food; setting it back to null falls
+         through to the inline placeholder below. See frontend.md §7.
+
+         w:h MUST match the aspect_ratio each asset was generated at (9:16, 1:1 or 3:4) --
+         the art is stretched to the element box, so a mismatch distorts the food. */
+      const FOODS = [
+        { name: 'cucumber',  src: '/food/cucumber.svg', color: '#8ee06a', w: 58, h: 104, weight: 4 },
+        { name: 'carrot',    src: '/food/carrot.svg',   color: '#e07b28', w: 52, h: 92,  weight: 2 },
+        { name: 'tomato',    src: '/food/tomato.svg',   color: '#e2483d', w: 52, h: 52,  weight: 2 },
+        { name: 'orange',    src: '/food/orange.svg',   color: '#e8892a', w: 52, h: 52,  weight: 2 },
+        { name: 'lemon',     src: '/food/lemon.svg',    color: '#e3c53f', w: 44, h: 58,  weight: 2 },
+        { name: 'red onion', src: '/food/onion.svg',    color: '#a05ba8', w: 50, h: 50,  weight: 2 },
+      ];
+
+      /* Flat 2D placeholders. Silhouettes follow the elongation ratios in ingredients.ts so
+         the six stay distinguishable without relying on hue (colourblind-safe). */
+      function placeholder(f) {
+        const c = f.color;
+        const dark = 'rgba(0,0,0,0.22)';
+        switch (f.name) {
+          case 'cucumber':
+            return `<svg viewBox="0 0 30 104" fill="none">
+              <rect x="2" y="2" width="26" height="100" rx="13" fill="${c}"/>
+              <rect x="2" y="2" width="9"  height="100" rx="4.5" fill="rgba(255,255,255,0.14)"/>
+              <path d="M15 12v80" stroke="${dark}" stroke-width="1.4"/>
+              <path d="M21 16v72" stroke="${dark}" stroke-width="1"/>
+              <path d="M9 16v72"  stroke="${dark}" stroke-width="1"/>
+            </svg>`;
+          case 'carrot':
+            return `<svg viewBox="0 0 28 92" fill="none">
+              <path d="M14 90 L3 22 a11 11 0 0 1 22 0 Z" fill="${c}"/>
+              <path d="M10 34h8M9 48h10M11 62h6" stroke="${dark}" stroke-width="1.4" stroke-linecap="round"/>
+              <path d="M14 14V2M14 12 6 5M14 12l8-7" stroke="#8ee06a" stroke-width="3" stroke-linecap="round"/>
+            </svg>`;
+          case 'tomato':
+            return `<svg viewBox="0 0 54 50" fill="none">
+              <path d="M27 48C12 48 3 39 3 28S13 10 27 10s24 7 24 18-9 20-24 20Z" fill="${c}"/>
+              <path d="M16 20c4-4 9-6 13-6" stroke="rgba(255,255,255,0.28)" stroke-width="3" stroke-linecap="round"/>
+              <path d="M27 11V3M27 9 18 4M27 9l9-5" stroke="#8ee06a" stroke-width="3" stroke-linecap="round"/>
+            </svg>`;
+          case 'orange':
+            return `<svg viewBox="0 0 52 52" fill="none">
+              <circle cx="26" cy="28" r="23" fill="${c}"/>
+              <circle cx="18" cy="20" r="6" fill="rgba(255,255,255,0.2)"/>
+              <circle cx="26" cy="6" r="2.5" fill="${dark}"/>
+              <path d="M26 6c4-3 8-3 10-1" stroke="#8ee06a" stroke-width="2.6" stroke-linecap="round"/>
+            </svg>`;
+          case 'lemon':
+            return `<svg viewBox="0 0 44 58" fill="none">
+              <ellipse cx="22" cy="29" rx="19" ry="24" fill="${c}"/>
+              <path d="M22 5V1M22 53v4" stroke="${c}" stroke-width="4" stroke-linecap="round"/>
+              <path d="M12 18c3-4 7-6 10-6" stroke="rgba(255,255,255,0.3)" stroke-width="3" stroke-linecap="round"/>
+            </svg>`;
+          default: /* red onion */
+            return `<svg viewBox="0 0 50 52" fill="none">
+              <path d="M25 50C11 50 3 41 3 30 3 18 13 8 25 8s22 10 22 22c0 11-8 20-22 20Z" fill="${c}"/>
+              <path d="M25 10v40M15 13c-4 9-4 27 0 35M35 13c4 9 4 27 0 35" stroke="${dark}" stroke-width="1.5"/>
+              <path d="M25 8 20 1M25 8l5-7" stroke="#8b95a1" stroke-width="2.2" stroke-linecap="round"/>
+            </svg>`;
+        }
+      }
+
+      const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+
+      const lanes = [
+        { el: document.getElementById('laneL'), items: [], last: 0 },
+        { el: document.getElementById('laneR'), items: [], last: 0 },
+      ];
+
+      const scoreEl = document.getElementById('score');
+      const detailEl = document.getElementById('detail');
+      const cutsEl = document.getElementById('cuts');
+      const cuts = [];
+
+      const rand = (a, b) => a + Math.random() * (b - a);
+
+      /* Weighted so cucumber — the only ingredient tuned end to end — leads the composition. */
+      const BAG = FOODS.flatMap((f) => Array(f.weight).fill(f));
+      const pickFood = () => BAG[(Math.random() * BAG.length) | 0];
+
+      function spawn(lane, atY) {
+        if (lane.items.length >= TUNABLES.maxPerLane) return;
+        const laneW = lane.el.clientWidth;
+        if (laneW < 30) return;
+
+        const f = pickFood();
+        const scale = Math.min(1, (laneW - 16) / f.w);
+        const w = f.w * scale;
+        const h = f.h * scale;
+
+        const btn = document.createElement('button');
+        btn.className = 'food';
+        btn.type = 'button';
+        btn.style.width = w + 'px';
+        btn.style.height = h + 'px';
+        btn.setAttribute('aria-label', `Slice the ${f.name}`);
+        /* Built through the DOM rather than an inline onerror attribute: the placeholder
+           markup is full of double quotes, and inlining it would terminate the attribute
+           early. A missing or broken asset silently falls back to the drawn shape, so the
+           page never shows a broken image (rule #9). */
+        if (f.src) {
+          const img = document.createElement('img');
+          img.alt = '';
+          img.addEventListener('error', () => { img.outerHTML = placeholder(f); }, { once: true });
+          img.src = f.src;
+          btn.appendChild(img);
+        } else {
+          btn.insertAdjacentHTML('beforeend', placeholder(f));
+        }
+
+        /* The target sits one target-thickness down from the leading edge — the phantom cut
+           line the spec calls for, in 2D. */
+        const targetY = Math.min(h - 6, TUNABLES.targetMm * TUNABLES.pxPerMm * 2.4);
+        const target = document.createElement('i');
+        target.className = 'target';
+        target.style.top = targetY + 'px';
+        btn.appendChild(target);
+
+        const blade = document.createElement('i');
+        blade.className = 'blade';
+        btn.appendChild(blade);
+
+        const item = {
+          el: btn, food: f, w, h, targetY, blade,
+          x: rand(6, Math.max(7, laneW - w - 6)),
+          y: atY !== undefined ? atY : -h - rand(0, 90),
+          vy: TUNABLES.fallPxPerSec * rand(1 - TUNABLES.fallJitter, 1 + TUNABLES.fallJitter),
+          rot: rand(-14, 14),
+          spin: rand(-1, 1) * TUNABLES.spinDegPerSec,
+          phase: Math.random() * Math.PI * 2,
+        };
+
+        btn.addEventListener('pointermove', (e) => {
+          const r = btn.getBoundingClientRect();
+          blade.style.top = Math.max(0, Math.min(r.height, e.clientY - r.top)) + 'px';
+        });
+        btn.addEventListener('click', (e) => {
+          const r = btn.getBoundingClientRect();
+          slice(lane, item, e.clientY - r.top);
+        });
+        /* Keyboard takes a guided cut on the target line: reachable for everyone, and honest
+           about being guided rather than faking a pointer position. */
+        btn.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            slice(lane, item, item.targetY);
+          }
+        });
+
+        lane.el.appendChild(btn);
+        lane.items.push(item);
+        draw(item, 0);
+      }
+
+      function draw(item, t) {
+        const sway = Math.sin(t * TUNABLES.swayHz + item.phase) * TUNABLES.swayPx;
+        item.el.style.transform =
+          `translate3d(${(item.x + sway).toFixed(1)}px, ${item.y.toFixed(1)}px, 0) rotate(${item.rot.toFixed(1)}deg)`;
+      }
+
+      function remove(lane, item) {
+        const i = lane.items.indexOf(item);
+        if (i >= 0) lane.items.splice(i, 1);
+        item.el.remove();
+      }
+
+      function slice(lane, item, cutY) {
+        if (item.cut) return;
+        item.cut = true;
+
+        const offset = cutY - item.targetY;
+        const thickness = Math.max(0.1, TUNABLES.targetMm + offset / TUNABLES.pxPerMm);
+        const frac = Math.max(0.04, Math.min(0.96, cutY / item.h));
+
+        /* Two halves split exactly where the cut landed, then thrown apart. */
+        const rect = item.el.getBoundingClientRect();
+        const laneRect = lane.el.getBoundingClientRect();
+        const baseX = rect.left - laneRect.left;
+        const baseY = rect.top - laneRect.top;
+
+        [0, 1].forEach((k) => {
+          const half = document.createElement('div');
+          half.className = 'half';
+          half.style.width = item.w + 'px';
+          half.style.height = item.h + 'px';
+          half.style.clipPath = k === 0
+            ? `inset(0 0 ${(1 - frac) * 100}% 0)`
+            : `inset(${frac * 100}% 0 0 0)`;
+          half.style.transform = `translate3d(${baseX}px, ${baseY}px, 0) rotate(${item.rot}deg)`;
+          half.style.setProperty('--dx', `${baseX + (k ? 16 : -16)}px`);
+          half.style.setProperty('--dy', `${baseY + (k ? 66 : 30)}px`);
+          half.style.setProperty('--dr', `${item.rot + (k ? 26 : -26)}deg`);
+          half.innerHTML = item.el.querySelector('svg, img').outerHTML;
+          lane.el.appendChild(half);
+          setTimeout(() => half.remove(), 700);
+        });
+
+        const chip = document.createElement('div');
+        const onTarget = Math.abs(thickness - TUNABLES.targetMm) <= TUNABLES.toleranceMm;
+        chip.className = 'chip' + (onTarget ? '' : ' miss');
+        chip.textContent = thickness.toFixed(1) + 'mm';
+        chip.style.left = Math.max(2, Math.min(lane.el.clientWidth - 62, baseX - 6)) + 'px';
+        chip.style.top = (baseY + cutY) + 'px';
+        lane.el.appendChild(chip);
+        setTimeout(() => chip.remove(), 950);
+
+        remove(lane, item);
+        record(thickness, item.food.name, onTarget);
+      }
+
+      /* Mirrors src/core/scoring.ts: mean and sigma over the session, reported as a sentence
+         of plain millimetres. No 0-100 score anywhere. */
+      function record(mm, name, onTarget) {
+        cuts.push({ mm, name, onTarget });
+
+        const n = cuts.length;
+        const mean = cuts.reduce((s, c) => s + c.mm, 0) / n;
+        const sigma = n < 2
+          ? 0
+          : Math.sqrt(cuts.reduce((s, c) => s + (c.mm - mean) ** 2, 0) / (n - 1));
+
+        scoreEl.textContent = `${mean.toFixed(1)}mm average, ±${sigma.toFixed(1)}mm.`;
+        detailEl.textContent =
+          `Target ${TUNABLES.targetMm.toFixed(0)}mm, ±${TUNABLES.toleranceMm.toFixed(1)}mm · ` +
+          `${n} cut${n === 1 ? '' : 's'} · last: ${name} at ${mm.toFixed(1)}mm`;
+
+        const li = document.createElement('li');
+        li.textContent = mm.toFixed(1);
+        if (!onTarget) li.className = 'wide';
+        cutsEl.prepend(li);
+        while (cutsEl.children.length > TUNABLES.maxCutsShown) cutsEl.lastChild.remove();
+      }
+
+      document.getElementById('reset').addEventListener('click', () => {
+        cuts.length = 0;
+        cutsEl.textContent = '';
+        scoreEl.textContent = 'No cuts yet.';
+        detailEl.textContent = 'Slice an ingredient in either lane to start measuring.';
+      });
+
+      /* ---------- the loop ---------- */
+
+      let last = performance.now();
+
+      function frame(now) {
+        const dt = Math.min(0.05, (now - last) / 1000);
+        last = now;
+        const t = now / 1000;
+
+        for (const lane of lanes) {
+          const H = lane.el.clientHeight;
+
+          if (now - lane.last > TUNABLES.spawnMs) {
+            lane.last = now;
+            spawn(lane);
+          }
+
+          for (let i = lane.items.length - 1; i >= 0; i--) {
+            const item = lane.items[i];
+            item.y += item.vy * dt;
+            item.rot += item.spin * dt;
+            if (item.y > H + item.h) { remove(lane, item); continue; }
+            draw(item, t);
+          }
+        }
+        requestAnimationFrame(frame);
+      }
+
+      /* Reduced motion: arrange the lanes once and never animate. Still fully sliceable. */
+      function arrangeStatic() {
+        for (const lane of lanes) {
+          const H = lane.el.clientHeight;
+          const rows = Math.max(2, Math.floor(H / 150));
+          for (let i = 0; i < rows; i++) spawn(lane, 40 + i * (H - 90) / rows);
+        }
+      }
+
+      if (reduced.matches) {
+        arrangeStatic();
+      } else {
+        for (const lane of lanes) {
+          for (let i = 0; i < 3; i++) spawn(lane, -i * 210 - 40);
+        }
+        requestAnimationFrame(frame);
+      }
+    </script>
+  </body>
+</html>
