@@ -17,6 +17,10 @@ import './panels.css';
 import './title.css';
 import './loading.css';
 import './counter.css';
+import './pick.css';
+import './library.css';
+import './dish.css';
+import './cutting.css';
 
 import { createApp, type PanelFactory, type Route } from './app.js';
 import { passthrough } from './passthrough.js';

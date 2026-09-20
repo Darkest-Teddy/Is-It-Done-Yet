@@ -1,0 +1,181 @@
+/*
+  Screen 2B, in artboard pixels off the folder's design document.
+
+  This one keeps its painted kitchen. Only 2A and 2E sit on the real counter; 2B is a card that
+  appears over the room you are already in, and the document's `#3E2F27` floor and `#5F4536`
+  rail are what it appears over. Replacing them with the camera here would mean holding the
+  camera open through a screen that has nothing to measure.
+
+  `idy-pop`, the half-second entrance on the card, is gone with the rest of the animations.
+*/
+
+.p-floor { position: absolute; left: 0; right: 0; bottom: 0; height: 300px; background: #3e2f27; }
+
+.p-rail-trim {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 236px;
+  height: 30px;
+  background: #5f4536;
+  border-top: 5px solid #46101a;
+  border-bottom: 5px solid #46101a;
+}
+
+.p-card {
+  position: absolute;
+  left: 50%;
+  top: 74px;
+  margin-left: -420px;
+  width: 840px;
+  background: #fff3e4;
+  border: 6px solid #46101a;
+  border-radius: 34px;
+  overflow: hidden;
+  transform: rotate(-1deg);
+  box-shadow:
+    inset 0 5px 0 rgb(255 255 255 / 0.72),
+    inset 0 -16px 28px rgb(120 74 44 / 0.18),
+    0 7px 0 rgb(70 16 26 / 0.4),
+    14px 18px 0 rgb(70 16 26 / 0.55),
+    28px 38px 54px rgb(0 0 0 / 0.55);
+}
+
+.p-banner {
+  background: #f5230e;
+  padding: 16px 30px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.p-banner__title {
+  font-family: var(--display);
+  font-size: 30px;
+  color: #fff3e4;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.p-banner__flag {
+  background: #fbd24b;
+  border: 3px solid #46101a;
+  border-radius: 999px;
+  padding: 4px 14px 6px;
+  font-family: var(--display);
+  font-size: 16px;
+  color: #46101a;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.p-body { display: flex; gap: 26px; padding: 26px 30px 8px; }
+
+.p-hero {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 230px;
+  height: 230px;
+  background: #fbe3a0;
+  border: 5px solid #46101a;
+  border-radius: 26px;
+  box-shadow: inset 0 5px 0 rgb(255 255 255 / 0.65), inset 0 -22px 34px rgb(70 16 26 / 0.16);
+}
+
+.p-main { flex: 1; min-width: 0; }
+
+.p-name {
+  font-family: var(--display);
+  font-size: 64px;
+  line-height: 0.86;
+  color: #f5230e;
+  text-transform: uppercase;
+}
+
+.p-blurb { margin: 12px 0 0; font-size: 15px; font-weight: 700; line-height: 1.4; color: #5a3a22; }
+
+.p-meta { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+
+.p-meta__pill {
+  border: 3px solid #46101a;
+  border-radius: 999px;
+  padding: 7px 16px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.p-strip { display: flex; gap: 8px; margin-top: 16px; align-items: center; }
+
+/* A missing ingredient is drawn back rather than dropped -- the card still says what the dish
+   needs, which is the question somebody looking at it is actually asking. */
+.p-strip img.is-missing { filter: saturate(0.2) opacity(0.5); }
+
+.p-actions { display: flex; gap: 14px; padding: 18px 30px 26px; }
+
+.p-go {
+  flex: 1;
+  text-align: center;
+  background: #f5230e;
+  border: 5px solid #46101a;
+  border-radius: 22px;
+  padding: 16px;
+  font-family: var(--display);
+  font-size: 30px;
+  color: #fff3e4;
+  text-transform: uppercase;
+  box-shadow:
+    inset 0 4px 0 rgb(255 255 255 / 0.3),
+    inset 0 -12px 22px rgb(0 0 0 / 0.22),
+    0 4px 0 #9a2a18,
+    6px 8px 0 #46101a,
+    13px 18px 24px rgb(0 0 0 / 0.35);
+  transition: transform 90ms ease-out, box-shadow 90ms ease-out;
+}
+
+.p-go:hover, .p-go:focus-visible {
+  outline: none;
+  transform: translate(-2px, -3px);
+  box-shadow:
+    inset 0 4px 0 rgb(255 255 255 / 0.3),
+    inset 0 -14px 24px rgb(0 0 0 / 0.22),
+    0 5px 0 #9a2a18,
+    9px 12px 0 #46101a,
+    18px 26px 34px rgb(0 0 0 / 0.4);
+}
+
+.p-go:active { transform: translate(4px, 5px); box-shadow: 3px 3px 0 #46101a; }
+
+.p-alt {
+  flex: 0 0 auto;
+  background: #fff3e4;
+  border: 5px solid #46101a;
+  border-radius: 22px;
+  padding: 16px 26px;
+  font-family: var(--display);
+  font-size: 30px;
+  color: #46101a;
+  text-transform: uppercase;
+  transition: background-color 90ms ease-out;
+}
+
+.p-alt:hover, .p-alt:focus-visible { outline: none; background: #fbd24b; }
+.p-alt[disabled] { background: #d9c6b2; color: #8a7866; cursor: default; }
+
+.p-footer {
+  position: absolute;
+  left: 50%;
+  bottom: 96px;
+  margin-left: -300px;
+  width: 600px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #c9a98e;
+}

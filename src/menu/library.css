@@ -1,0 +1,274 @@
+/*
+  Screen 2C, in artboard pixels off the folder's design document.
+
+  The search field is a real `<input>` here rather than the document's static "tomato" text --
+  the artboard is showing a filled-in state, not a read-only label. Everything around it keeps
+  the document's geometry: the 980px card grid at left 40 / top 176, three columns, 18px gutter;
+  the 340px counter rail on the right at the same top.
+*/
+
+.y-head {
+  position: absolute;
+  left: 40px;
+  top: 34px;
+  right: 40px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.y-title {
+  font-family: var(--display);
+  font-size: 38px;
+  color: #fff3e4;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.y-search {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fff3e4;
+  border: 5px solid #46101a;
+  border-radius: 999px;
+  padding: 10px 20px;
+  box-shadow:
+    inset 0 3px 0 rgb(255 255 255 / 0.7),
+    inset 0 -9px 18px rgb(120 74 44 / 0.16),
+    0 4px 0 rgb(70 16 26 / 0.3),
+    6px 8px 0 rgb(70 16 26 / 0.5),
+    12px 18px 26px rgb(0 0 0 / 0.4);
+}
+
+.y-search__glass { width: 20px; height: 20px; border: 4px solid #46101a; border-radius: 50%; flex: 0 0 auto; }
+
+.y-search__input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: 17px;
+  font-weight: 700;
+  color: #46101a;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.y-search__input::placeholder { color: #b08c6e; font-weight: 700; font-size: 15px; }
+
+.y-search__hits {
+  margin-left: auto;
+  flex: 0 0 auto;
+  background: #fbd24b;
+  border: 3px solid #46101a;
+  border-radius: 999px;
+  padding: 4px 14px 5px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #46101a;
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- filters */
+
+.y-filters { position: absolute; left: 40px; top: 108px; display: flex; gap: 10px; flex-wrap: wrap; }
+
+.y-chip {
+  background: #fff3e4;
+  border: 4px solid #46101a;
+  border-radius: 999px;
+  padding: 8px 20px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #46101a;
+  white-space: nowrap;
+  transition: background-color 90ms ease-out;
+}
+
+.y-chip:hover, .y-chip:focus-visible { outline: none; background: #fbd24b; }
+.y-chip.is-on { background: #f5230e; color: #fff3e4; }
+.y-chip.is-on:hover { background: #ff3a22; }
+
+/* ---------------------------------------------------------------- card grid */
+
+.y-grid {
+  position: absolute;
+  left: 40px;
+  top: 176px;
+  width: 980px;
+  max-height: 556px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  align-content: start;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: #46101a transparent;
+}
+
+.y-card {
+  background: #fff3e4;
+  border: 5px solid #46101a;
+  border-radius: 24px;
+  padding: 16px 16px 18px;
+  text-align: left;
+  box-shadow:
+    inset 0 4px 0 rgb(255 255 255 / 0.7),
+    inset 0 -10px 20px rgb(120 74 44 / 0.16),
+    0 4px 0 rgb(70 16 26 / 0.3),
+    7px 9px 0 rgb(70 16 26 / 0.5),
+    14px 20px 30px rgb(0 0 0 / 0.45);
+  transition: transform 90ms ease-out, box-shadow 90ms ease-out;
+}
+
+.y-card:hover, .y-card:focus-visible {
+  outline: none;
+  transform: translate(-3px, -4px);
+  box-shadow:
+    inset 0 4px 0 rgb(255 255 255 / 0.7),
+    inset 0 -12px 22px rgb(120 74 44 / 0.16),
+    0 5px 0 rgb(70 16 26 / 0.35),
+    11px 15px 0 rgb(70 16 26 / 0.5),
+    22px 30px 44px rgb(0 0 0 / 0.5);
+}
+
+.y-card:active { transform: translate(4px, 5px); box-shadow: 3px 3px 0 #46101a; }
+
+.y-card__tile {
+  display: grid;
+  place-items: center;
+  height: 124px;
+  border: 4px solid #46101a;
+  border-radius: 18px;
+  box-shadow: inset 0 4px 0 rgb(255 255 255 / 0.6), inset 0 -16px 26px rgb(70 16 26 / 0.16);
+}
+
+.y-card__name {
+  margin-top: 12px;
+  font-family: var(--display);
+  font-size: 27px;
+  line-height: 0.94;
+  color: #46101a;
+  text-transform: uppercase;
+}
+
+.y-card__meta { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+
+.y-card__pill {
+  border: 3px solid #46101a;
+  border-radius: 999px;
+  padding: 3px 11px 4px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.y-card__have {
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #7a5638;
+  letter-spacing: 0.03em;
+}
+
+.y-card__have.is-ready { color: #2f5a26; }
+
+.y-empty {
+  grid-column: 1 / -1;
+  padding: 26px;
+  border: 4px dashed rgb(255 243 228 / 0.3);
+  border-radius: 24px;
+  color: #fff3e4;
+}
+
+.y-empty__title { font-family: var(--display); font-size: 28px; text-transform: uppercase; }
+.y-empty__note { margin-top: 8px; font-size: 13px; font-weight: 700; color: #c9a98e; }
+
+/* ---------------------------------------------------------------- counter rail */
+
+.y-counter {
+  position: absolute;
+  right: 40px;
+  top: 176px;
+  width: 340px;
+  background: #fff3e4;
+  border: 5px solid #46101a;
+  border-radius: 26px;
+  padding: 20px 20px 22px;
+  box-shadow:
+    inset 0 4px 0 rgb(255 255 255 / 0.75),
+    inset 0 -12px 22px rgb(120 74 44 / 0.18),
+    0 5px 0 rgb(70 16 26 / 0.35),
+    9px 12px 0 rgb(70 16 26 / 0.5),
+    18px 26px 38px rgb(0 0 0 / 0.5);
+}
+
+.y-counter__title {
+  font-family: var(--display);
+  font-size: 28px;
+  color: #46101a;
+  text-transform: uppercase;
+  line-height: 0.95;
+}
+
+.y-counter__note { margin-top: 4px; font-size: 12px; font-weight: 700; color: #8a5a3c; }
+
+.y-chips {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 16px;
+  max-height: 232px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #46101a transparent;
+}
+
+.y-chip-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  border: 3px solid #46101a;
+  border-radius: 14px;
+  padding: 8px 2px;
+  box-shadow: inset 0 2px 0 rgb(255 255 255 / 0.55), inset 0 -6px 12px rgb(70 16 26 / 0.13);
+}
+
+.y-chip-item span { font-size: 10px; font-weight: 800; color: #46101a; }
+
+.y-more { margin-top: 20px; padding-top: 16px; border-top: 3px dashed #d8bfa4; }
+.y-more__title { font-family: var(--display); font-size: 24px; color: #46101a; text-transform: uppercase; line-height: 1; }
+.y-more__note { margin-top: 6px; font-size: 12px; font-weight: 700; color: #8a5a3c; }
+
+.y-more__btn {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  background: #fbd24b;
+  border: 4px solid #46101a;
+  border-radius: 16px;
+  padding: 10px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #46101a;
+  transition: background-color 90ms ease-out;
+}
+
+.y-more__btn:hover, .y-more__btn:focus-visible { outline: none; background: #ffdf6d; }
+.y-more__btn.is-on { background: #f5230e; color: #fff3e4; }

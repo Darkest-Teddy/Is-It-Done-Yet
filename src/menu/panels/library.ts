@@ -1,35 +1,54 @@
 /**
  * Screen 2C -- the recipe library.
  *
- * The artboard's filter row was six chips with plausible names: "Cook with what I have",
- * "Under 20 min", "Knife work", "Breakfast", "No knife", "Level 3+". Half of them would return
- * nothing against the recipes that actually exist, and a filter that silently empties the list
- * reads as a broken search rather than as an honest empty result.
+ * Built at the artboard's 1440x810: the 980px grid at left 40 / top 176 in three columns, the
+ * 340px counter rail on the right, the pill search bar across the top.
  *
- * So the chips are derived. Four are computed from recipe fields that genuinely exist, and the
- * rest are the real tags carried by the recipes in the book, most common first. Every chip is
- * therefore guaranteed to match at least one dish the moment it appears, and the row grows by
- * itself as the book grows.
+ * TWO DEPARTURES.
  *
- * The counter panel stays on screen while you browse, which is the point of the whole layout:
- * you are choosing a dish BECAUSE of what is on the counter, so hiding the counter to show the
- * choice is exactly backwards.
+ * The document's search field shows the static word "tomato" and a hint about a pinned
+ * keyboard. That is a filled-in state, not a read-only label, so it is a real `<input>` here;
+ * Quest Browser raises the system keyboard on focus, which is the pinned keyboard the hint
+ * means.
+ *
+ * The filter row is derived rather than transcribed. The document lists "Cook with what I
+ * have", "Under 20 min", "Knife work", "Breakfast", "No knife", "Level 3+"; against the recipes
+ * that actually exist, half of those match nothing, and a filter that silently empties the list
+ * reads as a broken search rather than an honest empty result. So four are computed from recipe
+ * fields that exist and the rest are the real tags the book carries, most common first. Every
+ * chip is therefore guaranteed to match at least one dish the moment it appears.
  */
 
 import { rankRecipes, searchRecipes, type RecipeMatch } from '../../core/pantry.js';
 import type { Recipe } from '../../core/recipe.js';
-import { artFor, designRem, GROUP_TINT, groupOf } from '../art.js';
+import { artFor, GROUP_TINT, groupOf, heroSize, type HeroIcon } from '../art.js';
 import type { AppContext, Panel, RouteParams } from '../app.js';
 import { categoryFor, pretty } from '../catalogue.js';
-import { art, button, fill, h } from '../dom.js';
+import { button, fill, h } from '../dom.js';
 import { createRail } from '../rail.js';
+import { createStage } from '../stage.js';
 
 const LEVEL: Readonly<Record<string, number>> = { easy: 1, medium: 2, hard: 3 };
-
 const KNIFE_WORDS = /\b(slice|sliced|chop|chopped|cut|dice|diced|grate|grated|halve|halves)\b/i;
+
+/** Artboard widths: card art 88, counter chips 36 with the optical table trimming the rest. */
+const CARD_ICON = 88;
+const CHIP_ICON = 36;
 
 const usesKnife = (recipe: Recipe): boolean =>
   recipe.steps.some((step) => KNIFE_WORDS.test(step.instruction));
+
+const img = (src: string, width: number): HTMLImageElement =>
+  h('img', {
+    attrs: { src, alt: '', draggable: 'false', decoding: 'async', loading: 'lazy' },
+    style: { width: `${width}px` },
+  });
+
+/** Optical sizing only applies to the hero set; a library icon has no such table. */
+function iconWidth(src: string, base: number): number {
+  const stem = src.split('/').pop()?.replace('.png', '') ?? '';
+  return heroSize(stem as HeroIcon, base);
+}
 
 interface Filter {
   readonly id: string;
@@ -37,7 +56,6 @@ interface Filter {
   readonly test: (match: RecipeMatch) => boolean;
 }
 
-/** Computed filters first, then whatever tags the book actually carries. */
 function filtersFor(recipes: readonly Recipe[]): readonly Filter[] {
   const computed: Filter[] = [
     { id: 'have', label: 'Cook with what I have', test: (m) => m.makeable },
@@ -54,9 +72,9 @@ function filtersFor(recipes: readonly Recipe[]): readonly Filter[] {
 
   // `captaincook4d` names the dataset the steps came from, not anything a cook would filter on.
   const tags = [...counts.entries()]
-    .filter(([tag, count]) => tag !== 'captaincook4d' && count > 0)
+    .filter(([tag]) => tag !== 'captaincook4d')
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 4)
+    .slice(0, 3)
     .map(([tag]): Filter => ({
       id: `tag:${tag}`,
       label: pretty(tag.replace(/-/g, ' ')),
@@ -69,19 +87,20 @@ function filtersFor(recipes: readonly Recipe[]): readonly Filter[] {
 export function libraryPanel(ctx: AppContext, _params: RouteParams): Panel {
   void _params;
 
+  const stage = createStage({ width: 1440, height: 810 });
   const filters = filtersFor(ctx.state.recipes);
 
-  const hits = h('span', { class: 'pill library__hits', text: '' });
-  const grid = h('div', { class: 'library__grid scroll' });
-  const chips = h('div', { class: 'library__filters' });
-  const counterChips = h('div', { class: 'library__counter-chips scroll' });
-  const counterNote = h('p', { class: 'note' });
+  const hits = h('span', { class: 'y-search__hits', text: '' });
+  const grid = h('div', { class: 'y-grid' });
+  const chips = h('div', { class: 'y-filters' });
+  const counterChips = h('div', { class: 'y-chips' });
+  const counterNote = h('div', { class: 'y-counter__note' });
 
   const search = h('input', {
-    class: 'library__search-input',
+    class: 'y-search__input',
     attrs: {
       type: 'search',
-      placeholder: 'Search the book — say it or type it',
+      placeholder: 'say it or type it on the pinned keyboard',
       'aria-label': 'Search recipes',
       autocomplete: 'off',
       spellcheck: 'false',
@@ -93,6 +112,11 @@ export function libraryPanel(ctx: AppContext, _params: RouteParams): Panel {
     ctx.setState({ query: search.value });
     paint();
   });
+
+  const almost = button('y-more__btn', () => {
+    ctx.setState({ filter: ctx.state.filter === 'close' ? null : 'close' });
+    paint();
+  }, 'Almost-there list');
 
   function listed(): readonly RecipeMatch[] {
     const found = searchRecipes(ctx.state.recipes, ctx.state.query);
@@ -110,24 +134,36 @@ export function libraryPanel(ctx: AppContext, _params: RouteParams): Panel {
     const { recipe } = match;
     const level = LEVEL[recipe.difficulty] ?? 2;
     const hero = recipe.requires[0]?.ingredient ?? recipe.name;
+    const src = artFor(hero, categoryFor(hero));
 
     return button(
-      `press library__card${match.makeable ? ' is-ready' : ''}`,
+      'y-card',
       () => openDish(recipe),
       h(
         'div',
-        { class: 'library__card-tile', style: { background: match.makeable ? 'var(--leaf)' : 'var(--cream-deep)' } },
-        art(artFor(hero, categoryFor(hero)), 4.4, recipe.name, true),
+        {
+          class: 'y-card__tile',
+          style: { background: match.makeable ? '#CDE6C7' : '#F7E3CC' },
+        },
+        img(src, iconWidth(src, CARD_ICON)),
       ),
-      h('span', { class: 'display d-sm library__card-name', text: recipe.name }),
+      h('div', { class: 'y-card__name', text: recipe.name }),
       h(
         'div',
-        { class: 'library__card-meta' },
-        h('span', { class: 'pill', text: `${recipe.averageMinutes} min` }),
-        h('span', { class: 'pill', text: `Level ${level}` }),
+        { class: 'y-card__meta' },
+        h('span', {
+          class: 'y-card__pill',
+          text: `${recipe.averageMinutes} min`,
+          style: { background: '#C4DAEE', color: '#2F4D68' },
+        }),
+        h('span', {
+          class: 'y-card__pill',
+          text: `Level ${level}`,
+          style: { background: '#F9D3B4', color: '#8A4B21' },
+        }),
       ),
-      h('span', {
-        class: `library__card-status${match.makeable ? ' is-ready' : ''}`,
+      h('div', {
+        class: `y-card__have${match.makeable ? ' is-ready' : ''}`,
         text: match.makeable
           ? 'Everything is on your counter'
           : `Missing ${match.missing.length}: ${match.missing.map((m) => pretty(m.ingredient)).join(', ')}`,
@@ -140,14 +176,10 @@ export function libraryPanel(ctx: AppContext, _params: RouteParams): Panel {
       chips,
       ...filters.map((filter) => {
         const on = ctx.state.filter === filter.id;
-        const chip = button(
-          `btn library__chip${on ? ' is-on' : ''}`,
-          () => {
-            ctx.setState({ filter: on ? null : filter.id });
-            paint();
-          },
-          filter.label,
-        );
+        const chip = button(`y-chip${on ? ' is-on' : ''}`, () => {
+          ctx.setState({ filter: on ? null : filter.id });
+          paint();
+        }, filter.label);
         chip.setAttribute('aria-pressed', String(on));
         return chip;
       }),
@@ -160,36 +192,30 @@ export function libraryPanel(ctx: AppContext, _params: RouteParams): Panel {
     fill(
       counterChips,
       ...(items.length === 0
-        ? [h('p', { class: 'note', text: 'Nothing counted yet. The list above is the whole book.' })]
-        : items.map((item) =>
-            h(
+        ? [h('div', { class: 'y-counter__note', text: 'Nothing counted yet.' })]
+        : items.map((item) => {
+            const src = artFor(item.ingredient, item.category);
+            return h(
               'div',
               {
-                class: 'library__counter-chip',
+                class: 'y-chip-item',
                 style: { background: GROUP_TINT[groupOf(item.category)] },
-                // The chip is icon-plus-count, as the artboard drew it. The name lives in the
-                // tooltip and in the image's alt text rather than being dropped entirely --
-                // a fallback icon is a category, not an identification, so the word matters.
                 attrs: { title: `${pretty(item.ingredient)} ×${item.count}` },
               },
-              art(artFor(item.ingredient, item.category), designRem(36), pretty(item.ingredient)),
-              h('span', { class: 'library__counter-count', text: `×${item.count}` }),
-            ),
-          )),
+              img(src, iconWidth(src, CHIP_ICON)),
+              h('span', { text: `×${item.count}` }),
+            );
+          })),
     );
 
     counterNote.textContent = items.length === 0
-      ? 'Scan your counter and this list starts filtering every card.'
-      : 'Every card above is ranked against these.';
+      ? 'Scan your counter and this starts filtering.'
+      : 'Filters every card above.';
   }
 
   function paint(): void {
     const matches = listed();
-    const ready = matches.filter((match) => match.makeable).length;
-
-    hits.textContent = matches.length === 0
-      ? 'no matches'
-      : `${matches.length} ${matches.length === 1 ? 'dish' : 'dishes'} · ${ready} ready to cook`;
+    hits.textContent = matches.length === 0 ? 'no hits' : `${matches.length} hits`;
 
     fill(
       grid,
@@ -197,25 +223,20 @@ export function libraryPanel(ctx: AppContext, _params: RouteParams): Panel {
         ? [
             h(
               'div',
-              { class: 'library__empty' },
-              h('span', { class: 'display d-md', text: 'Nothing matches' }),
-              h('p', {
-                class: 'note',
+              { class: 'y-empty' },
+              h('div', { class: 'y-empty__title', text: 'Nothing matches' }),
+              h('div', {
+                class: 'y-empty__note',
                 text: ctx.state.filter === null
                   ? 'Try a shorter search — the book is small so far.'
                   : 'Clear the filter, or search the whole book instead.',
               }),
-              ctx.state.filter === null
-                ? null
-                : button('btn btn--sun', () => {
-                    ctx.setState({ filter: null });
-                    paint();
-                  }, 'Clear the filter'),
             ),
           ]
         : matches.map(recipeCard)),
     );
 
+    almost.classList.toggle('is-on', ctx.state.filter === 'close');
     paintFilters();
     paintCounter();
   }
@@ -224,7 +245,7 @@ export function libraryPanel(ctx: AppContext, _params: RouteParams): Panel {
     [
       {
         key: 'A',
-        label: 'Open the first dish',
+        label: 'Open dish card',
         accent: true,
         onPress: () => {
           const first = listed()[0];
@@ -232,47 +253,58 @@ export function libraryPanel(ctx: AppContext, _params: RouteParams): Panel {
         },
       },
       { key: 'B', label: 'Cook something for me', onPress: () => ctx.go('pick') },
-      { key: 'X', label: 'Back to the counter', onPress: () => ctx.go('counter') },
-      { key: '☰', label: 'Title', end: true, shortcut: 'm', onPress: () => ctx.go('title') },
+      { key: 'Y', label: 'Back to the counter', onPress: () => ctx.go('counter') },
+      { key: '☰', label: 'Menu', end: true, shortcut: 'm', onPress: () => ctx.go('title') },
     ],
     () => ctx.back(),
+    'board',
   );
 
   paint();
 
-  const node = h(
-    'section',
-    { class: 'screen screen--night library' },
-    h(
-      'header',
-      { class: 'screen__head library__head' },
-      h('h1', { class: 'display d-lg library__title', text: 'Recipe library' }),
-      h('div', { class: 'library__search' }, search),
-      hits,
-    ),
+  stage.board.classList.add('b2');
+  stage.board.append(
     h(
       'div',
-      { class: 'screen__body library__body' },
-      h('div', { class: 'stack grow library__main' }, chips, grid),
+      { class: 'y-head' },
+      h('div', { class: 'y-title', text: 'Recipe library' }),
       h(
         'div',
-        { class: 'card library__counter' },
-        h('h2', { class: 'display d-md', text: 'Your counter' }),
-        counterNote,
-        counterChips,
-        h('hr', { class: 'divider' }),
-        button('btn btn--sun library__close-btn', () => {
-          ctx.setState({ filter: ctx.state.filter === 'close' ? null : 'close' });
-          paint();
-        }, 'Almost-there list'),
-        h('p', {
-          class: 'note',
-          text: 'Dishes you could finish with three more things from the shop.',
+        { class: 'y-search' },
+        h('div', { class: 'y-search__glass' }),
+        search,
+        hits,
+      ),
+    ),
+    chips,
+    grid,
+    h(
+      'div',
+      { class: 'y-counter' },
+      h('div', { class: 'y-counter__title', text: 'Your counter' }),
+      counterNote,
+      counterChips,
+      h(
+        'div',
+        { class: 'y-more' },
+        h('div', { class: 'y-more__title', text: 'Missing a lot?' }),
+        h('div', {
+          class: 'y-more__note',
+          text: 'Show recipes that need three items or fewer from the shop.',
         }),
+        almost,
       ),
     ),
     rail.node,
   );
 
-  return { node, destroy: () => rail.destroy() };
+  const node = h('section', { class: 'screen screen--board library' }, stage.node);
+
+  return {
+    node,
+    destroy: () => {
+      stage.destroy();
+      rail.destroy();
+    },
+  };
 }

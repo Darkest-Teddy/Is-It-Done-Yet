@@ -52,7 +52,7 @@ const img = (src: string, width: number): HTMLImageElement =>
 export function counterPanel(ctx: AppContext, _params: RouteParams): Panel {
   void _params;
 
-  const pass = mountPassthrough({ scrim: true });
+  const pass = mountPassthrough({ scrim: true, fault: false });
   const stage = createStage({ width: 1440, height: 810 });
   const reader = new FrameReader(480);
 

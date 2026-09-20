@@ -1,43 +1,44 @@
 /**
  * Screen 2E -- the competitive round, over the real board.
  *
- * The artboard drew a wooden board, a carrot and three rectangles standing in for slices, with
- * a knife swinging on a loop. This is the other screen where the stand-in was the whole point:
- * it sits over the headset's passthrough camera, and the numbers come off the board you are
- * actually cutting on.
+ * Built at the artboard's 1440x810: the 300px timer card centred at top 104, the three stat
+ * tiles at left 352 / bottom 44, the 420px leaderboard at right 48.
+ *
+ * THE DEPARTURE IS THE SAME AS 2A'S AND IT IS THE POINT OF THE PROJECT. The document draws a
+ * wooden board at left 352 / bottom 110, 520x170, with a carrot on it, three rectangles
+ * standing in for cut pieces, and a knife swinging above on `idy-chop`. That is a picture of
+ * the thing this round is supposed to measure. Here the passthrough camera fills the window,
+ * that rectangle is left clear as a framing guide for the real board, and the numbers come off
+ * what the camera actually sees.
  *
  * WHAT IS MEASURED, AND WHY IT IS NOT MILLIMETRES.
  *
- * Every frame is segmented, each blob's oriented rect gives a short side, and the short side of
- * a slice is its thickness. Turning that into millimetres needs pixels-per-millimetre, which
- * needs a calibration step against something of known width -- and a ninety-second round with a
- * judge holding the headset is the worst possible place to put a calibration step.
+ * Each blob's oriented rect gives a short side, and the short side of a slice is its thickness.
+ * Turning that into millimetres needs pixels-per-millimetre, which needs a calibration step --
+ * and ninety seconds with a judge wearing the headset is the worst possible place for one. So
+ * the round scores EVENNESS, which is scale-free: the coefficient of variation cancels the
+ * unknown scale out entirely. "94% even" is a true statement about the cutting; a millimetre
+ * figure off an uncalibrated camera would not be.
  *
- * So the round scores EVENNESS, which is scale-free: the coefficient of variation of the
- * measured widths cancels the unknown scale out entirely. Ten slices all forty pixels across
- * score exactly what ten slices all four millimetres across would. "94% even" is a true
- * statement about your cutting; quoting a millimetre figure off an uncalibrated camera would
- * not be, and an engineer judge asks about that in the first thirty seconds.
- *
- * The artboard's third tile was "Knuckle guard: SAFE". There is no hand tracking in a browser
- * tab -- that needs 26 joints from an immersive WebXR session -- so a safety indicator here
- * would be a green light wired to nothing, which is worse than no light at all. The tile shows
- * pieces on the board instead.
+ * The artboard's third tile is "Knuckle guard: SAFE". That needs 26 hand joints from an
+ * immersive WebXR session, which a browser tab does not get, so a safety light here would be
+ * wired to nothing -- worse than no light, because somebody would trust it. The tile reads
+ * pieces in shot instead.
  */
 
 import { rankFor } from '../../core/rank.js';
 import type { AppContext, Panel, RouteParams, RoundResult } from '../app.js';
 import { addToBoard, rankBoard, type RoundEntry } from '../board.js';
-import { art, button, fill, h } from '../dom.js';
-import { designRem, heroSize, heroUrl } from '../art.js';
+import { button, fill, h } from '../dom.js';
 import { createRail } from '../rail.js';
+import { createStage } from '../stage.js';
 import { mountPassthrough } from '../passthroughView.js';
 import { AnalysisLoop, evenness, loadVision, type Analysis } from '../vision.js';
 
 const ROUND_SECONDS = 90;
-/** Pieces in the round that count as a full pace score. A brunoise of one carrot is about this. */
+/** Pieces in a round that count as a full pace score. A brunoise of one carrot is about this. */
 const PACE_TARGET = 24;
-/** Widths kept for the evenness figure. Enough to be stable, short enough to follow the round. */
+/** Widths kept for the evenness figure. */
 const SAMPLE_CAP = 400;
 /** Fewer than this and there is no spread to speak of, so there is no score either. */
 const MIN_MEASUREMENTS = 3;
@@ -52,11 +53,19 @@ type Phase = 'ready' | 'running' | 'done';
 const scoreOf = (even: number, pieces: number): number =>
   0.7 * even + 0.3 * Math.min(1, pieces / PACE_TARGET);
 
+/** The document's three tile tints, in order. */
+const TILE: readonly { background: string; label: string }[] = [
+  { background: '#CDE6C7', label: '#2F5A26' },
+  { background: '#FBE3A0', label: '#8A6A2E' },
+  { background: '#F9C7BE', label: '#9A4E44' },
+];
+
 export function cuttingPanel(ctx: AppContext, params: RouteParams): Panel {
   const practice = params.practice === true;
   const recipe = ctx.state.recipes.find((r) => r.id === params.recipeId) ?? null;
 
-  const pass = mountPassthrough({ scrim: true });
+  const pass = mountPassthrough({ scrim: true, fault: false });
+  const stage = createStage({ width: 1440, height: 810 });
 
   let phase: Phase = 'ready';
   let loop: AnalysisLoop | null = null;
@@ -69,22 +78,43 @@ export function cuttingPanel(ctx: AppContext, params: RouteParams): Panel {
   let posted: RoundEntry | null = null;
   let visionReady = false;
 
-  // ---------------------------------------------------------------- structure
+  // ---------------------------------------------------------------- pieces
 
-  const clock = h('div', { class: 'display d-hero tabular cut__clock', text: formatClock(ROUND_SECONDS) });
-  const clockFill = h('div', { class: 'meter__fill', style: { width: '100%' } });
-  const clockLabel = h('div', { class: 'label', text: 'Time left', style: { color: 'var(--brown)' } });
+  const clock = h('div', { class: 'k-timer__clock', text: formatClock(ROUND_SECONDS) });
+  const clockLabel = h('div', { class: 'k-timer__label', text: 'Time left' });
+  const clockFill = h('div', { class: 'k-timer__fill', style: { width: '100%' } });
+  const camPill = h('div', { class: 'k-cam', text: 'Camera' });
+  const boardGuide = h(
+    'div',
+    { class: 'k-board' },
+    h('div', { class: 'k-board__hint', text: 'Put your board in this frame' }),
+  );
 
-  const evenValue = h('div', { class: 'display d-lg tabular', text: '—' });
-  const paceValue = h('div', { class: 'display d-lg tabular', text: '—' });
-  const piecesValue = h('div', { class: 'display d-lg tabular', text: '0' });
-  const hint = h('p', { class: 'note cut__hint' });
+  const statValues = [
+    h('div', { class: 'k-stat__value', text: '—' }),
+    h('div', { class: 'k-stat__value', text: '—' }),
+    h('div', { class: 'k-stat__value', text: '0' }),
+  ];
 
-  const boardRows = h('div', { class: 'cut__board-rows scroll' });
-  const boardNote = h('p', { class: 'note' });
+  const statTile = (index: number, label: string): HTMLElement => {
+    const tint = TILE[index] ?? TILE[0]!;
+    return h(
+      'div',
+      { class: 'k-stat', style: { background: tint.background } },
+      h('div', { class: 'k-stat__label', text: label, style: { color: tint.label } }),
+      statValues[index]!,
+    );
+  };
+
+  const rows = h('div', { class: 'k-lb__rows' });
+  const call = h('div', { class: 'k-lb__call' });
+  const rule = h('div', {
+    class: 'k-lb__rule',
+    text: 'Score is evenness first, speed second. A round that measures nothing does not post.',
+  });
 
   const nameInput = h('input', {
-    class: 'cut__name',
+    class: 'k-name',
     attrs: { type: 'text', maxlength: '16', 'aria-label': 'Your name on the board', autocomplete: 'off' },
   });
   nameInput.value = ctx.state.playerName;
@@ -93,33 +123,20 @@ export function cuttingPanel(ctx: AppContext, params: RouteParams): Panel {
     ctx.setState({ playerName: name === '' ? 'You' : name });
   });
 
-  const primary = button('btn btn--hot btn--big cut__primary', () => primaryAction(), 'Start the round');
-  const submit = button('btn btn--sun btn--big', () => post(), 'Put it on the board');
-  submit.disabled = true;
-
-  function statTile(label: string, value: HTMLElement, tint: string): HTMLElement {
-    return h(
-      'div',
-      { class: 'card cut__stat', style: { background: tint } },
-      h('span', { class: 'label', text: label, style: { color: 'var(--brown)' } }),
-      value,
-    );
-  }
+  const goButton = button('k-act k-act--go', () => primaryAction(), 'Start');
+  const postButton = button('k-act k-act--post', () => post(), 'Post it');
 
   // ---------------------------------------------------------------- round
 
   function primaryAction(): void {
-    if (phase === 'running') {
-      finish();
-      return;
-    }
-    void begin();
+    if (phase === 'running') finish();
+    else if (phase === 'done') reset();
+    else void begin();
   }
 
   async function begin(): Promise<void> {
     visionReady = await loadVision();
     const video = pass.video();
-
     if (!visionReady || video === null) {
       paint();
       return;
@@ -135,19 +152,17 @@ export function cuttingPanel(ctx: AppContext, params: RouteParams): Panel {
     loop = new AnalysisLoop(video, onAnalysis, 200, 420);
     loop.start();
 
-    if (!practice) {
-      timer = setInterval(() => {
+    timer = setInterval(() => {
+      elapsed += 1;
+      if (!practice) {
         remaining -= 1;
-        elapsed += 1;
-        if (remaining <= 0) finish();
-        else paint();
-      }, 1000);
-    } else {
-      timer = setInterval(() => {
-        elapsed += 1;
-        paint();
-      }, 1000);
-    }
+        if (remaining <= 0) {
+          finish();
+          return;
+        }
+      }
+      paint();
+    }, 1000);
 
     paint();
   }
@@ -172,23 +187,23 @@ export function cuttingPanel(ctx: AppContext, params: RouteParams): Panel {
     timer = null;
 
     const even = evenness(widths);
-    const result: RoundResult = {
-      evenness: even ?? 0,
-      pieces: peakPieces,
-      seconds: practice ? elapsed : ROUND_SECONDS - Math.max(0, remaining),
-      total: even === null ? 0 : scoreOf(even, peakPieces),
-      measurements: widths.length,
-    };
-    ctx.setState({ lastRound: result });
+    ctx.setState({
+      lastRound: {
+        evenness: even ?? 0,
+        pieces: peakPieces,
+        seconds: practice ? elapsed : ROUND_SECONDS - Math.max(0, remaining),
+        total: even === null ? 0 : scoreOf(even, peakPieces),
+        measurements: widths.length,
+      } satisfies RoundResult,
+    });
     paint();
   }
 
   function post(): void {
     const round = ctx.state.lastRound;
     if (round === null || practice || posted !== null) return;
-    // A round that measured nothing has no score, only a zero. Putting that on the board would
-    // leave a row that looks like a terrible attempt when it was really a camera that never saw
-    // the board.
+    // A round that measured nothing has no score, only a zero. Putting that on the board leaves
+    // a row that looks like a terrible attempt when it was a camera that never saw the board.
     if (round.measurements < MIN_MEASUREMENTS) return;
 
     const entry: RoundEntry = {
@@ -221,7 +236,7 @@ export function cuttingPanel(ctx: AppContext, params: RouteParams): Panel {
   // ---------------------------------------------------------------- painting
 
   function paintOverlay(): void {
-    if (live === null || phase === 'done') {
+    if (live === null || phase !== 'running') {
       pass.setOverlay([]);
       return;
     }
@@ -238,24 +253,23 @@ export function cuttingPanel(ctx: AppContext, params: RouteParams): Panel {
     const ranked = rankBoard(ctx.state.board);
 
     fill(
-      boardRows,
+      rows,
       ...ranked.slice(0, 8).map((entry, index) => {
         const mine = posted !== null && entry.at === posted.at && entry.name === posted.name;
         return h(
           'div',
-          { class: `cut__board-row${mine ? ' is-mine' : ''}` },
-          h('span', { class: 'display d-sm cut__pos tabular', text: String(index + 1) }),
-          h('span', { class: 'cut__badge', text: rankFor(entry.total).icon }),
+          { class: `k-row${mine ? ' is-mine' : ''}` },
+          h('span', { class: 'k-row__pos', text: String(index + 1).padStart(2, '0') }),
           h(
             'div',
-            { class: 'stack grow' },
-            h('span', { class: 'cut__who truncate', text: entry.name }),
-            h('span', {
-              class: 'cut__detail',
-              text: `${entry.pieces} pieces · ${Math.round(entry.evenness * 100)}% even`,
+            { class: 'k-row__body' },
+            h('div', { class: 'k-row__name', text: entry.name }),
+            h('div', {
+              class: 'k-row__tag',
+              text: `${rankFor(entry.total).title} · ${entry.pieces} pieces`,
             }),
           ),
-          h('span', { class: 'display d-sm tabular', text: entry.total.toFixed(2) }),
+          h('span', { class: 'k-row__score', text: points(entry.total) }),
         );
       }),
     );
@@ -263,20 +277,20 @@ export function cuttingPanel(ctx: AppContext, params: RouteParams): Panel {
     const round = ctx.state.lastRound;
     if (posted !== null) {
       const place = ranked.findIndex((e) => e.at === posted?.at && e.name === posted?.name) + 1;
-      boardNote.textContent = `You are ${ordinal(place)} of ${ranked.length} on this board.`;
+      call.textContent = `You are ${ordinal(place)} of ${ranked.length}`;
       return;
     }
     if (round !== null && round.measurements >= MIN_MEASUREMENTS) {
       const target = ranked.find((entry) => entry.total > round.total);
-      boardNote.textContent = target === undefined
-        ? 'That is the best round on this board.'
-        : `${(target.total - round.total).toFixed(2)} short of ${target.name}.`;
+      call.textContent = target === undefined
+        ? 'Best round on this board'
+        : `Beat ${points(target.total)} to pass ${target.name}`;
       return;
     }
     const top = ranked[0];
-    boardNote.textContent = top === undefined
-      ? 'Nothing on the board yet. First round sets the mark.'
-      : `${top.name} leads with ${top.total.toFixed(2)}. Evenness first, speed second.`;
+    call.textContent = top === undefined
+      ? 'First round sets the mark'
+      : `Beat ${points(top.total)} to take first`;
   }
 
   function paint(): void {
@@ -284,6 +298,7 @@ export function cuttingPanel(ctx: AppContext, params: RouteParams): Panel {
     const liveEven = phase === 'running' ? evenness(widths) : round?.evenness ?? null;
     const pieces = phase === 'running' ? peakPieces : round?.pieces ?? peakPieces;
     const seconds = phase === 'running' ? Math.max(1, elapsed) : round?.seconds ?? elapsed;
+    const measured = phase === 'done' ? round?.measurements ?? 0 : widths.length;
 
     clockLabel.textContent = practice ? 'Practising' : phase === 'done' ? 'Round over' : 'Time left';
     clock.textContent = practice ? formatClock(elapsed) : formatClock(Math.max(0, remaining));
@@ -291,44 +306,37 @@ export function cuttingPanel(ctx: AppContext, params: RouteParams): Panel {
       ? '100%'
       : `${Math.round((Math.max(0, remaining) / ROUND_SECONDS) * 100)}%`;
 
-    // '—' rather than '0%' when nothing was measured: zero evenness is a real, terrible score,
-    // and printing it for "the camera saw nothing" is the wrong answer to a different question.
-    const measured = phase === 'done' ? (round?.measurements ?? 0) : widths.length;
-    evenValue.textContent = liveEven === null || measured < MIN_MEASUREMENTS
+    statValues[0]!.textContent = liveEven === null || measured < MIN_MEASUREMENTS
       ? '—'
       : `${Math.round(liveEven * 100)}%`;
-    paceValue.textContent = pieces === 0 ? '—' : `${(pieces / Math.max(1, seconds)).toFixed(2)}/s`;
-    piecesValue.textContent = String(pieces);
+    statValues[1]!.textContent = pieces === 0 ? '—' : `${(pieces / Math.max(1, seconds)).toFixed(1)} / sec`;
+    statValues[2]!.textContent = String(pieces);
 
-    primary.textContent = phase === 'running'
-      ? practice ? 'Stop practising' : 'End the round early'
-      : phase === 'done'
-        ? 'Run it again'
-        : practice ? 'Start practising' : 'Start the round';
+    const camLive = pass.status() === 'live';
+    camPill.textContent = camLive ? 'Passthrough live' : `Camera ${pass.status()}`;
+    camPill.classList.toggle('is-live', camLive);
+    boardGuide.classList.toggle('is-live', camLive);
 
-    if (phase === 'done') primary.onclick = () => reset();
-    else primary.onclick = () => primaryAction();
+    goButton.textContent = phase === 'running'
+      ? practice ? 'Stop' : 'End round'
+      : phase === 'done' ? 'Run it again' : practice ? 'Start practising' : 'Start the round';
+    goButton.disabled = !camLive;
 
-    const camera = pass.status();
-    primary.disabled = camera !== 'live';
     const scoreable = round !== null && round.measurements >= MIN_MEASUREMENTS;
-    submit.disabled = practice || phase !== 'done' || !scoreable || posted !== null;
-    submit.textContent = posted !== null ? 'On the board' : 'Put it on the board';
+    postButton.disabled = practice || phase !== 'done' || !scoreable || posted !== null;
+    postButton.textContent = posted !== null ? 'On the board' : 'Post it';
 
-    hint.textContent = camera !== 'live'
+    rule.textContent = !camLive
       ? 'The round needs the camera. Nothing can be measured without it.'
-      : !visionReady && phase !== 'ready'
-        ? 'The vision engine did not load, so nothing can be measured this round.'
-        : phase === 'ready'
-          ? 'Put the board in view, then cut. Each piece is measured across its short side, and'
-            + ' the score is how close those measurements are to each other.'
-          : phase === 'running'
-            ? liveEven === null
-              ? 'Cut at least three pieces and leave them in shot — evenness needs something to compare.'
-              : `${widths.length} measurements so far.`
-            : round === null || round.measurements < MIN_MEASUREMENTS
-              ? 'Nothing was measured, so there is no score. Keep the cut pieces in shot and run it again.'
-              : `${Math.round(round.evenness * 100)}% even over ${round.measurements} measurements.`;
+      : phase === 'ready'
+        ? 'Each piece is measured across its short side. The score is how close those are to each other.'
+        : phase === 'running'
+          ? liveEven === null
+            ? 'Cut at least three pieces and leave them in shot.'
+            : `${widths.length} measurements so far.`
+          : scoreable
+            ? `${Math.round((round?.evenness ?? 0) * 100)}% even over ${round?.measurements ?? 0} measurements.`
+            : 'Nothing was measured, so there is no score.';
 
     paintBoard();
     railUpdate();
@@ -336,13 +344,13 @@ export function cuttingPanel(ctx: AppContext, params: RouteParams): Panel {
 
   // ---------------------------------------------------------------- shell
 
-  const rail = createRail([], () => ctx.back());
+  const rail = createRail([], () => ctx.back(), 'board');
 
   function railUpdate(): void {
     rail.update([
       {
         key: 'GRIP',
-        label: phase === 'running' ? 'End the round' : 'Start the round',
+        label: phase === 'running' ? 'End the round' : 'Hold the knife',
         accent: true,
         shortcut: 'shift',
         disabled: pass.status() !== 'live',
@@ -350,92 +358,73 @@ export function cuttingPanel(ctx: AppContext, params: RouteParams): Panel {
       },
       {
         key: 'A',
-        label: 'Put it on the board',
-        disabled: practice || phase !== 'done' || posted !== null
-          || (ctx.state.lastRound?.measurements ?? 0) < MIN_MEASUREMENTS,
+        label: 'Submit the board',
+        disabled: postButton.disabled,
         onPress: () => post(),
       },
       { key: 'Y', label: 'Quit the round', onPress: () => ctx.go('title') },
-      { key: '☰', label: 'Back', end: true, shortcut: 'm', onPress: () => ctx.back() },
+      { key: '☰', label: 'Menu', end: true, shortcut: 'm', onPress: () => ctx.back() },
     ]);
   }
 
-  const node = h(
-    'section',
-    { class: 'screen cut' },
-    pass.node,
+  stage.board.classList.add('b2', 'b2--live');
+  stage.board.append(
     h(
-      'header',
-      { class: 'screen__head cut__head' },
-      h('h1', { class: 'display d-lg cut__title', text: practice ? 'Knife practice' : 'Competitive cutting' }),
-      h('span', {
-        class: 'pill pill--hot pill--display',
-        text: recipe === null ? 'Free round' : recipe.name,
+      'div',
+      { class: 'k-head' },
+      h('div', { class: 'k-title', text: practice ? 'Knife practice' : 'Competitive cutting' }),
+      h('div', {
+        class: 'k-round',
+        text: recipe === null ? 'Free round · 90 seconds' : recipe.name,
       }),
-      h('span', { class: 'pill cut__cam', text: 'camera' }),
+    ),
+    camPill,
+    h(
+      'div',
+      { class: 'k-timer' },
+      clockLabel,
+      clock,
+      h('div', { class: 'k-timer__meter' }, clockFill),
+    ),
+    boardGuide,
+    h(
+      'div',
+      { class: 'k-stats' },
+      statTile(0, 'Even cuts'),
+      statTile(1, 'Pace'),
+      statTile(2, 'Pieces in shot'),
     ),
     h(
       'div',
-      { class: 'screen__body cut__body' },
+      { class: 'k-board-panel' },
       h(
         'div',
-        { class: 'stack grow cut__left' },
-        h(
-          'div',
-          { class: 'card cut__clock-card' },
-          clockLabel,
-          clock,
-          h('div', { class: 'meter cut__clock-meter' }, clockFill),
-        ),
-        h(
-          'div',
-          { class: 'cut__stats' },
-          statTile('Even cuts', evenValue, 'var(--leaf)'),
-          statTile('Pace', paceValue, 'var(--yellow-soft)'),
-          statTile('Pieces in shot', piecesValue, 'var(--pink)'),
-        ),
-        h('div', { class: 'card cut__controls' }, hint, h('div', { class: 'row cut__control-row' }, primary)),
+        { class: 'k-lb__head' },
+        h('div', { class: 'k-lb__title', text: 'Leaderboard' }),
+        h('div', { class: 'k-lb__scope', text: 'This device' }),
       ),
+      rows,
       h(
         'div',
-        { class: 'card cut__board' },
-        h(
-          'div',
-          { class: 'row cut__board-head' },
-          h('h2', { class: 'display d-md grow', text: 'Leaderboard' }),
-          h('span', { class: 'pill', text: 'This device' }),
-        ),
-        boardRows,
-        h('hr', { class: 'divider' }),
-        boardNote,
-        h(
-          'div',
-          { class: 'cut__post' },
-          h('div', { class: 'cut__name-wrap' }, art(heroUrl('carrot'), heroSize('carrot', designRem(36))), nameInput),
-          submit,
-        ),
+        { class: 'k-lb__foot' },
+        call,
+        rule,
+        h('div', { class: 'k-lb__actions' }, goButton, postButton),
+        h('div', { class: 'k-name-wrap' }, nameInput),
       ),
     ),
     rail.node,
   );
 
-  function onCameraChange(): void {
-    const el = node.querySelector('.cut__cam');
-    if (el instanceof HTMLElement) {
-      el.textContent = pass.status() === 'live' ? 'Passthrough live' : `Camera ${pass.status()}`;
-      el.classList.toggle('pill--leaf', pass.status() === 'live');
-    }
+  const node = h('section', { class: 'screen screen--board cutting' }, pass.node, stage.node);
+
+  const stopWatching = pass.onStatusChange(() => {
     // A camera that drops mid-round ends the round rather than quietly scoring nothing.
     if (pass.status() !== 'live' && phase === 'running') finish();
     paint();
-  }
+  });
 
-  const stopWatching = pass.onStatusChange(onCameraChange);
-
-  // Called once as well as on change: the camera is often ALREADY live by the time this screen
-  // mounts (the loading screen opened it), in which case no change event ever arrives and the
-  // pill would sit on its placeholder text forever.
-  onCameraChange();
+  paint();
 
   return {
     node,
@@ -444,10 +433,19 @@ export function cuttingPanel(ctx: AppContext, params: RouteParams): Panel {
       if (timer !== null) clearInterval(timer);
       stopWatching();
       pass.destroy();
+      stage.destroy();
       rail.destroy();
     },
   };
 }
+
+/**
+ * The score as the document prints it: four digits with a thousands separator.
+ *
+ * The underlying number is 0..1 -- 0.7 of evenness plus 0.3 of pace -- and this is a display
+ * scale on it, the same way a percentage is. Nothing is invented; 0.94 is 9,400.
+ */
+const points = (total: number): string => Math.round(total * 10000).toLocaleString('en-US');
 
 function formatClock(seconds: number): string {
   const whole = Math.max(0, Math.floor(seconds));
@@ -457,6 +455,5 @@ function formatClock(seconds: number): string {
 function ordinal(n: number): string {
   const rest = n % 100;
   if (rest >= 11 && rest <= 13) return `${n}th`;
-  const suffix = ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th';
-  return `${n}${suffix}`;
+  return `${n}${['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
 }

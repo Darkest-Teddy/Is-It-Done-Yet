@@ -34,6 +34,15 @@ export interface PassthroughView {
 export interface PassthroughOptions {
   /** Darkens the camera so cream panels stay readable over a bright counter. */
   readonly scrim?: boolean;
+  /**
+   * Draw the built-in fault card. On by default.
+   *
+   * The screens built on a scaled artboard turn this OFF and report the camera themselves. The
+   * card is positioned in window coordinates while their panels are positioned in artboard
+   * coordinates, so the two collide at any scale but one -- and the screen knows where its own
+   * empty space is, which this file cannot.
+   */
+  readonly fault?: boolean;
 }
 
 const FAULT_TITLE: Readonly<Record<PassthroughStatus, string>> = {
@@ -90,6 +99,11 @@ export function mountPassthrough(options: PassthroughOptions = {}): PassthroughV
   });
 
   function paintFault(state: PassthroughStatus, detail: string): void {
+    if (options.fault === false) {
+      fault.style.display = 'none';
+      fill(fault);
+      return;
+    }
     if (state === 'live') {
       fault.style.display = 'none';
       fill(fault);
