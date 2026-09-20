@@ -1,3 +1,272 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+---
+
+## Read this before trusting anything below
+
+**Everything from `# MISE — Master Build Spec` onward is the original hackathon master spec. It
+describes a Quest 3S / IWSDK / Havok cooking simulation whose code is NOT in this repository.**
+
+That spec is **doctrine, not description**. Its numbered rules (§17) still govern. Its
+architecture, file paths and §14 repo layout do not exist here — §14 is 0% accurate; none of
+`src/systems/`, `src/physics/`, `src/meshes/`, `src/perception/`, `src/shaders/`, `src/sim/`,
+`src/xr/`, `harness/`, `server/routes/` or `spectator/` is present.
+
+The correction is `DECISIONS.md` entry 12, which sits at line 272 of a 408-line file — after
+eleven entries a reader has already taken as description. Do not read entries 1–11 as current.
+
+## What is actually here
+
+Two live builds and one absent one.
+
+| Path | What | State |
+|---|---|---|
+| `src/` | Browser + webcam slice-measurement app. TypeScript, OpenCV.js | Runs. 196 tests |
+| `unity/` | Quest 3/3S MR perception app. C#, OpenXR, OpenCV for Unity | **Never compiled** |
+| `server/` | One file: a Qwen-VL relay for the Unity app, hosted or local | Runs |
+
+`README.md` says *"Not built: … anything XR"*. **That is wrong** — `unity/` landed in the same
+commit. Treat `unity/README.md` as authoritative for that half of the repo.
+
+**`unity/` is not an openable Unity project.** It contains `Assets/Scripts/Perception/` and
+nothing else — no `ProjectSettings/`, no `Packages/manifest.json`, no `.meta` files, no scenes,
+no `StreamingAssets/` (despite `unity/README.md` telling you to put `yolov8n.onnx` there). The
+scripts are copied into a Unity project you create yourself.
+
+## Commands
+
+All verified. Run from the repo root — `check:purity` resolves `src/core` relatively and throws
+`ENOENT` from anywhere else.
+
+```bash
+npm ci                  # first install is slow: OpenCV + Tesseract WASM payloads
+npm test                # THE FULL GATE: check:purity && typecheck && 196 tests
+npm run test:core       # fast inner loop, 177 tests, skips the purity-guard suite
+npm run check:purity    # layering only, instant
+npm run typecheck       # tsc --noEmit
+npm run dev             # 0.0.0.0:8081 -- LAN-visible on purpose, Windows firewall will prompt
+npm run build           # -> dist/, base './' so it works from any subpath
+```
+
+Single test file, and a single test by name:
+
+```bash
+npx vitest run src/core/track.test.ts
+npx vitest run src/core/track.test.ts -t "treats a stub that got longer as a bad baseline"
+```
+
+**`-t` with a pattern that matches nothing exits 0 with everything skipped.** A typo'd name is
+indistinguishable from a pass. Read the `N passed` line, never the exit code.
+
+The relay (Unity only — the web app never calls it). Two upstreams, both speaking
+chat-completions. **Use the npm scripts** — they load `.env` through Node's own `--env-file`,
+so no key ever goes on a command line:
+
+```bash
+npm run relay          # :8787, hosted Qwen. Needs OPENROUTER_API_KEY in .env
+npm run relay:local    # :8787, local Qwen via Ollama. No key, no network, no .env needed
+```
+
+`relay:local` passes `--upstream=ollama`, which beats both `.env` and the shell. That flag
+exists because npm scripts must work on Windows, where `VAR=val node ...` is a cmd.exe parse
+error — the alternative was a `cross-env` dependency the relay is built to avoid.
+
+`curl localhost:8787/health` says which upstream is live and which models it will forward.
+**The model string in the Unity build must match that allowlist** — the relay rejects anything
+else by name. Hosted is `qwen/qwen2.5-vl-72b-instruct:free`, local is `qwen2.5vl:3b`, and
+`VISION_MODELS=a,b` extends the list when a free-tier ID goes stale.
+
+No linter, no formatter, no CI. `npm test` is the entire quality gate and it is manual.
+
+## Architecture
+
+### `src/core/**` is framework-free, and this is enforced
+
+No `three`, `@iwsdk`, `@babylonjs` or `@dimforge` import may appear under `src/core`.
+`npm run check:purity` fails the build on one, and the guard is itself tested
+(`scripts/purity-rules.test.mjs`, 19 cases) because "an untested guard is worse than no guard".
+
+The dependency arrow points **only inward**: `src/main.ts`, `src/vision/*`, `src/audio/*` all
+import from core; nothing in core reaches out. Every intra-core edge is `import type`, so with
+`verbatimModuleSyntax` they erase entirely at compile time.
+
+This is what makes the hard parts — coordinate math, cut detection, OCR voting — provable from a
+terminal with no camera, browser or headset.
+
+### The web render loop
+
+`src/main.ts` `tick()`, once per `requestAnimationFrame`:
+
+```
+source() -> ImageData
+  -> segment()          src/vision/segment.ts   OpenCV: HSV -> saturation threshold -> contours
+  -> hue gate           filters to produce BEFORE tracking
+  -> observe()          src/core/track.ts       stub tracking, cut detection
+  -> recordCut()        src/core/metrics.ts
+  -> scoreSession()     src/core/scoring.ts     runs EVERY frame, not just on a cut
+  -> formatScore()      the headline string
+```
+
+**Option objects are rebuilt at their call sites every frame on purpose** (`segmentOptions()`,
+`trackOptions()`, `scoringOptions()`, `feedbackOptions()`). Hoisting any of them into a `const`
+outside `tick` is the single refactor that silently kills every slider at once.
+
+`segment()` caches eight WASM Mats across frames keyed on `(width, height, kernelPx, satFloor)`.
+Allocating them per frame cost ~250ms at 1080p **regardless of blob count** — the two `inRange`
+bound Mats are ~6MB each and exist only because the JS binding takes Mats where C++ takes
+Scalars. Never add a per-frame buffer without extending both the `Scratch` shape and its cache key.
+
+### The Unity pipeline
+
+```
+WebCamTexture -> Graphics.Blit (GPU downscale) -> AsyncGPUReadback   [render thread, <1ms]
+  -> Mat copy                                                        [main thread, ~2ms]
+  -> YOLOv8n + Canny contours                                        [ONE worker thread]
+  -> Depth API raycast, MRUK fallback                                [main thread -- Unity API]
+  -> size + veto filters -> tracking -> RecipeRunner                 [main thread]
+```
+
+One worker, not a pool: an OpenCV `Net` is not re-entrant, and two concurrent inferences on a
+mobile chip finish at the same time as each other, twice as late. The Mat is **copied** across
+the boundary because the feed reuses its buffer every capture.
+
+`CapturedFrame` carries the camera pose from the moment of the Blit. Using the live pose instead
+puts holograms 10–17cm out at 1m after a readback plus inference, which reads as broken tracking.
+
+### The two hysteresis layers lean opposite ways, deliberately
+
+This is the most important design conversation in the tree, and the two headers cross-reference
+each other:
+
+- **`src/core/track.ts`** — slow to confirm, cheap to miss. A false cut is written permanently
+  into the score, sigma and leaderboard. Eight rejection reasons gate a candidate; an increase is
+  never a cut, only a corrected baseline.
+- **`src/core/perception/tracking.ts`** — slow to appear, **slower to disappear**. Nothing is
+  scored; the failure is a label that blinks. `despawnMissFrames` (5) exceeds
+  `spawnConfirmFrames` (3) on purpose, with two confidence thresholds so a wobbling detector
+  lives in the band between them.
+
+Porting one's tuning to the other inverts the risk model. Read both headers before touching
+either set of constants.
+
+### Absent is never zero
+
+Stated and cross-cited in eight modules. `null` for a result that could not be computed,
+`undefined` for an unmeasured field of an otherwise-valid record. A sentinel is treated as a lie:
+defaulting an unmeasured cut angle to zero would score every slice the camera could not judge as
+a flawless square cut, inflating the score in the one direction nobody would question.
+
+Every constructor refuses rather than coerces — `calibrate()`, `identify()`, `entryFrom()`,
+`parseEntries()`, `setTunable()` all return null or ignore bad input.
+
+The one deliberate exception is `median([])` returning `NaN`, pinned by a test: NaN is the
+internal poison value, `null` is the exported one.
+
+### Magic numbers live in a registry
+
+`src/core/tunables.ts` (web) and `PerceptionTunables.cs` (Unity). Both generate their debug panel
+from the table and are read on **every** use. A cached read makes the slider look broken, which
+is worse than having no slider because you then debug the wrong thing.
+
+Changing a default that a document argues for breaks `tunables.test.ts` deliberately — update the
+rationale in the same commit.
+
+## Known traps
+
+Verified, in rough order of how much time they cost:
+
+- **`src/core/perception/**` and `src/vision/ocr*.ts` are unreachable from the running app.**
+  Six modules, ~500 lines, 60 tests, zero consumers. They are a portable library staged for the
+  headset. `tesseract.js` ships in the bundle for nothing.
+- **There are two `useOpenCv` functions** — `segment.ts:33` and `ocrPrep.ts:35`. `main.ts` only
+  calls the first. Wiring up `prepareCrop()` gets "OpenCV is not loaded" from the file you are
+  not looking at.
+- **The scoring sliders are dead whenever a ticket is selected.** `scoringOptions()` prefers
+  `activeRecipe?.…`, so `TARGET_THICKNESS_MM`/`TOLERANCE_MM`/`TARGET_SIGMA_MM` do nothing.
+  `ANGLE_TOLERANCE_DEG` is inert always — nothing measures cut angle.
+- **`DEFAULT_TRACK_OPTIONS.refractoryFrames` is 15; the registry says 5.** The registry is right
+  and production reads it. `DEFAULT_TRACK_OPTIONS` is a hand-maintained duplicate with nothing
+  pinning their agreement.
+- **`modes.value = x` fires no `change` event.** Dropping a clip leaves the scrub bar hidden
+  because the `.shown` toggle only happens in the listener.
+- **`check:purity` cannot catch a relative escape.** `import { segment } from '../vision/…'`
+  inside `src/core` reports "purity OK" — the exact inversion its own failure message forbids.
+- **`tsconfig.json`'s `"scripts"` include is a no-op** (no `allowJs`, all `.mjs`), so the purity
+  checker is never typechecked. `server/` is not in `include` at all.
+- **`status()` outside `tick` is invisible** — the status line is rewritten every frame.
+- Node 23 is excluded by the engine range, but `engine-strict` is off, so it warns rather than
+  fails.
+
+### Unity-specific
+
+None of the C# has been compiled — there is no Unity, Meta XR SDK or OpenCV for Unity on this
+machine. Brace balance is verified mechanically, which is not the same as compiling. Two real
+compile errors were caught that way; expect API drift on first build, most likely
+`PassthroughCameraUtils`, `EnvironmentRaycastHit.normalConfidence` and the `OVRInput` constants.
+
+The defects an audit found all shared one shape — **they work in the Editor and fail on the
+device**:
+
+- `Utils.getFilePath` returns empty on Android, because StreamingAssets lives inside the APK.
+  YOLO never loaded and the app presented as bad at detecting food. Now resolved through
+  `UnityWebRequest` into `persistentDataPath`. **Do not reintroduce it.**
+- `Shader.Find` resolves in the Editor and returns null in a build, because Unity strips
+  unreferenced shaders. All material creation goes through `UnlitMaterials`, which returns
+  null rather than throwing. Add an unlit shader to Always Included Shaders before shipping.
+- `Input.GetKey` under `#if UNITY_EDITOR` throws if the project uses the new Input System.
+- `OVRInput` silently returns zero with no `OVRManager` in the scene, so the debug panel
+  renders perfectly and does nothing.
+
+Known and deliberately unfixed: `MedianOf` leaks four native Mats per call; the per-inference
+`float[8400*84]` is a 2.8MB allocation that should be reused; `Utils.matToTexture2D` flips by
+default on most versions, so identification crops are probably upside down; and `_workerMat` is
+paired with its results only by the capture rate being slower than inference, which a runtime
+slider can close.
+
+`yield break` inside a `catch` is legal C#. Do not "fix" it.
+
+## Which documents to trust
+
+| Trust | Document |
+|---|---|
+| Authoritative for `unity/` | `unity/README.md` — verified against all 18 `.cs` files |
+| Authoritative for `src/` | `DECISIONS.md` entries **12–15** |
+| Right about `src/`, wrong about `unity/` and the test count (says 136, actual 196) | `README.md` |
+| Accurate only where it covers `src/core/perception` and `src/vision`; §6 is source for files that do not exist, and says so | `docs/MR-PERCEPTION.md` |
+| Doctrine only — rules survive, architecture does not | this file below, `DECISIONS.md` **1–11** |
+| Historical | `PHYSICS.md`, `docs/superpowers/**` |
+
+Of `PHYSICS.md`, only the **Thickness** section is still live (axial vs perpendicular,
+`thickness = axialDelta · cos(angle)`) — that is what `metrics.ts` implements. Nineteen of its
+twenty constants are asserted *absent* by `tunables.test.ts`, which exists to stop them coming
+back.
+
+**`docs/superpowers/` contains two unmarked frozen copies of documents that have since been
+corrected** — the embedded DECISIONS entry 5 and `PHYSICS.md` inside
+`plans/2026-09-18-mise-simulation-core.md`. Both still assert that `PhysicsShape.density` is
+g/cm³ and instruct a `/1000` conversion. That conclusion was measured against Havok and
+disproved; acting on it makes every mass a thousand times too light. Do not act on anything in
+those three files.
+
+## Of the master spec's §17 rules, these still apply
+
+**#3** vertical slices · **#4** confirmation and hysteresis before anything cosmetic ·
+**#9** every network call gets a timeout and a fallback · **#10** never block the render loop ·
+**#11** every magic number on a live slider · **#12** when ambiguous, pick what survives a live
+demo on bad wifi · **#13** do not fabricate sponsor integrations · **#15** log every deviation in
+`DECISIONS.md`.
+
+Void: **#1** (IWSDK), **#2** (phase gates), **#5**/**#6** (physics solvers), **#7** (procedural
+meshes — the food is real now), **#8** (`FoodThermalProfile` — the principle survives as the
+tunables registry). **#14** is half-void: the habit of marking constants `TUNED, not sourced` is
+alive, but `PHYSICS.md` is no longer a valid destination for new ones.
+
+**Rule #15 is currently breached** — the Unity/OpenXR pivot has no `DECISIONS.md` entry.
+
+---
+
 # MISE — Master Build Spec
 ### Hack the North 2026 · Meta Quest 3S · 4 people · ~36 hours
 

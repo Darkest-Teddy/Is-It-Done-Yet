@@ -620,3 +620,211 @@ piece of work, not a flag, and it must be budgeted before anyone commits to anch
 
 Recorded now because the panel demo is available immediately and the session demo is not, and
 the difference is one measurement rather than an opinion.
+
+---
+
+## 22. There is a second build, in Unity, and this log did not say so
+
+**Spec section:** rule #15 — "Log every deviation from this spec in `DECISIONS.md` with the
+reason." This entry exists because that rule was breached.
+
+**Reality:** entry 12 records one pivot, from the Quest/IWSDK simulation to the browser
+measurement app. There was a **second**, and nothing recorded it: `unity/Assets/Scripts/Perception/`
+is a Meta Quest 3/3S mixed-reality perception app in C# — Unity, OpenXR, MRUK, OpenCV for Unity,
+YOLOv8n through the DNN module. Eighteen files, and by commit count the most active part of the
+repository.
+
+It was invisible. `README.md` listed "anything XR" under **Not built** — in the same commit that
+added `unity/`. A newcomer read the README first and never opened the directory holding the
+newest work. The correction is now in `README.md` and in this file's own preamble.
+
+**Decision:** two live builds, one repository, sharing documents and a design but no code.
+
+- `src/` — browser, TypeScript, one fixed camera, measures real slices in millimetres.
+- `unity/` — Quest 3/3S, C#, passthrough cameras, identifies and places holograms.
+
+They cannot share source: one is TypeScript and the other C#. What they share is
+`src/core/perception/**`, which was written framework-free precisely so its algorithms — pose
+ring, unprojection, hysteresis, OCR voting — could be **ported** rather than imported. That is
+why those six modules are fully tested and have no consumer in the web app: they are a
+specification with a test suite attached, staged for the headset.
+
+**What that costs, honestly.** The web bundle carries `tesseract.js` and ~500 lines of
+unreachable TypeScript. That is real waste, and the alternative — deleting the reference
+implementation and rewriting it in C# from the spec — would have cost the tests, which are the
+only reason the coordinate math is trustworthy at all.
+
+**`unity/` is not a Unity project.** It holds `Assets/Scripts/Perception/` and nothing else: no
+`ProjectSettings/`, no `Packages/manifest.json`, no `.meta` files, no scenes, and no
+`StreamingAssets/` even though the model must live there. The scripts are dropped into a project
+you create. Nothing in the tree says so, which is why it is said here.
+
+**None of it has been compiled.** There is no Unity install, no Meta XR SDK and no OpenCV for
+Unity on the machine it was written on, so roughly half of these files cannot resolve a single
+external type as checked in. Brace and parenthesis balance has been verified mechanically and
+two genuine compile errors were caught that way — a field and a method both named `Rejected`,
+and a stale constructor signature — but "it balances" is not "it compiles". Expect API drift on
+first build, most likely `PassthroughCameraUtils`, `EnvironmentRaycastHit.normalConfidence` and
+the `OVRInput` button constants.
+
+## 23. Four bugs an audit found in the Unity build, and what they have in common
+
+**Reality:** the Unity code was reviewed file by file after it was written. Four defects, and
+all four share a shape: **they work in the place you would test them and fail in the place they
+run.**
+
+**`Utils.getFilePath` returns empty on Android.** On a Quest, StreamingAssets is not a directory
+— it is compressed inside the APK, and `Application.streamingAssetsPath` is a `jar:file://` URL
+no file API can open. The manager logged "model not found", set `enabled = false`, and YOLO never
+ran for the entire session. Everything else kept working, so it would have presented as *the
+model is bad at finding food* rather than as *the model never loaded*. Now resolved through
+`UnityWebRequest` into `persistentDataPath`, cached after the first run.
+
+**`Shader.Find` at runtime.** Unity strips every shader no scene material references, so the
+lookup that resolves in the Editor returns null in a build, and `new Material(null)` throws — in
+`DetectionVisualizer`, whose entire purpose is to draw something when nothing else has been set
+up. Now centralised in `UnlitMaterials`, which returns null and logs once instead of throwing,
+and which callers treat as "draw nothing".
+
+**The depth raycast never fell through to MRUK.** Both branches returned, so a low-confidence
+depth normal silently became `Vector3.up` and the scene model was never consulted. The comment
+three lines above said it fell through. **The comment described behaviour the code did not have**,
+which is worse than no comment: it survives review because the reviewer reads the comment.
+
+**Identification cropped the smallest matching box.** `bestScore = float.MaxValue` with a `<`
+comparison selects the minimum, so with two detections of one label it systematically sent the
+runtiest to be identified.
+
+**Decision:** all four fixed. The pattern is worth keeping: every one of them is invisible on the
+machine that writes the code and only appears on the device that runs it, which is an argument
+for getting onto hardware early rather than for reviewing harder.
+
+**Known and not fixed**, recorded so they are chosen rather than discovered: `MedianOf` leaks
+four native Mats per call; the per-inference `float[8400*84]` is a 2.8MB allocation that should
+be reused; `Utils.matToTexture2D` flips by default on most versions, so crops sent for
+identification are probably upside down; and `_workerMat` is paired with its results only by the
+capture rate being slower than inference — a runtime slider can close that gap.
+
+---
+
+## 24. The vision model is Qwen now, and it runs in two places
+
+**Spec section:** §6 names Gemini 3 Flash for scene semantics and §10.4 specifies a four-provider
+abstraction. Neither shipped. What shipped was one provider calling `gpt-4o-mini`, and this entry
+replaces it.
+
+**Reality:** identification went to OpenAI because it was the fastest thing to wire up at the
+time. That left the offline story hollow. Spec rule #9 says every network call gets a timeout and
+a fallback, and rule #12 says to pick what survives a live demo on bad wifi — and the fallback we
+had was `LocalHintProvider`, which does not identify anything. It returns the COCO label the
+detector already produced. Losing the network did not degrade identification; it removed it.
+
+That is the failure mode the spec warns about, dressed up as a fallback.
+
+**Decision:** Qwen2.5-VL, Apache-2.0 open weights, reached through the existing relay. The relay
+now resolves its upstream from `VISION_UPSTREAM`:
+
+- `openrouter` (default) — hosted 72B, free tier, needs a key and wifi, answers in 1–3s.
+- `ollama` — the same family running on the laptop over loopback, no key, no internet. Budgeted
+  at 5–15s for a 3B on an Intel iGPU. **Measured at 20–26s**, which is the one thing in this
+  entry that changed after it was written.
+
+**The point is that these are the same model, not two different ones.** A closed model gives you
+a fallback that is a worse model with different failure modes you have not rehearsed. This gives
+you the demo you practised, slower. The headset is not rebuilt to switch — both upstreams speak
+chat-completions, so the Unity side posts to one URL forever and never learns which answered.
+
+**What this cost, and it is not the model quality.** OpenAI's `response_format: json_schema` with
+`strict: true` *guarantees* the reply is one object with exactly those keys. No Qwen endpoint
+implements it — most ignore the field, some 400 on it, and that 400 reads as "the relay is
+broken" when it means "this model lacks that feature".
+
+So the request asks for `json_object`, which both upstreams honour, and the **keys come from the
+prompt**, which now states the shape explicitly. json_object constrains the reply to *parse* as
+JSON; it does not constrain what is in it. Those are different guarantees and the old code
+depended on the stronger one.
+
+And because neither is a guarantee, `ParseIdentification` trusts neither. It walks every `{` in
+the content and returns the first balanced object yielding a label, tracking string literals so a
+`}` inside a note does not close the object early. That absorbs a code fence, a leading "Here is
+the identification:", a `<think>` block, and a stray brace in prose — all things Qwen does and a
+strict schema never did.
+
+Confidence is normalised on the way out. Asked for 0–1 and told so twice, Qwen still answers `85`
+often enough to matter, and clamping that to 1.0 would read as **maximum confidence** — a silent
+lie in the one direction nobody audits. Same reasoning as "absent is never zero".
+
+**Verified end to end, against the real model.** `qwen2.5vl:3b` was pulled and driven through
+the relay with the exact request shape `BuildRequest` produces — the system prompt extracted from
+the `.cs` file rather than retyped, so the test cannot drift from the build:
+
+| Input | Reply | Round trip |
+|---|---|---|
+| Cucumber, 293×512 JPEG q70 | `{"label": "cucumber", "confidence": 0.95}` | 23.7s |
+| Wood worktop, 512×384 | `{"label": "none", "note": "worktop or cabinet"}` | 26.4s |
+| Cucumber, hint `broccoli` | `{"label": "cucumber"}` — hint overridden | 19.9s |
+
+The middle row is the one that matters. The false-positive filter is the reason the `none`
+instruction is in the prompt at all, and it survived the model swap. The third shows a wrong hint
+does not drag the answer with it.
+
+Those three replies were then added **verbatim** to the parser harness, which now runs 23 cases:
+fences, prose on both sides, braces and escaped quotes inside notes, a junk object before the
+real one, a `<think>` block, the three failure shapes, and these three live replies. All pass.
+The relay's own paths — startup refusals, health, allowlist rejection by name — were exercised
+separately.
+
+**The measurement invalidated a recommendation in this entry's first draft.** It said to set
+`timeoutSeconds` to 25 for the local model. Two of the three calls above exceed that, so the
+advice would have discarded answers that had already arrived and presented as "the offline path
+does not work". It is now 45, and `Range(1, 30)` became `Range(1, 60)` because 30 left no
+headroom over a measured 26s worst case. Estimating a latency budget and then not measuring it
+is how that class of bug ships.
+
+**What 25s an object actually costs.** Five objects on a table is two minutes of labels
+trickling in. Nothing blocks, and the COCO label shows the whole time, so it degrades rather
+than breaks. But the offline path is **not** equivalent to the hosted one and should not be
+described to a judge as though it were: same model, same answers, an order of magnitude later.
+
+**That is not a compile.** There is still no Unity on this machine, so everything touching
+`UnityWebRequest`, `Texture2D` or `JsonUtility` is unverified, and `JsonUtility` in particular is
+*stubbed* in that harness — it is System.Text.Json wearing its name. The algorithm is tested; its
+one Unity dependency is not. Expect the first real build to find something here.
+
+**Renamed** `OpenAiVisionProvider` to `VlmVisionProvider`, since the whole point is that it is no
+longer tied to one vendor. Safe to do now precisely because `unity/` has no `.meta` files — there
+are no GUID references to break. It will not be safe once the scripts are in a real project.
+
+**The hosted path is verified too**, against a real key, with the same three images:
+
+| Input | Reply | Round trip |
+|---|---|---|
+| Cucumber | `{"label": "cucumber", "confidence": 0.95}` | 2.1s |
+| Wood worktop | `{"label": "none", "note": "…not a food item or ingredient"}` | 0.9s |
+| Cucumber, hint `broccoli` | `cucumber`, note: *"the local detector's guess of 'broccoli' is incorrect"* | 1.8s |
+
+`json_object` **is** honoured — one clean object each time, no fence, no preamble. The tolerant
+parser was not exercised by these replies, which is the correct outcome: it is insurance, not
+the mechanism. All six live replies (three local, three hosted) are now pinned as parser cases,
+which brings that harness to 26.
+
+**The allowlist was wrong, and this is the entry's second correction.** It shipped naming
+`qwen/qwen2.5-vl-72b-instruct:free` and `qwen/qwen2.5-vl-32b-instruct:free`. **Neither model
+exists.** Both were written from memory, and the first real request would have been rejected by
+the relay's own allowlist — by name, at least, which is the one thing that worked as designed.
+Querying `/api/v1/models` takes one call and was not done until after the fact.
+
+Worse for the plan: of 447 models, exactly **one** free model accepts images and is a Qwen,
+`qwen/qwen3.8-27b:free`, and it returned `429 temporarily rate-limited upstream` on every
+attempt including an immediate retry. **The free tier is not a plan.** The default is now
+`qwen/qwen3-vl-30b-a3b-instruct`, which is paid and so cheap that three identifications did not
+move a $50 balance off `$0`.
+
+That leaves the two upstreams in a different relationship than this entry first described.
+Hosted is fast and effectively free but needs an account and a network. Local is free forever
+and needs neither, but is 10-25x slower. Neither is strictly better, which is the argument for
+having built the switch rather than picking one.
+
+**Not done:** `VISION_MODELS` is the escape hatch for the next time an ID drifts, and it was
+used to run these tests before the allowlist was edited — so it is exercised, but no test pins
+it. If a model ID silently disappears again, nothing fails until someone tries it.

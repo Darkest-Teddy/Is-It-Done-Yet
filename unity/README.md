@@ -13,6 +13,13 @@ Assets/Scripts/Perception/
 ├── DetectionRaycaster.cs       2D pixel → world ray → Depth/MRUK hit → placement
 ├── DocumentRectifier.cs        4 corners -> flat page, the OCR input
 ├── DetectionVisualizer.cs      runtime wireframe box, so no prefab authoring needed
+├── IVisionProvider.cs          identify-what-it-is seam, + offline fallback
+├── FoodPlausibility.cs         real-world size gating, food/container/ignore roles
+├── LabelMatch.cs               COCO vs open-vocabulary reconciliation
+├── Recipe.cs                   steps, ingredients, triggers
+├── RecipeRunner.cs             the state machine. Pure C#, unit-testable
+├── RecipeRailUI.cs             left rail + you-need checklist
+├── VlmVisionProvider.cs        Qwen-VL, via a relay that picks the upstream
 ├── PerceptionTunables.cs       every threshold, one registry, persisted
 ├── PerceptionDebugUI.cs        in-headset tuning panel + live edge view
 └── MRPerceptionManager.cs      threading, tracking, prefab lifecycle
@@ -342,3 +349,443 @@ under one lighting condition give you a solid white edge map or an empty one in 
    the desk texture mostly gone.
 3. **Edge dilate**, if borders still come out broken. This is the step that decides whether a
    page is one closed contour or three disconnected arcs.
+
+
+---
+
+## Identifying food with Qwen-VL
+
+COCO-80 knows ten foods, all prepared dishes, and no raw ingredients at all — no onion, no
+pepper, no cucumber, no cheese of any kind. Fixing that by training means a labelled *detection*
+dataset and a GPU. An open-vocabulary model needs neither.
+
+So the split is:
+
+```
+YOLO + contours   →  WHERE something is   →  local, 5Hz, milliseconds
+Qwen-VL           →  WHAT it is           →  once per object, 1-3s hosted / 20-26s local
+```
+
+### Why an open-weights model
+
+Because it makes the fallback real. Qwen-VL runs hosted *and* on the laptop on the table, so when
+the venue network turns hostile the demo does not change shape — the relay flips an env var and
+the same model answers, slower. A closed model gives you a fallback that is really just a worse
+model. Master spec rule 12: pick what survives a live demo on bad wifi.
+
+Both upstreams speak the OpenAI chat-completions dialect, which is the only reason one relay and
+one C# class can serve both. The headset never learns which is answering.
+
+### Once per object, not once per frame
+
+This is the whole reason a multi-second round trip is affordable at all. A jar on a table does not become
+a different jar. The local detector holds the track at 5 Hz, and `RequestIdentification` fills in
+the name a second or two later, after which it sticks.
+
+Five objects in a session is **five calls**. Calling per frame at 5 Hz for an hour would be
+eighteen thousand — which on a free tier is the difference between working and being rate
+limited, and on the local model between usable and unusable.
+
+Until the answer arrives the object shows the local label, so nothing is ever blank.
+
+### Setup
+
+**1. Run the relay** (repo root, needs nothing installed). Pick an upstream:
+
+```bash
+cp .env.example .env        # then put your free OpenRouter key in it
+npm run relay               # hosted Qwen
+
+# local Qwen. No key, no internet, no .env. One 3.2GB download, once.
+ollama pull qwen2.5vl:3b
+npm run relay:local
+```
+
+Both scripts work identically in PowerShell, bash and cmd, which the raw `node` invocations did
+not — `VAR=val node ...` is a parse error in cmd.exe. `.env` is read by **Node itself** through
+`--env-file-if-exists`, so there is no `dotenv` dependency and no key on a command line where
+it would land in shell history. `.env` is gitignored (`.gitignore:6`); `.env.example` documents
+every variable and holds no secrets.
+
+`relay:local` passes `--upstream=ollama`, which overrides both `.env` and the shell — so a
+`.env` configured for hosted does not have to be edited to rehearse the offline path.
+
+`curl http://localhost:8787/health` reports which upstream is live and which models it will
+forward. That is the question you actually have at 3am after flipping the env var.
+
+**2. Point the provider at it.** Add `VlmVisionProvider` to the scene, set `relayUrl` to
+`http://<your-laptop-lan-ip>:8787/vision`, and drag it into `MRPerceptionManager`'s
+**Vision Provider Behaviour** field. Set `model` to match the upstream — the relay rejects
+anything off its allowlist **by name**, so a mismatch says so rather than failing vaguely.
+
+Leave that field empty and it falls back to `LocalHintProvider` — COCO labels, fully offline,
+no relay at all. That is the configuration to rehearse the demo in.
+
+### Choosing an upstream
+
+| | Hosted (OpenRouter) | Local (Ollama) |
+|---|---|---|
+| Model | `qwen/qwen3-vl-30b-a3b-instruct` | `qwen2.5vl:3b` |
+| Latency | **0.9–2.1s measured** | **20–26s measured** on an Intel iGPU, warm |
+| Accuracy | Better, noticeably so on cheese and herbs | Good enough to name a vegetable |
+| Needs wifi | Yes | No |
+| Needs a key | Yes (free OpenRouter account) | No |
+| `timeoutSeconds` | 12 | **45** |
+
+**Both upstreams are verified end to end** with the exact request shape `BuildRequest`
+produces. Hosted, `qwen/qwen3-vl-30b-a3b-instruct`:
+
+| Input | Reply | Round trip |
+|---|---|---|
+| Cucumber, 293×512 JPEG q70 | `{"label": "cucumber", "confidence": 0.95}` | 2.1s |
+| Wood worktop, 512×384 | `{"label": "none", "note": "…not a food item or ingredient"}` | 0.9s |
+| Cucumber, hint `broccoli` | `{"label": "cucumber"}`, note: *"the local detector's guess of 'broccoli' is incorrect"* | 1.8s |
+
+`json_object` is honoured — every reply came back as one clean object, no fence, no preamble.
+The tolerant parser was not needed here, which is the point: it exists for when it is.
+
+**These numbers are measured, not estimated.** Running the real request shape against
+`qwen2.5vl:3b` through the relay on this laptop (Intel Core Ultra 7 155H, Arc iGPU, 16GB, model
+already warm):
+
+| Input | Reply | Round trip |
+|---|---|---|
+| Cucumber, 293×512 JPEG q70 | `{"label": "cucumber", "confidence": 0.95, ...}` | 23.7s |
+| Wood worktop, 512×384 | `{"label": "none", "note": "worktop or cabinet"}` | 26.4s |
+| Cucumber, hint `broccoli` | `{"label": "cucumber", ...}` — hint overridden | 19.9s |
+
+Two things worth noting. The false-positive filter **works** — bare worktop came back `none`,
+which is the whole reason that instruction is in the prompt. And a deliberately wrong hint did
+not drag the answer with it, which is the behaviour §"Identifying food" assumes.
+
+The cost is time. At ~25s an object, five objects on the table is two minutes of labels
+trickling in. Nothing blocks and the COCO label shows throughout, so it degrades rather than
+breaks — but the offline path is **not** equivalent to the hosted one. Same model, same answers,
+an order of magnitude later. Rehearse it before you rely on it.
+
+Default to hosted, rehearse local.
+
+**Check model IDs before trusting them.** The first version of the allowlist named
+`qwen/qwen2.5-vl-72b-instruct:free` and `...-32b-instruct:free`. **Neither exists.** Both were
+written from memory and would have failed on first contact. The catalogue is one call away:
+
+```bash
+curl -s https://openrouter.ai/api/v1/models | grep -o '"id":"qwen/[^"]*"'
+```
+
+When an ID goes stale, `VISION_MODELS` extends the allowlist without a code change:
+
+```bash
+VISION_MODELS=qwen/qwen3-vl-8b-instruct node server/vision-relay.mjs
+```
+
+**On "free".** `qwen/qwen3.8-27b:free` is the only genuinely free model that accepts images, and
+it returned `429 temporarily rate-limited upstream` on every attempt the day this was written,
+including an immediate retry. Treat it as a bonus, not a plan. `qwen/qwen3-vl-30b-a3b-instruct`
+is the tested default and costs a fraction of a cent per call — three test identifications did
+not move a $50 balance off `$0`.
+
+### The key does not go in the build
+
+`directApiKey` exists for desk testing and logs a warning every time it is used with a remote
+endpoint. Do not ship it.
+
+An APK is a zip file. A key compiled into one is extracted in minutes, and it is your key, your
+billing, your rate limit. No obfuscation changes this — the request has to carry the key in
+plaintext eventually, so anyone with the build and a proxy has it. The only real fix is that the
+device never holds the key.
+
+The local upstream sidesteps this entirely: there is no key, so `directEndpoint` pointed at
+`http://127.0.0.1:11434/v1/chat/completions` leaks nothing. That is the one case where direct
+mode is not a liability.
+
+The relay is ~160 lines, dependency-free, and caps body size and allowed models so it is not an
+open proxy. On a hackathon LAN the exposure is the room you are standing in; put it behind a
+tunnel with real auth for anything public.
+
+### Settings that matter
+
+| Setting | Default | Why |
+|---|---|---|
+| `model` | `qwen/qwen3-vl-30b-a3b-instruct` | Must match the relay's upstream. Local is `qwen2.5vl:3b` |
+| `responseFormat` | `JsonObject` | Portable across both upstreams. See below |
+| `lowDetail` | on | Flat token cost, 512px. For an object filling the crop, plenty. Ignored by local runtimes |
+| `maxEdgePx` | 512 | Uploading larger just to have it downsized server-side wastes the upload, the slowest part of the round trip on venue wifi |
+| `jpegQuality` | 70 | Visually fine here, a third the size of 95 |
+| `timeoutSeconds` | 12 | A timeout is the expected outcome on saturated wifi, not an error. The local label survives. **Raise to 45 for the local model** — measured worst case is 26s |
+
+### Structured output is a request, not a guarantee
+
+This is the one real incompatibility in the swap, and it is worth understanding before it costs
+you an evening.
+
+OpenAI's `response_format: json_schema` with `strict: true` **guarantees** the reply is exactly
+one object with exactly those keys. Qwen endpoints do not implement it — most ignore the field,
+some 400 on it, and a 400 here reads as "the relay is broken" when it really means "this model
+does not have that feature".
+
+So `responseFormat` defaults to `JsonObject`, which OpenRouter and Ollama both honour. That
+constrains the reply to *parse* as JSON; it does **not** constrain the keys. The keys come from
+the system prompt, which states the shape explicitly.
+
+And because neither is a guarantee, `ParseIdentification` does not trust either one. It walks
+every `{` in the reply and returns the first balanced object that yields a label, tracking string
+literals so a `}` inside a note does not end the object early. That handles a code fence, a
+leading "Here is the identification:", a `<think>` block, and a stray brace in prose — all
+things Qwen does and `gpt-4o-mini` under a strict schema never did.
+
+`JsonSchema` mode is still there if you point this at a model that honours it.
+
+Confidence is normalised on the way out: asked for 0–1 and told so twice, Qwen still answers
+`85` often enough that treating it as "clamps to 1.0, maximum confidence" would be a silent lie
+in the one direction nobody checks.
+
+### On cheese specifically
+
+Set expectations. Telling cheddar from gouda visually is hard for *people* without packaging
+context, and Qwen will usually give you "hard cheese" or "yellow cheese" rather than a variety —
+which is the correct answer, and the prompt explicitly asks for it rather than a confident wrong
+guess. The 3B local model is noticeably worse here than the hosted 72B.
+
+If cheese *identity* is load-bearing for the demo, read the label with the OCR path instead of
+recognising the cheese.
+
+### Prize-track note
+
+Nothing here touches the OpenAI track any more, which `CLAUDE.md` §13 says to skip anyway unless
+somebody genuinely uses Codex. Qwen2.5-VL is Apache-2.0 open weights, so there is no vendor claim
+to make and none to defend.
+
+If a sponsor track wants an open-model or on-device story, this is it: the same weights run in
+the cloud and on the laptop, and the relay switches between them without rebuilding the headset.
+
+---
+
+## False positives, and the bowl-contents path
+
+Two related problems with one shared answer.
+
+### You cannot fix this with training data
+
+A COCO detector on a kitchen counter produces a steady trickle of nonsense: wood grain called
+broccoli, a cabinet handle called a knife, a reflection called a bowl. The instinct is to get
+better training data — but that needs a labelled **detection** dataset (Food-101 is
+classification, so it cannot help), a GPU, and hours you do not have.
+
+Raising the confidence threshold does not work either. A false positive at 0.55 and a real
+carrot at 0.55 are indistinguishable *to the model*. You trade noise for misses.
+
+The fix is to ask questions the model cannot.
+
+### Filter 1: real-world size
+
+`FoodPlausibility` rejects detections that cannot be what the model says they are. A "banana"
+90cm long is a worktop. A "carrot" 2cm long is a scratch in the wood.
+
+**This only works because there is depth.** A 2D pipeline has no idea whether a box is a carrot
+at 30cm or a carrot-coloured cabinet at 3m — identical pixels. The depth raycast gives distance,
+distance plus the box gives metres, and metres are decisive. It is nearly free, because
+`EstimateSize` was already computing the number.
+
+Ranges are TUNED, not sourced, and deliberately generous: the job is to reject the absurd, not
+to adjudicate a large carrot.
+
+### Filter 2: let the model that can see everything veto
+
+The crop already goes to Qwen. The prompt now says: if this is worktop, a cabinet, a hand, an
+appliance or wood grain, answer `none`.
+
+That is an open-vocabulary false-positive filter for free. The local detector says broccoli, Qwen
+looks and says worktop, the track is retired immediately — not aged out over `forgetFrames`,
+because the detector will keep re-finding the same wood grain every capture and it would simply
+respawn.
+
+A veto is distinct from a timeout: a timeout means try again, a veto means stop.
+
+### Filter 3: utensils are context, never subjects
+
+`fork`, `knife` and `spoon` are `Role.Ignore`. They are useful for knowing a cutting step is
+happening; they are not things to put a hologram on.
+
+### The bowl-contents path
+
+COCO has `bowl` (45), `cup` (41), `bottle` (39), `wine glass` (40). These are `Role.Container`,
+and a container is interesting for **what is in it**.
+
+This is the whole route to everything COCO cannot see. Shredded cheese, chopped onion, flour,
+spices — none has a shape a detector can localise, and all of them sit in something that does.
+So the container gets found locally, and Qwen is asked about its contents rather than about the
+bowl. The label reads `shredded cheddar (in bowl)`.
+
+Without the `VisionSubject.Contents` distinction the model very reasonably answers "a bowl",
+which is the one thing already known.
+
+### Everything that gets dropped says so
+
+`LastRejection` and `RejectedCount` are on the debug panel — `rejected: carrot at 0.78m` is
+diagnosable in one glance. A detection that silently fails to appear is not, and the reflex is
+to start lowering the confidence threshold, which makes everything worse.
+
+### A note on the reference UX
+
+The Vision Pro cooking concept this is modelled on **does not box the food**. It boxes the hob
+("you need" + checklist), the hob again ("put the pan on"), and the pan ("add salt"). The peppers
+on the board get no box at all — identity comes from the recipe step, not from detection, and a
+left-hand rail tracks state (`ingredients → cutting → pouring → salting → cracking → waiting →
+done`).
+
+That is worth copying, because boxing a pan and a hob is easy and stable while boxing every
+pepper slice is neither. A recipe state machine that knows it is on the "cutting" step does not
+need a detector to tell it there is a pepper — it needs one to tell it *when the pepper has been
+cut*, which is a much easier question.
+
+
+---
+
+## The recipe rail
+
+The piece that makes this look like the reference concept — and, more usefully, the piece that
+makes the detector's job easy.
+
+```
+Recipe.cs        steps, ingredients, triggers, and a built-in Shakshuka
+RecipeRunner.cs  the state machine. Pure C#, no UnityEngine, unit-testable
+RecipeRailUI.cs  the left rail and the "you need" checklist
+```
+
+### It inverts what perception is for
+
+Without a recipe, perception answers **"what is on this counter"** — an open question, against a
+model that knows ten foods, on a wooden surface that generates false positives all day.
+
+With a recipe, it answers **"has the pan arrived yet"** — closed, expected, easy. A step knows
+what it is waiting for, so anything that is not that simply does not matter. The false-positive
+problem does not get solved so much as become irrelevant.
+
+### Most steps are timers, and that is fine
+
+The reference says so out loud: its instruction reads **"add salt (2 sec)"**. That is a timer,
+not a detector.
+
+Detection earns its place on the steps where something *appears* or *leaves* — a pan arriving on
+the hob, the last ingredient reaching the counter. Those are easy, robust and visible. Building
+six fragile gesture detectors for steps a countdown covers better is how you lose a night.
+
+| Trigger | Use for |
+|---|---|
+| `Manual` | Anything hard to see. The safe default |
+| `Appears` / `Disappears` | A pan on the hob, a board cleared |
+| `CountAtLeast` | Cut something into pieces and count them |
+| `Seconds` | Salting, pouring, waiting — most of a recipe |
+
+### Every step is manually skippable
+
+`ManualOverride` defaults true and should stay true. Master spec rule #12: pick what survives a
+live demo. If the pan is not detected — bad light, wrong angle, somebody's arm in the way — the
+demo must not be stranded on step four in front of a judge.
+
+Right index trigger advances, left goes back. An automatic trigger that works is a nice touch; a
+manual override that always works is the difference between a demo and an apology.
+
+### The anchored instruction reuses the box that already exists
+
+The current step names an `AnchorLabel`, and whichever tracked object carries that label shows
+the instruction **instead of** its own name. The box around the pan says "add salt" while that
+step is live, then goes back to saying "pan".
+
+No new rendering, no second anchoring system. This is exactly what the reference does: it boxes
+the hob, then the hob again, then the pan — all large, stable, trivially detected objects. It
+never boxes the food.
+
+### Lazy follow, not rigid lock
+
+The rail wants to be ambient, which argues for head-locking it. But rigidly head-locked UI in a
+headset is genuinely nauseating — it never moves relative to your eye, so the vestibular system
+gets no parallax and concludes something is wrong.
+
+So there is a dead zone. The panel stays world-fixed while you look around normally, and only
+catches up once you have turned far enough that it would otherwise leave view. You can look at
+the board without it chasing you, and it is still there when you look back.
+
+`followDeadZoneDeg` defaults to 22. Below about 12 it feels glued to your face; above about 35
+it is gone when you look back for it.
+
+### Checklist polarity
+
+Bright means **still needed**, dim means found — the same polarity as the reference, where the
+two un-struck lines are the two things not yet on the counter. It reads as a shopping list,
+because that is what it is.
+
+Ingredients vision will never see (cumin, paprika) are marked `Optional` and strike through on
+progress rather than on detection. More honest than a checklist stuck forever on "1 teaspoon
+cumin", and it avoids having to explain why.
+
+
+---
+
+## Recipe labels and COCO's vocabulary
+
+COCO-80's **entire** kitchen vocabulary:
+
+```
+bottle, wine glass, cup, fork, knife, spoon, bowl
+banana, apple, sandwich, orange, broccoli, carrot, hot dog, pizza, donut, cake
+diningtable, microwave, oven, toaster, sink, refrigerator
+```
+
+Everything else a kitchen contains — pepper, egg, garlic, onion, cheese, pan, hob — is invisible
+to it and needs the vision provider. There is no threshold that changes this.
+
+### Two recipes, and the default is the offline one
+
+`Recipe.FruitSalad()` is built entirely from real COCO classes — banana, apple, orange, bowl,
+knife — so it runs with **no network at all**. It is the default, per rule #12, and it is the one
+to rehearse with. Master spec 5.2.3 wants the full demo runnable offline; a recipe whose every
+step waits on a cloud round trip cannot satisfy that.
+
+`Recipe.Shakshuka()` matches the reference video but **needs the vision provider**. Pepper, egg
+and garlic have no COCO class and never will. `WorksOffline` is false, and those ingredients
+carry `NeedsVisionProvider` so the rail can explain a stalled checklist rather than leaving
+somebody to work it out.
+
+Switch between them on the manager's **Recipe** dropdown.
+
+### Every label is now a list
+
+One real object has several names. A frying pan seen from above is routinely "bowl" to COCO and
+"frying pan" to Qwen, and the step should anchor to it either way:
+
+```csharp
+AnchorLabels = new[] { "frying pan", "pan", "skillet", "bowl" },
+```
+
+Where a COCO class is a plausible stand-in it is listed as a fallback — a tall tin often reads as
+"bottle", an induction top often trips "oven". Those are not corrections to the model, they are
+alternative names for the same pixels.
+
+### Matching is not string equality
+
+COCO says `bottle`, Qwen says `bottle of olive oil`. The recipe says `pepper`, Qwen says
+`red bell pepper`. All the same object; `==` matches none of them, and the checklist sits there
+never ticking while the thing is plainly on the counter.
+
+`LabelMatch` applies two rules:
+
+- **Contiguous subsequence** — "olive oil" inside "bottle of olive oil"
+- **Shared head noun** — English compound nouns put the head last: "red bell **pepper**",
+  "frying **pan**", "shredded cheddar in a **bowl**"
+
+Articles and prepositions are dropped first, so "in a bowl" has head noun `bowl`, not `a`.
+
+Deliberately **not** edit-distance fuzzy matching. "pan" and "pen" are one character apart and
+are not the same thing, and a recipe that advances on the wrong object is worse than one that
+waits.
+
+### A track carries both names, as one entry
+
+`Observe` takes `IReadOnlyList<string[]>` — one array per tracked object, holding the detector's
+class and the provider's name together.
+
+That shape matters. Flattening them into a list of strings would make `CountAtLeast` score one
+banana as two the moment Qwen called it "sliced banana", and the cutting step would fire on a
+single uncut piece of fruit. **One track is one object**, however many names it has.

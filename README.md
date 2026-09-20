@@ -7,7 +7,11 @@ and tells you how thick your slices actually were — in millimetres you can che
 6.2mm average, ±0.5mm. Target 6mm, ±2mm.
 ```
 
-No headset. One camera. Everything runs in the browser, locally, with no network.
+No headset. One camera. Everything on this page runs in the browser, locally, with no network.
+
+**This repo holds two builds.** This README covers the browser app in `src/`. There is also a
+Quest 3/3S MR perception app in `unity/` — see `unity/README.md`. Neither is the Quest/IWSDK
+cooking simulation that `CLAUDE.md` describes; that code is not in this repository.
 
 ---
 
@@ -48,7 +52,9 @@ cut — inflating the score in the one direction nobody would question.
 
 ### Not built
 
-Thermal simulation, hand-safety tracking, blade tracking, anything XR. `CLAUDE.md` in this repo
+Thermal simulation, hand-safety tracking, blade tracking. No XR **in this app** — but see
+`unity/` for the Quest build, which is a separate program sharing only the design in
+`src/core/perception/`. `CLAUDE.md` in this repo
 is the master spec for a Quest 3S build whose code is **not here**; `DECISIONS.md` entries 1–11
 describe it, and entry 12 explains what happened. Read both as doctrine, not description.
 
@@ -58,7 +64,7 @@ describe it, and entry 12 explains what happened. Read both as doctrine, not des
 
 ```bash
 npm ci
-npm test       # purity + typecheck + 136 tests
+npm test       # purity + typecheck + 196 tests
 npm run dev    # http://localhost:8081
 ```
 

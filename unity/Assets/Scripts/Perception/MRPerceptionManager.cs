@@ -33,6 +33,17 @@ namespace MRPerception
         [SerializeField] private PassthroughCameraFeed feed;
         [SerializeField] private DetectionRaycaster raycaster;
 
+        [Tooltip(
+            "Anything implementing IVisionProvider -- VlmVisionProvider, or leave empty to " +
+            "fall back to the local detector's own label and run fully offline.")]
+        [SerializeField] private MonoBehaviour visionProviderBehaviour;
+
+        [Tooltip(
+            "FruitSalad is built entirely from real COCO classes and runs with no network. " +
+            "Shakshuka matches the reference video but needs the vision provider -- pepper, " +
+            "egg and garlic have no COCO class and never will.")]
+        [SerializeField] private RecipeChoice recipe = RecipeChoice.FruitSalad;
+
         [Header("Prefabs")]
         [SerializeField] private GameObject foodBoundsPrefab;
         [SerializeField] private GameObject documentBoundsPrefab;
@@ -76,6 +87,15 @@ namespace MRPerception
         private YoloFoodDetector _foodDetector;
         private DocumentContourDetector _documentDetector;
         private DocumentRectifier _rectifier;
+        private IVisionProvider _vision;
+        private RecipeRunner _recipe;
+        private readonly List<string[]> _visibleTracks = new();
+
+        /// <summary>
+        /// The running recipe. Read by RecipeRailUI; there is exactly one, and the manager owns
+        /// it because it is the thing holding the label stream that drives it.
+        /// </summary>
+        public RecipeRunner Recipe => _recipe;
 
         private Mat _workerMat;
         private volatile bool _busy;
@@ -94,6 +114,24 @@ namespace MRPerception
 
         public int TrackedCount => _tracked.Count;
 
+        /// <summary>Round trip of the last identification. Sets the whole feel; show it.</summary>
+        public float LastVisionMs { get; private set; }
+
+        public string VisionProviderName => _vision?.Name ?? "none";
+
+        /// <summary>
+        /// Why the last detection was thrown away, and how many have been.
+        ///
+        /// On the debug panel because a detection that silently fails to appear is undiagnosable,
+        /// and the natural reaction is to start lowering the confidence threshold -- which makes
+        /// everything worse. "rejected: carrot at 0.78m" is readable in one glance.
+        /// </summary>
+        public string LastRejection { get; private set; } = "";
+
+        public int RejectedCount => _rejected;
+
+        private int _rejected;
+
         /// <summary>
         /// The frame the detectors last ran on, and the edge map they produced, for the debug
         /// panel. Both are live buffers owned by other objects -- read only, never dispose.
@@ -101,6 +139,16 @@ namespace MRPerception
         public Mat LastFrameMat => _workerMat;
 
         public Mat LastEdgeMat => _documentDetector?.LastEdges;
+
+        /// <summary>
+        /// Which recipe to run. Defaults to the offline-safe one, per rule #12 -- the demo that
+        /// works on saturated venue wifi is the one to have selected by default.
+        /// </summary>
+        public enum RecipeChoice
+        {
+            FruitSalad,
+            Shakshuka
+        }
 
         private sealed class TrackedObject
         {
@@ -114,23 +162,116 @@ namespace MRPerception
             public bool Seen;
             public GameObject Instance;
             public DetectionVisualizer Visualizer;
+
+            /// <summary>What to show. The vision provider's answer once it arrives, else the
+            /// local detector's class name.</summary>
+            public string DisplayLabel;
+            public bool IdentifyPending;
+            public bool Identified;
+            /// <summary>The vision provider looked and said there is nothing here.</summary>
+            public bool Vetoed;
         }
 
-        private void Start()
+        private System.Collections.IEnumerator Start()
         {
-            string path = Utils.getFilePath(modelStreamingPath);
+            // Resolve the model BEFORE anything else, and yield while doing it -- see
+            // ResolveModelPath. Until this returns there is no detector, so Update's _busy gate
+            // and the null checks below carry the first few frames.
+            string path = null;
+            yield return ResolveModelPath(p => path = p);
+
             if (string.IsNullOrEmpty(path))
             {
-                Debug.LogError($"[Perception] model not found in StreamingAssets: {modelStreamingPath}");
+                Debug.LogError(
+                    $"[Perception] could not load {modelStreamingPath}. On Android it must be " +
+                    "copied out of the APK first; see ResolveModelPath. Detection is disabled.");
                 enabled = false;
-                return;
+                yield break;
             }
 
             _foodDetector = new YoloFoodDetector(path, inputSize);
             _documentDetector = new DocumentContourDetector();
             _rectifier = new DocumentRectifier();
+            _recipe = new RecipeRunner(
+                recipe == RecipeChoice.Shakshuka
+                    ? MRPerception.Recipe.Shakshuka()
+                    : MRPerception.Recipe.FruitSalad());
+
+            _vision = visionProviderBehaviour as IVisionProvider;
+            if (_vision == null)
+            {
+                // Offline by default rather than broken by default. Master spec 5.2.3 wants the
+                // whole demo runnable with no network, and rehearsed that way at least once.
+                _vision = new LocalHintProvider();
+                if (visionProviderBehaviour != null)
+                {
+                    Debug.LogWarning(
+                        $"[Perception] {visionProviderBehaviour.GetType().Name} does not " +
+                        "implement IVisionProvider; using local labels.");
+                }
+            }
 
             feed.FrameReady += OnFrameReady;
+        }
+
+        /// <summary>
+        /// Gets a real filesystem path to the ONNX model, on Android as well as the Editor.
+        ///
+        /// THIS IS WHY IT IS NOT ONE LINE. On Android -- which is what a Quest is --
+        /// StreamingAssets does not exist on disk. It lives compressed inside the APK, and
+        /// Application.streamingAssetsPath is a "jar:file://..." URL that no file API can open.
+        /// OpenCV's Dnn.readNetFromONNX needs a genuine path, so the bytes have to be pulled out
+        /// with UnityWebRequest and written somewhere real first.
+        ///
+        /// The one-line version, Utils.getFilePath, returns empty on Android. It does not throw
+        /// and it does not warn: the manager simply logs "model not found", disables itself, and
+        /// YOLO never runs for the entire session. Everything else keeps working, so it presents
+        /// as "the model is bad at detecting food" rather than as "the model never loaded".
+        ///
+        /// Cached in persistentDataPath, so the copy happens once per install.
+        /// </summary>
+        private System.Collections.IEnumerator ResolveModelPath(System.Action<string> onDone)
+        {
+            string source = System.IO.Path.Combine(Application.streamingAssetsPath, modelStreamingPath);
+
+            // Desktop and Editor: StreamingAssets is a real directory, use it in place.
+            if (!source.Contains("://"))
+            {
+                onDone(System.IO.File.Exists(source) ? source : null);
+                yield break;
+            }
+
+            string cached = System.IO.Path.Combine(Application.persistentDataPath, modelStreamingPath);
+            if (System.IO.File.Exists(cached))
+            {
+                onDone(cached);
+                yield break;
+            }
+
+            using (var request = UnityEngine.Networking.UnityWebRequest.Get(source))
+            {
+                yield return request.SendWebRequest();
+
+                if (request.result != UnityEngine.Networking.UnityWebRequest.Result.Success)
+                {
+                    Debug.LogError($"[Perception] could not read {source}: {request.error}");
+                    onDone(null);
+                    yield break;
+                }
+
+                try
+                {
+                    string dir = System.IO.Path.GetDirectoryName(cached);
+                    if (!string.IsNullOrEmpty(dir)) System.IO.Directory.CreateDirectory(dir);
+                    System.IO.File.WriteAllBytes(cached, request.downloadHandler.data);
+                    onDone(cached);
+                }
+                catch (System.Exception e)
+                {
+                    Debug.LogError($"[Perception] could not cache the model: {e.Message}");
+                    onDone(null);
+                }
+            }
         }
 
         private void OnDestroy()
@@ -146,7 +287,9 @@ namespace MRPerception
 
         private void OnFrameReady(Mat rgba, CapturedFrame frame)
         {
-            if (_busy) return;   // still working; skip this capture rather than queue it
+            // _foodDetector is null until ResolveModelPath finishes, which on Android means an
+            // APK read. Frames that arrive first are dropped rather than queued.
+            if (_busy || _foodDetector == null || _documentDetector == null) return;
 
             if (_workerMat == null || _workerMat.cols() != rgba.cols() || _workerMat.rows() != rgba.rows())
             {
@@ -211,6 +354,22 @@ namespace MRPerception
             foreach (Detection2D d in results)
             {
                 if (!raycaster.TryPlace(d, _workerFrame, feed, out Detection3D placed)) continue;
+
+                // The filter a 2D pipeline cannot have. A "banana" 90cm long is a worktop, and
+                // no confidence score will ever say so -- but the depth raycast just told us
+                // how big it actually is, and that is decisive. Utensils are dropped here too:
+                // a knife is useful context, never a subject.
+                if (d.Kind == DetectionKind.Food)
+                {
+                    if (FoodPlausibility.RoleOf(d.Label) == FoodPlausibility.Role.Ignore) continue;
+                    if (!FoodPlausibility.PlausibleSize(d.Label, placed.SizeMeters))
+                    {
+                        LastRejection = FoodPlausibility.Explain(d.Label, placed.SizeMeters);
+                        _rejected++;
+                        continue;
+                    }
+                }
+
                 Integrate(placed);
 
                 // Rectification reads from the worker Mat, which is only valid until the next
@@ -226,6 +385,133 @@ namespace MRPerception
             }
 
             Retire();
+            RequestIdentification(results);
+            DriveRecipe();
+        }
+
+        /// <summary>
+        /// Hands the current label set to the recipe.
+        ///
+        /// This is the inversion that makes the whole thing robust. Without a recipe, perception
+        /// has to answer "what is on this counter" -- an open question, against a model that
+        /// knows ten foods, on a wooden surface that generates false positives all day. With
+        /// one, it answers "has the pan arrived yet": closed, expected, and easy. Anything that
+        /// is not what the step is waiting for simply does not matter.
+        /// </summary>
+        private void DriveRecipe()
+        {
+            if (_recipe == null) return;
+
+            _visibleTracks.Clear();
+            foreach (TrackedObject t in _tracked)
+            {
+                if (t.Vetoed || t.Hits < confirmFrames) continue;
+
+                // BOTH names, as one entry. COCO says "bottle", the provider says "bottle of
+                // olive oil"; a recipe written against either vocabulary should match. Keeping
+                // them together rather than as two entries is what stops one object counting
+                // twice when a step is waiting for three of something.
+                bool distinct = !string.IsNullOrEmpty(t.DisplayLabel)
+                                && !string.Equals(t.DisplayLabel, t.Label,
+                                    System.StringComparison.OrdinalIgnoreCase);
+                _visibleTracks.Add(distinct
+                    ? new[] { t.Label, t.DisplayLabel }
+                    : new[] { t.Label });
+            }
+
+            _recipe.Observe(_visibleTracks, Time.realtimeSinceStartup);
+        }
+
+        /// <summary>
+        /// Asks the vision provider to name ONE unidentified object per capture.
+        ///
+        /// Once per object, not once per frame, and that is the whole reason a one-second cloud
+        /// round trip is affordable here. A jar on a table does not become a different jar: the
+        /// local detector holds the track at 5Hz and this fills in the name a second later,
+        /// after which it sticks. Five objects in a session means five calls -- rather than one
+        /// per frame, which at 5Hz for an hour would be eighteen thousand.
+        ///
+        /// One at a time, newest first. Newest because the object the user just put down is the
+        /// one they are waiting to see named.
+        /// </summary>
+        private void RequestIdentification(List<Detection2D> results)
+        {
+            if (_vision == null || _vision.Busy || _workerMat == null) return;
+
+            for (int i = _tracked.Count - 1; i >= 0; i--)
+            {
+                TrackedObject t = _tracked[i];
+                if (t.Identified || t.IdentifyPending) continue;
+                if (t.Hits < confirmFrames) continue;
+
+                // Find the 2D box this track came from in THIS frame, so the crop matches what
+                // was actually seen. A stale box crops the wrong pixels.
+                // LARGEST matching box, not smallest. This picked the minimum by having the
+                // comparison inverted, so with two detections of the same label it
+                // systematically cropped the runtiest one and sent that to be identified. Area
+                // is a proxy for "the one actually in view": more pixels is a better crop, and
+                // a tiny box of the same label is usually a partial or a duplicate.
+                int best = -1;
+                float bestScore = -1f;
+                for (int r = 0; r < results.Count; r++)
+                {
+                    if (results[r].Label != t.Label) continue;
+                    float score = Mathf.Abs(results[r].PixelRect.width * results[r].PixelRect.height);
+                    if (score > bestScore) { bestScore = score; best = r; }
+                }
+                if (best < 0) continue;
+
+                Texture2D crop = CropToTexture(_workerMat, results[best].PixelRect);
+                if (crop == null) continue;
+
+                // A bowl is interesting for what is in it. This is the whole route to everything
+                // COCO cannot see -- shredded cheese, chopped onion, flour, spices. None of them
+                // has a shape a detector can localise; all of them sit in something that does.
+                bool isContainer =
+                    FoodPlausibility.RoleOf(t.Label) == FoodPlausibility.Role.Container;
+                VisionSubject subject = isContainer ? VisionSubject.Contents : VisionSubject.Object;
+
+                t.IdentifyPending = true;
+                TrackedObject captured = t;
+                _vision.Identify(crop, t.Label, subject, result =>
+                {
+                    Destroy(crop);
+                    captured.IdentifyPending = false;
+                    LastVisionMs = result.LatencyMs > 0f ? result.LatencyMs : LastVisionMs;
+
+                    if (result.Rejected)
+                    {
+                        // An open-vocabulary veto. The local detector said broccoli, the model
+                        // looked and said worktop. Believe the one that can see everything.
+                        captured.Vetoed = true;
+                        LastRejection = captured.Label + ": " +
+                            (string.IsNullOrEmpty(result.Note) ? "not a subject" : result.Note);
+                        _rejected++;
+                        return;
+                    }
+
+                    if (!result.Ok) return;      // failure, not a verdict -- retry next capture
+
+                    captured.Identified = true;
+                    captured.DisplayLabel = isContainer
+                        ? result.Label + " (in " + captured.Label + ")"
+                        : result.Label;
+                });
+                return;   // one per capture
+            }
+        }
+
+        /// <summary>Lifts a pixel rect out of a Mat as a Texture2D. Caller destroys it.</summary>
+        private static Texture2D CropToTexture(Mat frame, UnityEngine.Rect rect)
+        {
+            int x = Mathf.Clamp(Mathf.FloorToInt(rect.x), 0, frame.cols() - 1);
+            int y = Mathf.Clamp(Mathf.FloorToInt(rect.y), 0, frame.rows() - 1);
+            int w = Mathf.Clamp(Mathf.CeilToInt(rect.width), 1, frame.cols() - x);
+            int h = Mathf.Clamp(Mathf.CeilToInt(rect.height), 1, frame.rows() - y);
+            if (w < 8 || h < 8) return null;
+
+            using var roi = new Mat(frame, new OpenCVForUnity.CoreModule.Rect(x, y, w, h));
+            return DocumentRectifier.ToTexture(roi);
         }
 
         private void Integrate(in Detection3D placed)
@@ -250,6 +536,7 @@ namespace MRPerception
                 _tracked.Add(new TrackedObject
                 {
                     Label = placed.Source.Label,
+                    DisplayLabel = placed.Source.Label,
                     Kind = placed.Source.Kind,
                     Position = placed.Position,
                     Rotation = placed.Rotation,
@@ -301,7 +588,11 @@ namespace MRPerception
             }
             else if (match.Visualizer != null)
             {
-                match.Visualizer.Apply(match.Position, match.Rotation, scale, match.Label);
+                string shown = match.DisplayLabel;
+                string instruction = _recipe?.InstructionFor(shown)
+                                     ?? _recipe?.InstructionFor(match.Label);
+                if (!string.IsNullOrEmpty(instruction)) shown = instruction;
+                match.Visualizer.Apply(match.Position, match.Rotation, scale, shown);
             }
         }
 
@@ -310,6 +601,18 @@ namespace MRPerception
             for (int i = _tracked.Count - 1; i >= 0; i--)
             {
                 TrackedObject t = _tracked[i];
+
+                // A veto retires the track immediately rather than waiting out forgetFrames.
+                // The local detector will keep re-finding the same wood grain every capture, so
+                // letting it age out normally means it simply respawns.
+                if (t.Vetoed)
+                {
+                    if (t.Instance != null) Destroy(t.Instance);
+                    if (t.Visualizer != null) Destroy(t.Visualizer.gameObject);
+                    _tracked.RemoveAt(i);
+                    continue;
+                }
+
                 if (t.Seen) continue;
 
                 t.Misses++;

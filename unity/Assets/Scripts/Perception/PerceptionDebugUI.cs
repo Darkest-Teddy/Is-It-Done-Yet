@@ -86,6 +86,8 @@ namespace MRPerception
             // app foregrounded is the failure this is guarding against.
             PerceptionTunables.Save();
             if (_imageTexture != null) Destroy(_imageTexture);
+            // Runtime-created materials are not freed by destroying their renderers.
+            if (_imageQuad != null) UnlitMaterials.Release(_imageQuad.material);
         }
 
         private void OnApplicationPause(bool paused)
@@ -135,23 +137,8 @@ namespace MRPerception
             _imageQuad.enabled = false;
         }
 
-        private static Material MakeUnlit(Color color, bool transparent)
-        {
-            Shader shader = Shader.Find("Universal Render Pipeline/Unlit")
-                            ?? Shader.Find("Unlit/Transparent")
-                            ?? Shader.Find("Sprites/Default");
-            var m = new Material(shader) { color = color };
-            if (transparent)
-            {
-                // Works across pipelines: the names differ but setting both is harmless.
-                m.SetFloat("_Surface", 1f);
-                m.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-                m.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-                m.SetInt("_ZWrite", 0);
-                m.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
-            }
-            return m;
-        }
+        private static Material MakeUnlit(Color color, bool transparent) =>
+            UnlitMaterials.Create(color, transparent);
 
         private void Update()
         {
@@ -271,6 +258,21 @@ namespace MRPerception
                    .Append("   ").Append(manager.TrackedCount).Append(" obj");
             }
             _sb.Append('\n');
+
+            if (manager != null)
+            {
+                _sb.Append("vision: ").Append(manager.VisionProviderName);
+                if (manager.LastVisionMs > 0f)
+                {
+                    _sb.Append("  ").Append(Mathf.RoundToInt(manager.LastVisionMs)).Append("ms");
+                }
+                _sb.Append("   rejected ").Append(manager.RejectedCount).Append('\n');
+
+                if (!string.IsNullOrEmpty(manager.LastRejection))
+                {
+                    _sb.Append("last drop: ").Append(manager.LastRejection).Append('\n');
+                }
+            }
 
             string camera = feed == null ? "no feed" : feed.IsReady ? "camera ok" : "camera WAITING";
             string perm = permissions == null
