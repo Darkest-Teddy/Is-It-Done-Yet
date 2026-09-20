@@ -556,3 +556,127 @@ four native Mats per call; the per-inference `float[8400*84]` is a 2.8MB allocat
 be reused; `Utils.matToTexture2D` flips by default on most versions, so crops sent for
 identification are probably upside down; and `_workerMat` is paired with its results only by the
 capture rate being slower than inference — a runtime slider can close that gap.
+
+---
+
+## 20. The vision model is Qwen now, and it runs in two places
+
+**Spec section:** §6 names Gemini 3 Flash for scene semantics and §10.4 specifies a four-provider
+abstraction. Neither shipped. What shipped was one provider calling `gpt-4o-mini`, and this entry
+replaces it.
+
+**Reality:** identification went to OpenAI because it was the fastest thing to wire up at the
+time. That left the offline story hollow. Spec rule #9 says every network call gets a timeout and
+a fallback, and rule #12 says to pick what survives a live demo on bad wifi — and the fallback we
+had was `LocalHintProvider`, which does not identify anything. It returns the COCO label the
+detector already produced. Losing the network did not degrade identification; it removed it.
+
+That is the failure mode the spec warns about, dressed up as a fallback.
+
+**Decision:** Qwen2.5-VL, Apache-2.0 open weights, reached through the existing relay. The relay
+now resolves its upstream from `VISION_UPSTREAM`:
+
+- `openrouter` (default) — hosted 72B, free tier, needs a key and wifi, answers in 1–3s.
+- `ollama` — the same family running on the laptop over loopback, no key, no internet. Budgeted
+  at 5–15s for a 3B on an Intel iGPU. **Measured at 20–26s**, which is the one thing in this
+  entry that changed after it was written.
+
+**The point is that these are the same model, not two different ones.** A closed model gives you
+a fallback that is a worse model with different failure modes you have not rehearsed. This gives
+you the demo you practised, slower. The headset is not rebuilt to switch — both upstreams speak
+chat-completions, so the Unity side posts to one URL forever and never learns which answered.
+
+**What this cost, and it is not the model quality.** OpenAI's `response_format: json_schema` with
+`strict: true` *guarantees* the reply is one object with exactly those keys. No Qwen endpoint
+implements it — most ignore the field, some 400 on it, and that 400 reads as "the relay is
+broken" when it means "this model lacks that feature".
+
+So the request asks for `json_object`, which both upstreams honour, and the **keys come from the
+prompt**, which now states the shape explicitly. json_object constrains the reply to *parse* as
+JSON; it does not constrain what is in it. Those are different guarantees and the old code
+depended on the stronger one.
+
+And because neither is a guarantee, `ParseIdentification` trusts neither. It walks every `{` in
+the content and returns the first balanced object yielding a label, tracking string literals so a
+`}` inside a note does not close the object early. That absorbs a code fence, a leading "Here is
+the identification:", a `<think>` block, and a stray brace in prose — all things Qwen does and a
+strict schema never did.
+
+Confidence is normalised on the way out. Asked for 0–1 and told so twice, Qwen still answers `85`
+often enough to matter, and clamping that to 1.0 would read as **maximum confidence** — a silent
+lie in the one direction nobody audits. Same reasoning as "absent is never zero".
+
+**Verified end to end, against the real model.** `qwen2.5vl:3b` was pulled and driven through
+the relay with the exact request shape `BuildRequest` produces — the system prompt extracted from
+the `.cs` file rather than retyped, so the test cannot drift from the build:
+
+| Input | Reply | Round trip |
+|---|---|---|
+| Cucumber, 293×512 JPEG q70 | `{"label": "cucumber", "confidence": 0.95}` | 23.7s |
+| Wood worktop, 512×384 | `{"label": "none", "note": "worktop or cabinet"}` | 26.4s |
+| Cucumber, hint `broccoli` | `{"label": "cucumber"}` — hint overridden | 19.9s |
+
+The middle row is the one that matters. The false-positive filter is the reason the `none`
+instruction is in the prompt at all, and it survived the model swap. The third shows a wrong hint
+does not drag the answer with it.
+
+Those three replies were then added **verbatim** to the parser harness, which now runs 23 cases:
+fences, prose on both sides, braces and escaped quotes inside notes, a junk object before the
+real one, a `<think>` block, the three failure shapes, and these three live replies. All pass.
+The relay's own paths — startup refusals, health, allowlist rejection by name — were exercised
+separately.
+
+**The measurement invalidated a recommendation in this entry's first draft.** It said to set
+`timeoutSeconds` to 25 for the local model. Two of the three calls above exceed that, so the
+advice would have discarded answers that had already arrived and presented as "the offline path
+does not work". It is now 45, and `Range(1, 30)` became `Range(1, 60)` because 30 left no
+headroom over a measured 26s worst case. Estimating a latency budget and then not measuring it
+is how that class of bug ships.
+
+**What 25s an object actually costs.** Five objects on a table is two minutes of labels
+trickling in. Nothing blocks, and the COCO label shows the whole time, so it degrades rather
+than breaks. But the offline path is **not** equivalent to the hosted one and should not be
+described to a judge as though it were: same model, same answers, an order of magnitude later.
+
+**That is not a compile.** There is still no Unity on this machine, so everything touching
+`UnityWebRequest`, `Texture2D` or `JsonUtility` is unverified, and `JsonUtility` in particular is
+*stubbed* in that harness — it is System.Text.Json wearing its name. The algorithm is tested; its
+one Unity dependency is not. Expect the first real build to find something here.
+
+**Renamed** `OpenAiVisionProvider` to `VlmVisionProvider`, since the whole point is that it is no
+longer tied to one vendor. Safe to do now precisely because `unity/` has no `.meta` files — there
+are no GUID references to break. It will not be safe once the scripts are in a real project.
+
+**The hosted path is verified too**, against a real key, with the same three images:
+
+| Input | Reply | Round trip |
+|---|---|---|
+| Cucumber | `{"label": "cucumber", "confidence": 0.95}` | 2.1s |
+| Wood worktop | `{"label": "none", "note": "…not a food item or ingredient"}` | 0.9s |
+| Cucumber, hint `broccoli` | `cucumber`, note: *"the local detector's guess of 'broccoli' is incorrect"* | 1.8s |
+
+`json_object` **is** honoured — one clean object each time, no fence, no preamble. The tolerant
+parser was not exercised by these replies, which is the correct outcome: it is insurance, not
+the mechanism. All six live replies (three local, three hosted) are now pinned as parser cases,
+which brings that harness to 26.
+
+**The allowlist was wrong, and this is the entry's second correction.** It shipped naming
+`qwen/qwen2.5-vl-72b-instruct:free` and `qwen/qwen2.5-vl-32b-instruct:free`. **Neither model
+exists.** Both were written from memory, and the first real request would have been rejected by
+the relay's own allowlist — by name, at least, which is the one thing that worked as designed.
+Querying `/api/v1/models` takes one call and was not done until after the fact.
+
+Worse for the plan: of 447 models, exactly **one** free model accepts images and is a Qwen,
+`qwen/qwen3.8-27b:free`, and it returned `429 temporarily rate-limited upstream` on every
+attempt including an immediate retry. **The free tier is not a plan.** The default is now
+`qwen/qwen3-vl-30b-a3b-instruct`, which is paid and so cheap that three identifications did not
+move a $50 balance off `$0`.
+
+That leaves the two upstreams in a different relationship than this entry first described.
+Hosted is fast and effectively free but needs an account and a network. Local is free forever
+and needs neither, but is 10-25x slower. Neither is strictly better, which is the argument for
+having built the switch rather than picking one.
+
+**Not done:** `VISION_MODELS` is the escape hatch for the next time an ID drifts, and it was
+used to run these tests before the allowlist was edited — so it is exercised, but no test pins
+it. If a model ID silently disappears again, nothing fails until someone tries it.

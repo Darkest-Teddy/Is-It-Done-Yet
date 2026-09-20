@@ -15,11 +15,11 @@ Assets/Scripts/Perception/
 ├── DetectionVisualizer.cs      runtime wireframe box, so no prefab authoring needed
 ├── IVisionProvider.cs          identify-what-it-is seam, + offline fallback
 ├── FoodPlausibility.cs         real-world size gating, food/container/ignore roles
-├── LabelMatch.cs               COCO vs GPT vocabulary reconciliation
+├── LabelMatch.cs               COCO vs open-vocabulary reconciliation
 ├── Recipe.cs                   steps, ingredients, triggers
 ├── RecipeRunner.cs             the state machine. Pure C#, unit-testable
 ├── RecipeRailUI.cs             left rail + you-need checklist
-├── OpenAiVisionProvider.cs     GPT vision, via a key-holding relay
+├── VlmVisionProvider.cs        Qwen-VL, via a relay that picks the upstream
 ├── PerceptionTunables.cs       every threshold, one registry, persisted
 ├── PerceptionDebugUI.cs        in-headset tuning panel + live edge view
 └── MRPerceptionManager.cs      threading, tracking, prefab lifecycle
@@ -353,7 +353,7 @@ under one lighting condition give you a solid white edge map or an empty one in 
 
 ---
 
-## Identifying food with GPT
+## Identifying food with Qwen-VL
 
 COCO-80 knows ten foods, all prepared dishes, and no raw ingredients at all — no onion, no
 pepper, no cucumber, no cheese of any kind. Fixing that by training means a labelled *detection*
@@ -363,46 +363,143 @@ So the split is:
 
 ```
 YOLO + contours   →  WHERE something is   →  local, 5Hz, milliseconds
-GPT vision        →  WHAT it is           →  cloud, once per object, ~1s
+Qwen-VL           →  WHAT it is           →  once per object, 1-3s hosted / 20-26s local
 ```
+
+### Why an open-weights model
+
+Because it makes the fallback real. Qwen-VL runs hosted *and* on the laptop on the table, so when
+the venue network turns hostile the demo does not change shape — the relay flips an env var and
+the same model answers, slower. A closed model gives you a fallback that is really just a worse
+model. Master spec rule 12: pick what survives a live demo on bad wifi.
+
+Both upstreams speak the OpenAI chat-completions dialect, which is the only reason one relay and
+one C# class can serve both. The headset never learns which is answering.
 
 ### Once per object, not once per frame
 
-This is the whole reason a one-second round trip is affordable. A jar on a table does not become
+This is the whole reason a multi-second round trip is affordable at all. A jar on a table does not become
 a different jar. The local detector holds the track at 5 Hz, and `RequestIdentification` fills in
-the name a second later, after which it sticks.
+the name a second or two later, after which it sticks.
 
 Five objects in a session is **five calls**. Calling per frame at 5 Hz for an hour would be
-eighteen thousand — the difference between a fraction of a cent and a real bill, and between
-"the app feels laggy" and no perceptible latency at all.
+eighteen thousand — which on a free tier is the difference between working and being rate
+limited, and on the local model between usable and unusable.
 
 Until the answer arrives the object shows the local label, so nothing is ever blank.
 
 ### Setup
 
-**1. Run the relay** (repo root, needs nothing installed):
+**1. Run the relay** (repo root, needs nothing installed). Pick an upstream:
 
 ```bash
-OPENAI_API_KEY=sk-... node server/vision-relay.mjs
+cp .env.example .env        # then put your free OpenRouter key in it
+npm run relay               # hosted Qwen
+
+# local Qwen. No key, no internet, no .env. One 3.2GB download, once.
+ollama pull qwen2.5vl:3b
+npm run relay:local
 ```
 
-**2. Point the provider at it.** Add `OpenAiVisionProvider` to the scene, set `relayUrl` to
-`http://<your-laptop-lan-ip>:8787/vision`, and drag it into `MRPerceptionManager`'s
-**Vision Provider Behaviour** field.
+Both scripts work identically in PowerShell, bash and cmd, which the raw `node` invocations did
+not — `VAR=val node ...` is a parse error in cmd.exe. `.env` is read by **Node itself** through
+`--env-file-if-exists`, so there is no `dotenv` dependency and no key on a command line where
+it would land in shell history. `.env` is gitignored (`.gitignore:6`); `.env.example` documents
+every variable and holds no secrets.
 
-Leave that field empty and it falls back to `LocalHintProvider` — COCO labels, fully offline.
-That is the configuration to rehearse the demo in.
+`relay:local` passes `--upstream=ollama`, which overrides both `.env` and the shell — so a
+`.env` configured for hosted does not have to be edited to rehearse the offline path.
+
+`curl http://localhost:8787/health` reports which upstream is live and which models it will
+forward. That is the question you actually have at 3am after flipping the env var.
+
+**2. Point the provider at it.** Add `VlmVisionProvider` to the scene, set `relayUrl` to
+`http://<your-laptop-lan-ip>:8787/vision`, and drag it into `MRPerceptionManager`'s
+**Vision Provider Behaviour** field. Set `model` to match the upstream — the relay rejects
+anything off its allowlist **by name**, so a mismatch says so rather than failing vaguely.
+
+Leave that field empty and it falls back to `LocalHintProvider` — COCO labels, fully offline,
+no relay at all. That is the configuration to rehearse the demo in.
+
+### Choosing an upstream
+
+| | Hosted (OpenRouter) | Local (Ollama) |
+|---|---|---|
+| Model | `qwen/qwen3-vl-30b-a3b-instruct` | `qwen2.5vl:3b` |
+| Latency | **0.9–2.1s measured** | **20–26s measured** on an Intel iGPU, warm |
+| Accuracy | Better, noticeably so on cheese and herbs | Good enough to name a vegetable |
+| Needs wifi | Yes | No |
+| Needs a key | Yes (free OpenRouter account) | No |
+| `timeoutSeconds` | 12 | **45** |
+
+**Both upstreams are verified end to end** with the exact request shape `BuildRequest`
+produces. Hosted, `qwen/qwen3-vl-30b-a3b-instruct`:
+
+| Input | Reply | Round trip |
+|---|---|---|
+| Cucumber, 293×512 JPEG q70 | `{"label": "cucumber", "confidence": 0.95}` | 2.1s |
+| Wood worktop, 512×384 | `{"label": "none", "note": "…not a food item or ingredient"}` | 0.9s |
+| Cucumber, hint `broccoli` | `{"label": "cucumber"}`, note: *"the local detector's guess of 'broccoli' is incorrect"* | 1.8s |
+
+`json_object` is honoured — every reply came back as one clean object, no fence, no preamble.
+The tolerant parser was not needed here, which is the point: it exists for when it is.
+
+**These numbers are measured, not estimated.** Running the real request shape against
+`qwen2.5vl:3b` through the relay on this laptop (Intel Core Ultra 7 155H, Arc iGPU, 16GB, model
+already warm):
+
+| Input | Reply | Round trip |
+|---|---|---|
+| Cucumber, 293×512 JPEG q70 | `{"label": "cucumber", "confidence": 0.95, ...}` | 23.7s |
+| Wood worktop, 512×384 | `{"label": "none", "note": "worktop or cabinet"}` | 26.4s |
+| Cucumber, hint `broccoli` | `{"label": "cucumber", ...}` — hint overridden | 19.9s |
+
+Two things worth noting. The false-positive filter **works** — bare worktop came back `none`,
+which is the whole reason that instruction is in the prompt. And a deliberately wrong hint did
+not drag the answer with it, which is the behaviour §"Identifying food" assumes.
+
+The cost is time. At ~25s an object, five objects on the table is two minutes of labels
+trickling in. Nothing blocks and the COCO label shows throughout, so it degrades rather than
+breaks — but the offline path is **not** equivalent to the hosted one. Same model, same answers,
+an order of magnitude later. Rehearse it before you rely on it.
+
+Default to hosted, rehearse local.
+
+**Check model IDs before trusting them.** The first version of the allowlist named
+`qwen/qwen2.5-vl-72b-instruct:free` and `...-32b-instruct:free`. **Neither exists.** Both were
+written from memory and would have failed on first contact. The catalogue is one call away:
+
+```bash
+curl -s https://openrouter.ai/api/v1/models | grep -o '"id":"qwen/[^"]*"'
+```
+
+When an ID goes stale, `VISION_MODELS` extends the allowlist without a code change:
+
+```bash
+VISION_MODELS=qwen/qwen3-vl-8b-instruct node server/vision-relay.mjs
+```
+
+**On "free".** `qwen/qwen3.8-27b:free` is the only genuinely free model that accepts images, and
+it returned `429 temporarily rate-limited upstream` on every attempt the day this was written,
+including an immediate retry. Treat it as a bonus, not a plan. `qwen/qwen3-vl-30b-a3b-instruct`
+is the tested default and costs a fraction of a cent per call — three test identifications did
+not move a $50 balance off `$0`.
 
 ### The key does not go in the build
 
-`directApiKey` exists for desk testing and logs a warning every time it is used. Do not ship it.
+`directApiKey` exists for desk testing and logs a warning every time it is used with a remote
+endpoint. Do not ship it.
 
 An APK is a zip file. A key compiled into one is extracted in minutes, and it is your key, your
 billing, your rate limit. No obfuscation changes this — the request has to carry the key in
 plaintext eventually, so anyone with the build and a proxy has it. The only real fix is that the
 device never holds the key.
 
-The relay is ~120 lines, dependency-free, and caps body size and allowed models so it is not an
+The local upstream sidesteps this entirely: there is no key, so `directEndpoint` pointed at
+`http://127.0.0.1:11434/v1/chat/completions` leaks nothing. That is the one case where direct
+mode is not a liability.
+
+The relay is ~160 lines, dependency-free, and caps body size and allowed models so it is not an
 open proxy. On a hackathon LAN the exposure is the room you are standing in; put it behind a
 tunnel with real auth for anything public.
 
@@ -410,33 +507,57 @@ tunnel with real auth for anything public.
 
 | Setting | Default | Why |
 |---|---|---|
-| `model` | `gpt-4o-mini` | Fast, cheap, easily good enough to name a vegetable |
-| `lowDetail` | on | Flat token cost, 512px. For an object filling the crop, plenty — and several times cheaper and faster than `high` |
-| `maxEdgePx` | 512 | Uploading larger just to have it downsized server-side wastes the upload, which is the slowest part of the round trip on venue wifi |
+| `model` | `qwen/qwen3-vl-30b-a3b-instruct` | Must match the relay's upstream. Local is `qwen2.5vl:3b` |
+| `responseFormat` | `JsonObject` | Portable across both upstreams. See below |
+| `lowDetail` | on | Flat token cost, 512px. For an object filling the crop, plenty. Ignored by local runtimes |
+| `maxEdgePx` | 512 | Uploading larger just to have it downsized server-side wastes the upload, the slowest part of the round trip on venue wifi |
 | `jpegQuality` | 70 | Visually fine here, a third the size of 95 |
-| `timeoutSeconds` | 8 | A timeout is the expected outcome on saturated wifi, not an error. The local label survives |
+| `timeoutSeconds` | 12 | A timeout is the expected outcome on saturated wifi, not an error. The local label survives. **Raise to 45 for the local model** — measured worst case is 26s |
 
-Structured output (`json_schema`) is on, so the reply is parseable JSON rather than prose that
-happens to contain a name. Without it the model sometimes answers "This appears to be a
-cucumber!" and every parser downstream has to cope with sentences.
+### Structured output is a request, not a guarantee
+
+This is the one real incompatibility in the swap, and it is worth understanding before it costs
+you an evening.
+
+OpenAI's `response_format: json_schema` with `strict: true` **guarantees** the reply is exactly
+one object with exactly those keys. Qwen endpoints do not implement it — most ignore the field,
+some 400 on it, and a 400 here reads as "the relay is broken" when it really means "this model
+does not have that feature".
+
+So `responseFormat` defaults to `JsonObject`, which OpenRouter and Ollama both honour. That
+constrains the reply to *parse* as JSON; it does **not** constrain the keys. The keys come from
+the system prompt, which states the shape explicitly.
+
+And because neither is a guarantee, `ParseIdentification` does not trust either one. It walks
+every `{` in the reply and returns the first balanced object that yields a label, tracking string
+literals so a `}` inside a note does not end the object early. That handles a code fence, a
+leading "Here is the identification:", a `<think>` block, and a stray brace in prose — all
+things Qwen does and `gpt-4o-mini` under a strict schema never did.
+
+`JsonSchema` mode is still there if you point this at a model that honours it.
+
+Confidence is normalised on the way out: asked for 0–1 and told so twice, Qwen still answers
+`85` often enough that treating it as "clamps to 1.0, maximum confidence" would be a silent lie
+in the one direction nobody checks.
 
 ### On cheese specifically
 
 Set expectations. Telling cheddar from gouda visually is hard for *people* without packaging
-context, and GPT will usually give you "hard cheese" or "yellow cheese" rather than a variety —
+context, and Qwen will usually give you "hard cheese" or "yellow cheese" rather than a variety —
 which is the correct answer, and the prompt explicitly asks for it rather than a confident wrong
-guess.
+guess. The 3B local model is noticeably worse here than the hosted 72B.
 
 If cheese *identity* is load-bearing for the demo, read the label with the OCR path instead of
 recognising the cheese.
 
 ### Prize-track note
 
-`CLAUDE.md` §13 says to skip the OpenAI track unless somebody genuinely uses Codex, because it
-requires documenting how Codex helped you build and judges check. Using the API for vision is a
-technical choice and is fine — just do not claim the track without the Codex work. It does mean
-dropping the Gemini track if GPT replaces Gemini entirely.
+Nothing here touches the OpenAI track any more, which `CLAUDE.md` §13 says to skip anyway unless
+somebody genuinely uses Codex. Qwen2.5-VL is Apache-2.0 open weights, so there is no vendor claim
+to make and none to defend.
 
+If a sponsor track wants an open-model or on-device story, this is it: the same weights run in
+the cloud and on the laptop, and the relay switches between them without rebuilding the headset.
 
 ---
 
@@ -471,10 +592,10 @@ to adjudicate a large carrot.
 
 ### Filter 2: let the model that can see everything veto
 
-The crop already goes to GPT. The prompt now says: if this is worktop, a cabinet, a hand, an
+The crop already goes to Qwen. The prompt now says: if this is worktop, a cabinet, a hand, an
 appliance or wood grain, answer `none`.
 
-That is an open-vocabulary false-positive filter for free. The local detector says broccoli, GPT
+That is an open-vocabulary false-positive filter for free. The local detector says broccoli, Qwen
 looks and says worktop, the track is retired immediately — not aged out over `forgetFrames`,
 because the detector will keep re-finding the same wood grain every capture and it would simply
 respawn.
@@ -493,7 +614,7 @@ and a container is interesting for **what is in it**.
 
 This is the whole route to everything COCO cannot see. Shredded cheese, chopped onion, flour,
 spices — none has a shape a detector can localise, and all of them sit in something that does.
-So the container gets found locally, and GPT is asked about its contents rather than about the
+So the container gets found locally, and Qwen is asked about its contents rather than about the
 bowl. The label reads `shredded cheddar (in bowl)`.
 
 Without the `VisionSubject.Contents` distinction the model very reasonably answers "a bowl",
@@ -632,7 +753,7 @@ Switch between them on the manager's **Recipe** dropdown.
 ### Every label is now a list
 
 One real object has several names. A frying pan seen from above is routinely "bowl" to COCO and
-"frying pan" to GPT, and the step should anchor to it either way:
+"frying pan" to Qwen, and the step should anchor to it either way:
 
 ```csharp
 AnchorLabels = new[] { "frying pan", "pan", "skillet", "bowl" },
@@ -644,7 +765,7 @@ alternative names for the same pixels.
 
 ### Matching is not string equality
 
-COCO says `bottle`, GPT says `bottle of olive oil`. The recipe says `pepper`, GPT says
+COCO says `bottle`, Qwen says `bottle of olive oil`. The recipe says `pepper`, Qwen says
 `red bell pepper`. All the same object; `==` matches none of them, and the checklist sits there
 never ticking while the thing is plainly on the counter.
 
@@ -666,5 +787,5 @@ waits.
 class and the provider's name together.
 
 That shape matters. Flattening them into a list of strings would make `CountAtLeast` score one
-banana as two the moment GPT called it "sliced banana", and the cutting step would fire on a
+banana as two the moment Qwen called it "sliced banana", and the cutting step would fire on a
 single uncut piece of fruit. **One track is one object**, however many names it has.

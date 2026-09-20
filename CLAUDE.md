@@ -25,7 +25,7 @@ Two live builds and one absent one.
 |---|---|---|
 | `src/` | Browser + webcam slice-measurement app. TypeScript, OpenCV.js | Runs. 196 tests |
 | `unity/` | Quest 3/3S MR perception app. C#, OpenXR, OpenCV for Unity | **Never compiled** |
-| `server/` | One file: an OpenAI relay for the Unity app | Runs |
+| `server/` | One file: a Qwen-VL relay for the Unity app, hosted or local | Runs |
 
 `README.md` says *"Not built: … anything XR"*. **That is wrong** — `unity/` landed in the same
 commit. Treat `unity/README.md` as authoritative for that half of the repo.
@@ -60,12 +60,23 @@ npx vitest run src/core/track.test.ts -t "treats a stub that got longer as a bad
 **`-t` with a pattern that matches nothing exits 0 with everything skipped.** A typo'd name is
 indistinguishable from a pass. Read the `N passed` line, never the exit code.
 
-The relay (Unity only — the web app never calls it). PowerShell, since the header comment in the
-file itself is bash-only:
+The relay (Unity only — the web app never calls it). Two upstreams, both speaking
+chat-completions. **Use the npm scripts** — they load `.env` through Node's own `--env-file`,
+so no key ever goes on a command line:
 
-```powershell
-$env:OPENAI_API_KEY = "sk-..."; node server/vision-relay.mjs   # :8787
+```bash
+npm run relay          # :8787, hosted Qwen. Needs OPENROUTER_API_KEY in .env
+npm run relay:local    # :8787, local Qwen via Ollama. No key, no network, no .env needed
 ```
+
+`relay:local` passes `--upstream=ollama`, which beats both `.env` and the shell. That flag
+exists because npm scripts must work on Windows, where `VAR=val node ...` is a cmd.exe parse
+error — the alternative was a `cross-env` dependency the relay is built to avoid.
+
+`curl localhost:8787/health` says which upstream is live and which models it will forward.
+**The model string in the Unity build must match that allowlist** — the relay rejects anything
+else by name. Hosted is `qwen/qwen2.5-vl-72b-instruct:free`, local is `qwen2.5vl:3b`, and
+`VISION_MODELS=a,b` extends the list when a free-tier ID goes stale.
 
 No linter, no formatter, no CI. `npm test` is the entire quality gate and it is manual.
 

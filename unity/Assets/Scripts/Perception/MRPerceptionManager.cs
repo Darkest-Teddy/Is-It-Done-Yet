@@ -34,7 +34,7 @@ namespace MRPerception
         [SerializeField] private DetectionRaycaster raycaster;
 
         [Tooltip(
-            "Anything implementing IVisionProvider -- OpenAiVisionProvider, or leave empty to " +
+            "Anything implementing IVisionProvider -- VlmVisionProvider, or leave empty to " +
             "fall back to the local detector's own label and run fully offline.")]
         [SerializeField] private MonoBehaviour visionProviderBehaviour;
 

@@ -8,6 +8,8 @@
   },
   "scripts": {
     "dev": "vite",
+    "relay": "node --env-file-if-exists=.env server/vision-relay.mjs",
+    "relay:local": "node --env-file-if-exists=.env server/vision-relay.mjs --upstream=ollama",
     "build": "vite build",
     "test:core": "vitest run src/core",
     "check:purity": "node scripts/check-purity.mjs",
