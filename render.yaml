@@ -1,0 +1,41 @@
+# Render blueprint. Lives at the repo root because that is where Render looks for it; the
+# service itself is `rootDir: server`, so the front-end build is not part of it.
+#
+# Verified against https://render.com/docs/blueprint-spec (September 2026): the field is
+# `runtime`, not the deprecated `env`, and `sync: false` marks a value Render prompts for
+# instead of reading from this file. MONGODB_URI must stay `sync: false` -- a connection string
+# with a password in a committed file is the failure this whole section exists to avoid.
+
+services:
+  - type: web
+    name: is-it-done-yet-api
+    runtime: node
+    plan: free
+    region: oregon
+    rootDir: server
+    # `npm ci` over `npm install`: the lockfile is the point of committing one.
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_VERSION
+        value: '22'
+      - key: NODE_ENV
+        value: production
+      # Prompted at create time. Never written here.
+      - key: MONGODB_URI
+        sync: false
+      - key: DB_NAME
+        value: isitdone
+      # The GitHub Pages origin the front end is served from. Origin only, no path.
+      - key: ALLOWED_ORIGIN
+        value: https://darkest-teddy.github.io
+      # One proxy hop in front of the app. Without this every request looks like it came from
+      # Render's load balancer and the rate limiter locks out the whole venue at once.
+      - key: TRUST_PROXY
+        value: '1'
+      - key: RATE_LIMIT_WINDOW_MS
+        value: '60000'
+      - key: RATE_LIMIT_MAX_WRITES
+        value: '120'
