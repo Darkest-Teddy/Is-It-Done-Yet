@@ -1,0 +1,141 @@
+<!--
+  Setup stage: count what is on the counter, then let the cook correct it.
+
+  The correction step is the accuracy strategy, not a nicety. No vision model counts a cluttered
+  counter perfectly, and a recipe list built on a miscount sends someone to start a dish they
+  cannot finish. A scan the cook has corrected is accurate by construction rather than on
+  average. So every row is editable, and low-confidence rows are visually marked as questions
+  rather than facts.
+
+  Slots are pre-declared; `src/xr/panels.ts` drives them. See library.uikitml for why.
+-->
+<style>
+  .root {
+    display: flex; flex-direction: column;
+    width: 900px; height: 620px; padding: 28px; gap: 14px;
+    background-color: #12151a; border-radius: 24px;
+  }
+
+  .header { display: flex; flex-direction: row; align-items: center; gap: 14px; }
+  .title { font-size: 32px; font-weight: 700; color: #e8ecf1; flex-grow: 1; }
+
+  .status { font-size: 17px; color: #96a1ae; }
+  .notes { font-size: 15px; color: #e0b86a; }
+
+  .list { display: flex; flex-direction: column; gap: 8px; flex-grow: 1; }
+
+  .item {
+    display: flex; flex-direction: row; align-items: center; gap: 14px;
+    height: 58px; padding-left: 16px; padding-right: 12px;
+    background-color: #1b2027; border-radius: 14px;
+    border-width: 1px; border-color: #2b323d;
+  }
+  
+  .itemUnsure { border-color: #e0b86a; }
+  .itemIcon { font-size: 28px; width: 40px; }
+  .itemName { font-size: 20px; color: #e8ecf1; flex-grow: 1; }
+  .itemConf { font-size: 14px; color: #96a1ae; width: 120px; }
+  .itemCount {
+    font-size: 22px; font-weight: 700; color: #e8ecf1; width: 46px;
+  }
+  .step {
+    width: 42px; height: 42px; font-size: 22px; font-weight: 700;
+    color: #e8ecf1; background-color: #2b323d; border-radius: 10px;
+    align-items: center; justify-content: center;
+  }
+
+  .actions { display: flex; flex-direction: row; gap: 12px; }
+  .btn {
+    height: 60px; padding-left: 26px; padding-right: 26px;
+    font-size: 20px; font-weight: 600; border-radius: 15px;
+    align-items: center; justify-content: center;
+  }
+  .btnPrimary { background-color: #8ee06a; color: #12151a; flex-grow: 1; }
+  .btnBlocked { background-color: #3a3f47; color: #8a929c; flex-grow: 1; }
+  .btnGhost {
+    background-color: #1b2027; color: #e8ecf1;
+    border-width: 1px; border-color: #2b323d;
+  }
+</style>
+
+<div id="scan-root" class="root">
+  <div class="header">
+    <span class="title">What's on your counter?</span>
+    <button id="scan-run" class="btn btnGhost">Scan</button>
+  </div>
+
+  <span id="scan-status" class="status">Point the camera at your ingredients and press Scan.</span>
+  <span id="scan-notes" class="notes"></span>
+
+  <div id="scan-list" class="list">
+    <div id="scan-0" class="item">
+      <span id="scan-0-icon" class="itemIcon">🍅</span>
+      <span id="scan-0-name" class="itemName">—</span>
+      <span id="scan-0-conf" class="itemConf">—</span>
+      <button id="scan-0-minus" class="step">−</button>
+      <span id="scan-0-count" class="itemCount">0</span>
+      <button id="scan-0-plus" class="step">+</button>
+    </div>
+    <div id="scan-1" class="item">
+      <span id="scan-1-icon" class="itemIcon">🍅</span>
+      <span id="scan-1-name" class="itemName">—</span>
+      <span id="scan-1-conf" class="itemConf">—</span>
+      <button id="scan-1-minus" class="step">−</button>
+      <span id="scan-1-count" class="itemCount">0</span>
+      <button id="scan-1-plus" class="step">+</button>
+    </div>
+    <div id="scan-2" class="item">
+      <span id="scan-2-icon" class="itemIcon">🍅</span>
+      <span id="scan-2-name" class="itemName">—</span>
+      <span id="scan-2-conf" class="itemConf">—</span>
+      <button id="scan-2-minus" class="step">−</button>
+      <span id="scan-2-count" class="itemCount">0</span>
+      <button id="scan-2-plus" class="step">+</button>
+    </div>
+    <div id="scan-3" class="item">
+      <span id="scan-3-icon" class="itemIcon">🍅</span>
+      <span id="scan-3-name" class="itemName">—</span>
+      <span id="scan-3-conf" class="itemConf">—</span>
+      <button id="scan-3-minus" class="step">−</button>
+      <span id="scan-3-count" class="itemCount">0</span>
+      <button id="scan-3-plus" class="step">+</button>
+    </div>
+    <div id="scan-4" class="item">
+      <span id="scan-4-icon" class="itemIcon">🍅</span>
+      <span id="scan-4-name" class="itemName">—</span>
+      <span id="scan-4-conf" class="itemConf">—</span>
+      <button id="scan-4-minus" class="step">−</button>
+      <span id="scan-4-count" class="itemCount">0</span>
+      <button id="scan-4-plus" class="step">+</button>
+    </div>
+    <div id="scan-5" class="item">
+      <span id="scan-5-icon" class="itemIcon">🍅</span>
+      <span id="scan-5-name" class="itemName">—</span>
+      <span id="scan-5-conf" class="itemConf">—</span>
+      <button id="scan-5-minus" class="step">−</button>
+      <span id="scan-5-count" class="itemCount">0</span>
+      <button id="scan-5-plus" class="step">+</button>
+    </div>
+    <div id="scan-6" class="item">
+      <span id="scan-6-icon" class="itemIcon">🍅</span>
+      <span id="scan-6-name" class="itemName">—</span>
+      <span id="scan-6-conf" class="itemConf">—</span>
+      <button id="scan-6-minus" class="step">−</button>
+      <span id="scan-6-count" class="itemCount">0</span>
+      <button id="scan-6-plus" class="step">+</button>
+    </div>
+    <div id="scan-7" class="item">
+      <span id="scan-7-icon" class="itemIcon">🍅</span>
+      <span id="scan-7-name" class="itemName">—</span>
+      <span id="scan-7-conf" class="itemConf">—</span>
+      <button id="scan-7-minus" class="step">−</button>
+      <span id="scan-7-count" class="itemCount">0</span>
+      <button id="scan-7-plus" class="step">+</button>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button id="scan-skip" class="btn btnGhost">Skip</button>
+    <button id="scan-done" class="btn btnBlocked">Looks right — show recipes</button>
+  </div>
+</div>

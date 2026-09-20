@@ -1,9 +1,13 @@
 node_modules/
 dist/
 .vite/
-.iwsdk/
 *.local
+
+# Secrets. `*.local` covers Vite's .env.local but NOT a plain .env, and this repo has a public
+# remote plus a gh-pages deploy -- a key committed here is a key published to the internet.
 .env
+.env.*
+!.env.example
 
 # Unity (unity/) -- generated, machine-specific, or huge
 unity/Library/

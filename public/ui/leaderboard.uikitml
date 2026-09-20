@@ -1,0 +1,106 @@
+<!--
+  Booth leaderboard. Shares the right column with the chef panel.
+
+  Exists because a number nobody can beat is not a game. At a booth every player is on one
+  machine, so local storage genuinely is the shared store, and people come back to beat their
+  own row. A crowd forms, and judges notice crowds.
+
+  Your own row is highlighted rather than pinned to the top: the point is seeing who is above
+  you, which a pinned row hides.
+-->
+<style>
+  .root {
+    display: flex; flex-direction: column;
+    width: 420px; height: 480px; padding: 22px; gap: 12px;
+    background-color: #12151a; border-radius: 24px;
+  }
+
+  .head { display: flex; flex-direction: row; align-items: baseline; gap: 10px; }
+  .title { font-size: 24px; font-weight: 700; color: #e8ecf1; flex-grow: 1; }
+  .dish { font-size: 14px; color: #96a1ae; }
+
+  .rows { display: flex; flex-direction: column; gap: 6px; flex-grow: 1; }
+
+  .row {
+    display: flex; flex-direction: row; align-items: center; gap: 12px;
+    height: 52px; padding-left: 12px; padding-right: 14px;
+    background-color: #1b2027; border-radius: 12px;
+    border-width: 2px; border-color: #1b2027;
+  }
+  .rowMe { border-color: #8ee06a; }
+  .pos { font-size: 19px; font-weight: 700; color: #6f7883; width: 34px; }
+  .posTop { color: #e0b86a; }
+  .badge { font-size: 22px; width: 32px; }
+  .who { font-size: 19px; color: #e8ecf1; flex-grow: 1; }
+  .total { font-size: 20px; font-weight: 700; color: #8ee06a; width: 62px; }
+  .detail { font-size: 13px; color: #6f7883; width: 92px; }
+
+  .footer {
+    display: flex; flex-direction: row; align-items: center; gap: 10px;
+    padding-top: 6px;
+  }
+  .youAre { font-size: 15px; color: #96a1ae; flex-grow: 1; }
+  .again {
+    height: 48px; padding-left: 20px; padding-right: 20px;
+    font-size: 17px; font-weight: 700; color: #12151a;
+    background-color: #8ee06a; border-radius: 12px;
+    align-items: center; justify-content: center;
+  }
+</style>
+
+<div id="lb-root" class="root">
+  <div class="head">
+    <span class="title">Leaderboard</span>
+    <span id="lb-dish" class="dish">Tomato Mozzarella</span>
+  </div>
+
+  <div id="lb-rows" class="rows">
+    <div id="lb-0" class="row">
+      <span id="lb-0-pos" class="pos posTop">1</span>
+      <span id="lb-0-badge" class="badge">👑</span>
+      <span id="lb-0-who" class="who">—</span>
+      <span id="lb-0-total" class="total">—</span>
+      <span id="lb-0-detail" class="detail">—</span>
+    </div>
+    <div id="lb-1" class="row">
+      <span id="lb-1-pos" class="pos posTop">2</span>
+      <span id="lb-1-badge" class="badge">🏅</span>
+      <span id="lb-1-who" class="who">—</span>
+      <span id="lb-1-total" class="total">—</span>
+      <span id="lb-1-detail" class="detail">—</span>
+    </div>
+    <div id="lb-2" class="row">
+      <span id="lb-2-pos" class="pos posTop">3</span>
+      <span id="lb-2-badge" class="badge">⭐</span>
+      <span id="lb-2-who" class="who">—</span>
+      <span id="lb-2-total" class="total">—</span>
+      <span id="lb-2-detail" class="detail">—</span>
+    </div>
+    <div id="lb-3" class="row">
+      <span id="lb-3-pos" class="pos">4</span>
+      <span id="lb-3-badge" class="badge">🍳</span>
+      <span id="lb-3-who" class="who">—</span>
+      <span id="lb-3-total" class="total">—</span>
+      <span id="lb-3-detail" class="detail">—</span>
+    </div>
+    <div id="lb-4" class="row">
+      <span id="lb-4-pos" class="pos">5</span>
+      <span id="lb-4-badge" class="badge">🍳</span>
+      <span id="lb-4-who" class="who">—</span>
+      <span id="lb-4-total" class="total">—</span>
+      <span id="lb-4-detail" class="detail">—</span>
+    </div>
+    <div id="lb-5" class="row">
+      <span id="lb-5-pos" class="pos">6</span>
+      <span id="lb-5-badge" class="badge">🥄</span>
+      <span id="lb-5-who" class="who">—</span>
+      <span id="lb-5-total" class="total">—</span>
+      <span id="lb-5-detail" class="detail">—</span>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span id="lb-you" class="youAre">You are 4th of 12 tonight</span>
+    <button id="lb-again" class="again">Cut again</button>
+  </div>
+</div>

@@ -1,5 +1,5 @@
 {
-  "name": "mise",
+  "name": "is-it-done-yet",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -11,18 +11,27 @@
     "relay": "node --env-file-if-exists=.env server/vision-relay.mjs",
     "relay:local": "node --env-file-if-exists=.env server/vision-relay.mjs --upstream=ollama",
     "build": "vite build",
+    "preview": "vite preview --port 8081 --host",
+    "headset": "adb reverse tcp:8081 tcp:8081 && vite",
+    "headset:preview": "npm run build && adb reverse tcp:8081 tcp:8081 && vite preview --port 8081 --host",
+    "devtools": "adb forward tcp:9222 localabstract:chrome_devtools_remote && echo 'open chrome://inspect, or curl http://localhost:9222/json'",
     "test:core": "vitest run src/core",
     "check:purity": "node scripts/check-purity.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "npm run check:purity && npm run typecheck && vitest run"
+    "test": "npm run check:purity && npm run typecheck && vitest run",
+    "dev:usb": "node -e \"process.env.VITE_HTTPS='0';require('child_process').spawn('npx',['vite'],{stdio:'inherit',env:process.env,shell:true})\"",
+    "adb:reverse": "adb reverse tcp:8081 tcp:8081",
+    "build:pages": "node -e \"process.env.VITE_BASE='/Is-It-Done-Yet/';require('child_process').spawn('npx',['vite','build'],{stdio:'inherit',env:process.env,shell:true})\""
   },
   "devDependencies": {
     "@types/node": "^26.6.1",
+    "@vitejs/plugin-basic-ssl": "^2.3.0",
     "typescript": "~5.9.3",
     "vite": "^7.1.4",
     "vitest": "^5.0.1"
   },
   "dependencies": {
+    "@iwsdk/core": "^0.5.3",
     "@techstark/opencv-js": "^5.0.0-release.1",
     "tesseract.js": "^7.0.0"
   }

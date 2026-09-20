@@ -1,0 +1,93 @@
+<!--
+  Cutting competition. The gamified skill loop, and the only panel with arcade energy.
+
+  Everything here is sized to be read at arm's length through a 3S lens while your eyes are
+  really on the knife, so the live number is enormous and everything else is small. A readout
+  you have to focus on is a readout that gets ignored mid-cut.
+
+  The target band, not a single number, is the whole mechanic: a cook cannot hit 5.0mm, they can
+  hit 4 to 6, and scoring them against a point they cannot reach teaches nothing.
+-->
+<style>
+  .root {
+    display: flex; flex-direction: column;
+    width: 760px; height: 420px; padding: 26px; gap: 14px;
+    background-color: #12151a; border-radius: 24px;
+  }
+
+  .top { display: flex; flex-direction: row; align-items: center; gap: 14px; }
+  .title { font-size: 26px; font-weight: 700; color: #e8ecf1; flex-grow: 1; }
+  .target {
+    font-size: 18px; font-weight: 600; color: #12151a;
+    background-color: #e0b86a; border-radius: 10px;
+    padding-left: 14px; padding-right: 14px; padding-top: 6px; padding-bottom: 6px;
+  }
+
+  .live { display: flex; flex-direction: row; align-items: center; gap: 22px; }
+  .bigNumber { font-size: 118px; font-weight: 700; color: #8ee06a; }
+  .unit { font-size: 30px; font-weight: 600; color: #6f7883; }
+  .verdict { display: flex; flex-direction: column; gap: 4px; flex-grow: 1; }
+  .verdictWord { font-size: 34px; font-weight: 700; color: #8ee06a; }
+  .verdictWhy { font-size: 17px; color: #96a1ae; }
+
+  .band { display: flex; flex-direction: row; height: 26px; gap: 3px; }
+  .seg { flex-grow: 1; background-color: #1b2027; border-radius: 4px; }
+  .segIn { background-color: #8ee06a; }
+  .segNear { background-color: #e0b86a; }
+  .segOut { background-color: #e06a6a; }
+
+  .stats { display: flex; flex-direction: row; gap: 12px; }
+  .stat {
+    display: flex; flex-direction: column; gap: 2px; flex-grow: 1;
+    padding: 12px 14px; background-color: #1b2027; border-radius: 14px;
+  }
+  .statValue { font-size: 26px; font-weight: 700; color: #e8ecf1; }
+  .statLabel { font-size: 13px; color: #96a1ae; }
+  .statHot .statValue { color: #e0b86a; }
+</style>
+
+<div id="cut-root" class="root">
+  <div class="top">
+    <span class="title">Cutting</span>
+    <span id="cut-target" class="target">target 4-6mm</span>
+  </div>
+
+  <div class="live">
+    <span id="cut-mm" class="bigNumber">5.2</span>
+    <span class="unit">mm</span>
+    <div class="verdict">
+      <span id="cut-verdict" class="verdictWord">Good</span>
+      <span id="cut-why" class="verdictWhy">Inside the band. Keep the blade at this angle.</span>
+    </div>
+  </div>
+
+  <div id="cut-band" class="band">
+    <div id="cut-seg-0" class="seg"></div>
+    <div id="cut-seg-1" class="seg"></div>
+    <div id="cut-seg-2" class="seg segNear"></div>
+    <div id="cut-seg-3" class="seg segIn"></div>
+    <div id="cut-seg-4" class="seg segIn"></div>
+    <div id="cut-seg-5" class="seg segIn"></div>
+    <div id="cut-seg-6" class="seg segNear"></div>
+    <div id="cut-seg-7" class="seg"></div>
+  </div>
+
+  <div class="stats">
+    <div class="stat">
+      <span id="cut-count" class="statValue">12</span>
+      <span class="statLabel">SLICES</span>
+    </div>
+    <div class="stat statHot">
+      <span id="cut-streak" class="statValue">7</span>
+      <span class="statLabel">IN A ROW</span>
+    </div>
+    <div class="stat">
+      <span id="cut-sigma" class="statValue">0.4mm</span>
+      <span class="statLabel">SCATTER</span>
+    </div>
+    <div class="stat">
+      <span id="cut-score" class="statValue">0.86</span>
+      <span class="statLabel">SCORE</span>
+    </div>
+  </div>
+</div>

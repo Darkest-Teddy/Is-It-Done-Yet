@@ -475,7 +475,155 @@ a judging table. It feeds the identical intent path, so what the tests prove is 
 Selection is by feature detection, never by user-agent string: Quest Browser reports a
 Chrome-shaped UA and lacks the constructor, so sniffing gets the answer exactly backwards.
 
-## 18. There is a second build, in Unity, and this log did not say so
+## 18. Gate zero passes. Quest Browser reaches the passthrough cameras
+
+**Spec section:** §3, which budgets fifteen minutes to test whether Quest Browser exposes
+passthrough to `getUserMedia`, states it "has not been verified on your specific headset and OS
+build", and specifies the Luxonis OAK-1 as the fallback if it fails.
+
+**Reality:** measured on the device, 2026-09-19, via `public/quest-check.html` served over
+`adb reverse` and opened at `http://localhost:8081`. Quest 3S, Horizon OS v207,
+OculusBrowser 152 / Chromium 152.
+
+```
+PASS  secure context        http://localhost:8081
+PASS  camera                "camera 2, facing back" 1280x960 @ 30fps
+PASS  video inputs          camera 0 front | camera 2 back | camera 1 back
+PASS  microphone            peak 99% -- audio really arriving
+PASS  WebAssembly           OpenCV.js can run
+PASS  webxr immersive-ar    supported
+PASS  webxr immersive-vr    supported
+PASS  idle frame rate       72.9 fps, empty page
+FAIL  SpeechRecognition     constructor absent
+FAIL  speechSynthesis       absent
+```
+
+The room was **visually confirmed** in the video preview, which is the part the API cannot tell
+you: a camera track can start, report a plausible resolution, and still deliver black frames.
+Entry 17's own warning about `WebCamTexture` doing exactly that is why this was checked by eye
+rather than by status code.
+
+**Decision:** the OAK-1 fallback is not needed and stays in the bag. More importantly, **a
+headset build does not require Unity.** Camera, microphone, WebAssembly and WebXR are all
+reachable from the browser, over a bridge that installs nothing on the device.
+
+**What this voids:** the OpenCV-for-Unity purchase as a critical-path blocker, the Unity project
+bring-up, the APK build and sideload loop, and the `yolov8n.onnx` export. `unity/` stays in the
+tree because the C# is good and the OCR work may still want it, but it is no longer gating
+anything.
+
+**What it does NOT establish, and the distinction matters.** This was a 2D browser page. Whether
+`getUserMedia` keeps delivering frames *inside* an active `immersive-ar` session is a separate
+question and is still unverified. A 2D panel floating in passthrough is a usable demo and the
+measurement is equally real there, but overlays anchored to real objects need the immersive
+session. Test that before designing around it.
+
+**Performance is now the open question and it is not answered by the 72.9 fps above**, which was
+an empty page. `README.md` measures segmentation at roughly 125ms per megapixel in WASM on a
+laptop — about 8fps at 720p. The XR2 Gen 2 is a mobile part already running a compositor. Until
+the real pipeline is measured on-device, "the camera works on Quest" does not imply "the app
+runs on Quest".
+
+## 19. The chef has no browser voice on the headset
+
+**Reality:** from the same run. `speechSynthesis` is **absent** in Quest Browser, not merely
+unreliable. `SpeechRecognition` is absent too, as entry 17 predicted.
+
+`src/audio/chef.ts` documents three tiers: a pre-generated ElevenLabs bank, the browser
+synthesiser, then silence with the line still on screen. On the headset the middle tier does not
+exist, so the chef is either ElevenLabs or subtitles, with nothing in between.
+
+**Decision:** this promotes ElevenLabs from a sponsor-track integration to a load-bearing
+dependency *on the headset only*, and it changes the failure mode the bank has to survive. The
+laptop keeps all three tiers and degrades gracefully; the headset falls straight from tier 1 to
+tier 3. The bank must therefore be generated and cached **before** a headset demo starts, and
+the subtitle path has to be good enough to carry the demo on its own, because it is the only
+thing behind it.
+
+`AudioContext` passes, so anything we synthesise or fetch ourselves still plays. It is only the
+platform's own text-to-speech that is missing. The synthesised chop sound in `src/audio/chop.ts`
+is unaffected.
+
+## 20. Camera and immersive-ar coexist. The browser can host a real MR app
+
+**Open question from entry 18:** that entry confirmed the passthrough cameras are reachable from
+a 2D page and explicitly refused to generalise, because an immersive session takes over the
+compositor and a browser may suspend capture when a page stops being the foreground document.
+If capture died on session entry, overlays anchored to real objects would be unreachable from
+the browser and the plan would collapse back to a floating 2D panel.
+
+**Reality:** measured on device via `public/xr-camera-test.html`, two independent runs.
+
+```
+before:  87/87   advancing, mean luminance 87.9, 0 black
+during: 627/629  advancing, mean luminance 95.8, 0 black    <- inside immersive-ar
+4410 XR frames over 62.1s = 71.0 fps, with capture running
+```
+
+Second run reproduced it: `772/774 advancing, 0 black`.
+
+The measurement checks two independent things on a timer, because a status code distinguishes
+neither: `video.currentTime` advancing proves new frames are *decoding*, and mean luminance
+above zero proves they are not *black*. Entry 18 was caught out by exactly that gap in the other
+direction, and `unity/README.md` documents black-frame delivery with "no exception, no log line"
+as a real failure mode of this hardware.
+
+**Decision:** build the headset experience as a WebXR `immersive-ar` session in Quest Browser.
+Anchored overlays on real objects are available, the session sustains ~71fps against a 72Hz
+target with capture live, and entering a session *is* the app — there is no packaging step
+between here and a working MR demo.
+
+**What this settles.** Combined with entry 18, no part of the headset plan requires Unity: not
+the camera, not the microphone, not the immersive session, not anchoring. `unity/` is retained
+for its OCR work and because the C# is good, but it gates nothing and blocks nobody.
+
+**What is still unmeasured, and it is now the only gate.** The 71fps figure is capture plus a
+trivial WebGL clear. It contains no OpenCV. `README.md` puts segmentation at roughly 125ms per
+megapixel in WASM — about 8fps at 720p on a laptop — and the XR2 Gen 2 is a mobile part already
+driving a stereo compositor. Nothing here licenses the assumption that the measurement pipeline
+fits in the remaining budget. Measure it before designing around it.
+
+## 21. Segmentation costs 87ms on the headset. That is fine for a panel and fatal for a session
+
+**Open question from entry 20:** the 71fps measured inside an immersive session contained no
+OpenCV. This is that number.
+
+**Reality:** the built app, served over `adb reverse` and read out of the live page over the
+DevTools bridge, on Quest 3S:
+
+```
+5 blobs · 0 produce · uncalibrated · cv 87.1ms · frame 129.5ms (8fps) · 1280x720
+```
+
+Segmentation costs **87.1ms per frame**, for a whole-frame rate of about **8fps**.
+
+The surprise is that this is roughly what `README.md` measures on a laptop. The XR2 Gen 2 is
+holding its own against a desktop CPU on this WASM workload, so no headset-specific penalty
+needs accounting for. The cost is the pixel count, as the README already says.
+
+**Decision, and it splits by presentation mode.**
+
+*As a 2D panel, 8fps ships as-is.* Entry 13's whole argument is that a cucumber does not move
+between frames, and §5.1 of the master spec designs the perception layer around ~1Hz detection.
+8fps is eight times faster than the architecture asks for. Nothing needs optimising to demo
+this today.
+
+*In an `immersive-ar` session, 87ms of main-thread work is disqualifying.* A 72Hz session has a
+13.9ms budget per frame. Blocking it for 87ms drops the session to ~8fps, and a headset running
+at 8fps is not merely ugly, it is nauseating — the one failure mode that ends a judge's turn
+early and is remembered afterwards.
+
+**So the immersive path has a prerequisite that the panel path does not: move segmentation into
+a Web Worker before entering a session.** `src/vision/segment.ts` is already the only file that
+touches OpenCV and everything downstream takes plain numbers, so the seam exists. It is a real
+piece of work, not a flag, and it must be budgeted before anyone commits to anchored overlays.
+
+Recorded now because the panel demo is available immediately and the session demo is not, and
+the difference is one measurement rather than an opinion.
+
+---
+
+## 22. There is a second build, in Unity, and this log did not say so
 
 **Spec section:** rule #15 — "Log every deviation from this spec in `DECISIONS.md` with the
 reason." This entry exists because that rule was breached.
@@ -519,7 +667,7 @@ and a stale constructor signature — but "it balances" is not "it compiles". Ex
 first build, most likely `PassthroughCameraUtils`, `EnvironmentRaycastHit.normalConfidence` and
 the `OVRInput` button constants.
 
-## 19. Four bugs an audit found in the Unity build, and what they have in common
+## 23. Four bugs an audit found in the Unity build, and what they have in common
 
 **Reality:** the Unity code was reviewed file by file after it was written. Four defects, and
 all four share a shape: **they work in the place you would test them and fail in the place they
@@ -559,7 +707,7 @@ capture rate being slower than inference — a runtime slider can close that gap
 
 ---
 
-## 20. The vision model is Qwen now, and it runs in two places
+## 24. The vision model is Qwen now, and it runs in two places
 
 **Spec section:** §6 names Gemini 3 Flash for scene semantics and §10.4 specifies a four-provider
 abstraction. Neither shipped. What shipped was one provider calling `gpt-4o-mini`, and this entry

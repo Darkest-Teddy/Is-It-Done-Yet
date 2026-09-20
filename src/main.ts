@@ -883,3 +883,24 @@ ready
     console.error('[mise]', error);
   });
 
+/**
+ * Registers the service worker, which is what makes the app installable and what makes it run
+ * with no network -- the ~15MB OpenCV WASM binary is cached once instead of fetched over
+ * saturated hall wifi while a judge waits.
+ *
+ * Guarded on `import.meta.env.DEV` rather than on the hostname. The headset reaches the dev
+ * server through `adb reverse` as `localhost`, so a hostname test would disable the worker in
+ * exactly the place it needs testing, while still leaving it enabled against the dev server on
+ * a laptop -- where it caches module output Vite is simultaneously rewriting and serves stale
+ * code that survives a hard reload. `DEV` is false for anything built, including `vite preview`
+ * on localhost, which is the correct line.
+ */
+if (!import.meta.env.DEV && 'serviceWorker' in navigator) {
+  addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch((error: unknown) => {
+      // Never fatal. An uninstallable app that runs beats an installable one that does not.
+      console.warn('[mise] service worker not registered:', error);
+    });
+  });
+}
+

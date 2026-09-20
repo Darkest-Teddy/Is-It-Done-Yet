@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lab</title>
+    <!--
+      Feature test rig, designed for the Quest 3 browser window rather than a desktop.
+
+      Gate zero (DECISIONS #18) proved Quest Browser reaches the passthrough cameras. It did not
+      answer whether the real pipeline RUNS there at a usable rate, and that number decides
+      whether this is a live overlay or a 1Hz coach. Every stage is timed separately and the
+      frame time is the loudest thing on the page.
+
+      Built to headset constraints, not desktop ones:
+      - FITS ONE VIEWPORT, never scrolls. Scrolling a page with a controller ray is miserable,
+        and with hand tracking it is worse. Everything reachable without moving the page.
+      - Targets are 64px minimum. A ray jitters with your head, and pinch has no hover state to
+        tell you what you are about to hit.
+      - Opaque panels, high contrast. These float over passthrough, and a translucent card on a
+        bright kitchen counter is unreadable.
+      - Big type. Text at arm's length through a lens is why quest-check.html is sized the way
+        it is, and this follows it.
+    -->
+    <style>
+      :root {
+        --bg: #0b0d11; --panel: #161c25; --line: #27303c;
+        --fg: #eef2f6; --dim: #939fad;
+        --ok: #6ee07a; --warn: #ffc95e; --bad: #ff7a7a; --accent: #8ee06a;
+        color-scheme: dark;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; overflow: hidden; }
+      body {
+        margin: 0; padding: 14px; background: var(--bg); color: var(--fg);
+        font: 20px/1.35 ui-sans-serif, system-ui, sans-serif;
+        display: flex; flex-direction: column; gap: 12px;
+      }
+
+      /* Row 1: tabs. Full-width targets, nothing subtle. */
+      .tabs { display: flex; gap: 10px; flex: 0 0 auto; }
+      .tabs button {
+        flex: 1; height: 68px; border-radius: 14px;
+        font-family: inherit; font-size: 22px; font-weight: 700; line-height: 1;
+        border: 2px solid var(--line); background: var(--panel); color: var(--fg);
+      }
+      .tabs button[aria-pressed='true'] {
+        background: var(--accent); color: #0b0d11; border-color: var(--accent);
+      }
+
+      /* Row 2: the stage and a narrow control rail. Fills whatever height is left. */
+      .main { flex: 1 1 auto; display: flex; gap: 12px; min-height: 0; }
+      .stage {
+        flex: 1 1 auto; min-width: 0; background: #000;
+        border-radius: 14px; overflow: hidden;
+        display: flex; align-items: center; justify-content: center;
+      }
+      canvas { max-width: 100%; max-height: 100%; display: block; }
+
+      .rail {
+        flex: 0 0 310px; display: flex; flex-direction: column; gap: 10px;
+        min-height: 0; overflow: hidden;
+      }
+      .card {
+        background: var(--panel); border: 2px solid var(--line);
+        border-radius: 14px; padding: 12px 14px;
+      }
+      .card h2 {
+        font-family: inherit; font-size: 13px; font-weight: 700; line-height: 1;
+        letter-spacing: .1em; text-transform: uppercase;
+        color: var(--dim); margin: 0 0 8px;
+      }
+
+      #cardTune, #cardOcr { flex: 1 1 60%; min-height: 150px; overflow-y: auto; }
+      #cardFound { flex: 1 1 40%; min-height: 90px; overflow-y: auto; }
+      #cardTune.hide, #cardOcr.hide { flex: 0 0 0; min-height: 0; padding: 0; border: 0; }
+
+      /* Picker and its refresh share one row; stacked they cost ~140px the rail cannot spare. */
+      .camRow { display: flex; gap: 8px; align-items: center; }
+      .camRow select { flex: 1 1 auto; min-width: 0; }
+      .camRow .btn { flex: 0 0 64px; width: 64px; margin-top: 0; font-size: 26px; }
+      label.slider { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; margin-bottom: 10px; }
+      label.slider span { font-size: 16px; color: var(--dim); }
+      label.slider output { font: 700 16px ui-monospace, Menlo, monospace; color: var(--accent); }
+      /* Tall track: a thin slider is unhittable with a ray. */
+      label.slider input { grid-column: 1 / -1; width: 100%; height: 44px; accent-color: var(--accent); }
+
+      select, .btn {
+        width: 100%; height: 64px; padding: 0 14px;
+        font-family: inherit; font-size: 19px; font-weight: 700; line-height: 1;
+        border-radius: 12px; border: 2px solid var(--line);
+        background: var(--bg); color: var(--fg);
+      }
+      .btn { background: var(--accent); color: #0b0d11; border-color: var(--accent); }
+      .btn.ghost { background: var(--panel); color: var(--fg); border-color: var(--line); }
+      .btn + .btn, select + .btn { margin-top: 8px; }
+
+      /* Row 3: the verdict strip. This is what the page exists to produce. */
+      .perf {
+        flex: 0 0 auto; display: flex; align-items: center; gap: 18px;
+        background: var(--panel); border: 2px solid var(--line);
+        border-radius: 14px; padding: 10px 18px;
+      }
+      #fps { font: 700 40px/1 ui-monospace, Menlo, monospace; min-width: 170px; }
+      #perfVerdict { font-size: 19px; font-weight: 600; }
+      .stages { display: flex; gap: 16px; font-variant-numeric: tabular-nums; }
+      .stages div { text-align: right; }
+      .stages b { display: block; font: 700 21px/1.1 ui-monospace, Menlo, monospace; }
+      .stages span { font-size: 13px; color: var(--dim); }
+
+      .list { display: flex; flex-direction: column; gap: 5px; font-size: 18px; }
+      .item { display: flex; gap: 9px; align-items: center; }
+      .item .n { font: 700 19px ui-monospace, Menlo, monospace; color: var(--accent); min-width: 30px; }
+      #ocrOut {
+        font: 400 16px/1.45 ui-monospace, Menlo, monospace; white-space: pre-wrap;
+        overflow-y: auto; flex: 1 1 auto;
+      }
+      .muted { color: var(--dim); }
+      .hide { display: none !important; }
+      #status { font-size: 14px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    </style>
+  </head>
+  <body>
+    <div class="tabs">
+      <button id="tab-ingredients" aria-pressed="true">Ingredients</button>
+      <button id="tab-ocr" aria-pressed="false">OCR</button>
+      <button id="tab-library" aria-pressed="false">Library</button>
+    </div>
+
+    <div class="main">
+      <div class="stage"><canvas id="view"></canvas></div>
+
+      <div class="rail">
+        <div class="card camRow" style="flex:0 0 auto">
+          <select id="cameras"></select>
+          <button class="btn ghost" id="swap">↻</button>
+        </div>
+
+        <div class="card" id="cardTune">
+          <h2>Tuning</h2>
+          <div id="sliders"></div>
+        </div>
+
+        <div class="card hide" id="cardOcr">
+          <h2>Text read</h2>
+          <button class="btn" id="readNow">Read frame</button>
+          <div id="ocrOut" class="muted" style="margin-top:8px">Point at a recipe card.</div>
+        </div>
+
+        <div class="card" id="cardFound">
+          <h2>Detected</h2>
+          <div class="list" id="found"><span class="muted">nothing yet</span></div>
+        </div>
+
+        <div class="card" style="flex:0 0 auto">
+          <button class="btn ghost" id="send">Send results to laptop</button>
+          <div id="sendOut" class="muted" style="margin-top:6px; font-size:14px"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="perf">
+      <div id="fps">—</div>
+      <div style="flex:1 1 auto; min-width:0">
+        <div id="perfVerdict" class="muted">measuring…</div>
+        <div id="status">starting…</div>
+      </div>
+      <div class="stages">
+        <div><b id="tGrab">—</b><span>grab</span></div>
+        <div><b id="tSeg">—</b><span>segment</span></div>
+        <div><b id="tCls">—</b><span>classify</span></div>
+        <div><b id="tSize">—</b><span>size</span></div>
+      </div>
+    </div>
+
+    <script type="module">
+      import cv from '@techstark/opencv-js';
+      import { listCameras, open, FrameGrabber } from '/src/vision/camera.ts';
+      import { segment, useOpenCv, DEFAULT_SEGMENT_OPTIONS } from '/src/vision/segment.ts';
+      import { identify } from '/src/core/ingredients.ts';
+      import { createOcrReader } from '/src/vision/ocr.ts';
+      import { pantryFromScan, rankRecipes, iconFor } from '/src/core/pantry.ts';
+      import { RECIPES } from '/src/core/recipe.ts';
+
+      const $ = (id) => document.getElementById(id);
+      const canvas = $('view');
+      const ctx = canvas.getContext('2d');
+      const status = (t) => { $('status').textContent = t; };
+
+      useOpenCv(cv);
+
+      let mode = 'ingredients';
+      let grabber = null;
+      let video = null;
+      const opts = { ...DEFAULT_SEGMENT_OPTIONS };
+      /** Longest edge fed to OpenCV. The single biggest lever on frame time. */
+      let maxEdge = 480;
+
+      function slider(label, min, max, step, get, set) {
+        const l = document.createElement('label');
+        l.className = 'slider';
+        const s = document.createElement('span'); s.textContent = label;
+        const o = document.createElement('output'); o.textContent = get();
+        const i = document.createElement('input');
+        Object.assign(i, { type: 'range', min, max, step, value: get() });
+        i.addEventListener('input', () => { set(Number(i.value)); o.textContent = i.value; });
+        l.append(s, o, i);
+        $('sliders').append(l);
+      }
+      // Analysis width leads, because on a mobile GPU it is the only knob that matters much.
+      slider('analysis width px', 240, 1280, 40, () => maxEdge, (v) => { maxEdge = v; });
+      slider('saturation floor', 0.05, 0.6, 0.01, () => opts.minSaturation, (v) => { opts.minSaturation = v; });
+      slider('min area px', 100, 6000, 50, () => opts.minAreaPx, (v) => { opts.minAreaPx = v; });
+      slider('morph kernel', 1, 11, 2, () => opts.morphKernelPx, (v) => { opts.morphKernelPx = v; });
+
+      async function startCamera(deviceId) {
+        try {
+          video = document.createElement('video');
+          video.playsInline = true; video.muted = true;
+          video.srcObject = await open(deviceId ? { deviceId, width: 1280, height: 720 } : undefined);
+          await video.play();
+          grabber = new FrameGrabber(video);
+          status('camera live');
+
+          const cams = await listCameras();
+          const sel = $('cameras');
+          sel.innerHTML = '';
+          for (const c of cams) {
+            const o = document.createElement('option');
+            o.value = c.deviceId; o.textContent = c.label;
+            sel.append(o);
+          }
+          if (deviceId) sel.value = deviceId;
+        } catch (e) {
+          status(`camera failed: ${e.name}: ${e.message}`);
+        }
+      }
+      $('cameras').addEventListener('change', (e) => startCamera(e.target.value));
+      $('swap').addEventListener('click', () => startCamera($('cameras').value || undefined));
+
+      const work = document.createElement('canvas');
+      const wctx = work.getContext('2d', { willReadFrequently: true });
+
+      const ring = [];
+      const avg = (k) => ring.length ? ring.reduce((a, r) => a + r[k], 0) / ring.length : 0;
+      let lastPantry = null;
+
+      function tick() {
+        requestAnimationFrame(tick);
+        if (!grabber || !video || video.videoWidth === 0) return;
+
+        const t0 = performance.now();
+        // Draw the video straight into the small canvas. Grabbing a full frame and scaling
+        // afterwards costs a full-resolution getImageData for nothing.
+        const k = Math.min(1, maxEdge / Math.max(video.videoWidth, video.videoHeight));
+        const w = Math.max(1, Math.round(video.videoWidth * k));
+        const h = Math.max(1, Math.round(video.videoHeight * k));
+        if (work.width !== w || work.height !== h) { work.width = w; work.height = h; }
+        wctx.drawImage(video, 0, 0, w, h);
+        const small = wctx.getImageData(0, 0, w, h);
+        const t1 = performance.now();
+
+        let blobs = [];
+        try { blobs = segment(small, opts); } catch (e) { status(`segment threw: ${e.message}`); }
+        const t2 = performance.now();
+
+        const named = blobs.map((b) => ({ blob: b, id: identify(b.features) }));
+        const t3 = performance.now();
+
+        if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+        ctx.putImageData(small, 0, 0);
+
+        if (mode !== 'ocr') {
+          for (const { blob, id } of named) {
+            ctx.beginPath();
+            blob.contour.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+            ctx.closePath();
+            ctx.strokeStyle = id ? '#8ee06a' : '#ff7a7a';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            const label = id ? `${id.name} ${(id.confidence * 100) | 0}%` : `${blob.features.hueDeg | 0}deg`;
+            ctx.font = '700 15px system-ui';
+            const tw = ctx.measureText(label).width + 10;
+            ctx.fillStyle = 'rgba(0,0,0,.78)';
+            ctx.fillRect(blob.centroid.x - tw / 2, blob.centroid.y - 11, tw, 22);
+            ctx.fillStyle = id ? '#8ee06a' : '#ff7a7a';
+            ctx.fillText(label, blob.centroid.x - tw / 2 + 5, blob.centroid.y + 5);
+          }
+        }
+
+        ring.push({ grab: t1 - t0, seg: t2 - t1, cls: t3 - t2, all: performance.now() - t0 });
+        if (ring.length > 30) ring.shift();
+
+        const all = avg('all');
+        $('fps').textContent = all > 0 ? `${(1000 / all).toFixed(1)} fps` : '—';
+        $('tGrab').textContent = `${avg('grab').toFixed(0)}ms`;
+        $('tSeg').textContent = `${avg('seg').toFixed(0)}ms`;
+        $('tCls').textContent = `${avg('cls').toFixed(0)}ms`;
+        $('tSize').textContent = `${w}x${h}`;
+
+        const v = $('perfVerdict');
+        if (all < 40) { v.textContent = 'live overlay is viable'; v.style.color = 'var(--ok)'; }
+        else if (all < 350) { v.textContent = 'fine for a ~1Hz coach, too slow to track'; v.style.color = 'var(--warn)'; }
+        else { v.textContent = 'too slow even for 1Hz — cut the analysis width'; v.style.color = 'var(--bad)'; }
+
+        const counts = new Map();
+        for (const { id } of named) if (id) counts.set(id.name, (counts.get(id.name) ?? 0) + 1);
+        lastPantry = pantryFromScan(
+          [...counts].map(([ingredient, count]) => ({ ingredient, count, category: 'unknown', confidence: 0.8 })), 0);
+
+        const found = $('found');
+        found.innerHTML = '';
+        if (counts.size === 0) found.innerHTML = '<span class="muted">nothing recognised</span>';
+        for (const [name, n] of [...counts].sort((a, b) => b[1] - a[1])) {
+          const d = document.createElement('div');
+          d.className = 'item';
+          d.innerHTML = `<span class="n">${n}</span><span>${iconFor(name)}</span><span>${name}</span>`;
+          found.append(d);
+        }
+        if (mode === 'library' && lastPantry) {
+          const hr = document.createElement('div');
+          hr.style.cssText = 'margin-top:9px;border-top:2px solid var(--line);padding-top:9px';
+          hr.innerHTML = rankRecipes(lastPantry, RECIPES).map((m) =>
+            `<div class="item"><span>${m.recipe.icon}</span><span style="flex:1">${m.recipe.name}</span>` +
+            `<span style="color:${m.makeable ? 'var(--ok)' : 'var(--warn)'};font-size:15px">` +
+            `${m.makeable ? 'ready' : `−${m.missing.length}`}</span></div>`).join('');
+          found.append(hr);
+        }
+      }
+
+      // Created eagerly so the worker download overlaps with the camera coming up, instead of
+      // stalling the first read by several seconds.
+      const ocr = createOcrReader();
+      let ocrReady = false;
+      ocr.ready.then((ok) => { ocrReady = ok; if (!ok) $('ocrOut').textContent = 'OCR engine failed to load.'; });
+
+      $('readNow').addEventListener('click', async () => {
+        if (!ocrReady) { $('ocrOut').textContent = 'OCR still loading…'; return; }
+        if (ocr.busy) return;
+        $('ocrOut').textContent = 'reading…';
+        const t = performance.now();
+        try {
+          const regions = await ocr.read(canvas, { psm: 6 });
+          const ms = (performance.now() - t).toFixed(0);
+          $('ocrOut').textContent = regions.length === 0
+            ? `no text found (${ms}ms)`
+            // TextRegion.confidence is 0..1, not a percentage. Printing it raw shows "1%"
+            // for a perfect read, which looks like the OCR failed.
+            : `${regions.length} regions, ${ms}ms\n\n` +
+              regions.map((r) => `${((r.confidence ?? 0) * 100).toFixed(0)}%  ${r.text}`).join('\n');
+        } catch (e) {
+          $('ocrOut').textContent = `OCR failed: ${e.message}`;
+        }
+      });
+
+      function setMode(m) {
+        mode = m;
+        for (const k of ['ingredients', 'ocr', 'library']) {
+          $(`tab-${k}`).setAttribute('aria-pressed', String(k === m));
+        }
+        $('cardOcr').classList.toggle('hide', m !== 'ocr');
+        $('cardTune').classList.toggle('hide', m === 'ocr');
+      }
+      for (const k of ['ingredients', 'ocr', 'library']) {
+        $(`tab-${k}`).addEventListener('click', () => setMode(k));
+      }
+
+      $('send').addEventListener('click', async () => {
+        const body = [
+          `lab results  ${new Date().toISOString()}`,
+          `ua           ${navigator.userAgent}`,
+          `viewport     ${innerWidth}x${innerHeight}`,
+          `analysis     ${$('tSize').textContent} @ maxEdge ${maxEdge}`,
+          `fps          ${$('fps').textContent}   (${$('perfVerdict').textContent})`,
+          `grab/seg/cls ${$('tGrab').textContent} / ${$('tSeg').textContent} / ${$('tCls').textContent}`,
+          `tuning       sat ${opts.minSaturation}  area ${opts.minAreaPx}  morph ${opts.morphKernelPx}`,
+          `detected     ${$('found').innerText.replace(/\n+/g, ' | ')}`,
+          `ocr          ${$('ocrOut').innerText.slice(0, 400)}`,
+        ].join('\n');
+        try {
+          const r = await fetch('/quest-results', { method: 'POST', body });
+          $('sendOut').textContent = r.ok ? 'written to results/' : `failed: HTTP ${r.status}`;
+        } catch (e) {
+          $('sendOut').textContent = `failed: ${e.message}`;
+        }
+      });
+
+      await startCamera();
+      setMode('ingredients');
+      tick();
+    </script>
+  </body>
+</html>

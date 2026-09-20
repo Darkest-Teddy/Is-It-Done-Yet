@@ -1,0 +1,91 @@
+<!--
+  The chef panel. Sits to the right of the cook and is never hidden.
+
+  This is where the personality lives. The other panels are information; this one is a person.
+  It holds the current bark, the fault being coached, and the rank you are working toward, so
+  there is always something in the corner of your eye that reacts to what you just did.
+
+  Deliberately narrow and tall: it rides beside the board rather than over it, because anything
+  that covers the cutting surface in passthrough is worse than not being there.
+-->
+<style>
+  .root {
+    display: flex; flex-direction: column;
+    width: 420px; height: 620px; padding: 24px; gap: 16px;
+    background-color: #12151a; border-radius: 24px;
+  }
+
+  .chefTop { display: flex; flex-direction: row; align-items: center; gap: 14px; }
+  .face {
+    width: 74px; height: 74px; font-size: 44px;
+    background-color: #1b2027; border-radius: 20px;
+    align-items: center; justify-content: center;
+  }
+  .who { display: flex; flex-direction: column; gap: 2px; flex-grow: 1; }
+  .chefName { font-size: 22px; font-weight: 700; color: #e8ecf1; }
+  .chefMood { font-size: 15px; color: #96a1ae; }
+
+  .bark {
+    display: flex; flex-direction: column; gap: 8px;
+    padding: 18px; background-color: #1b2027; border-radius: 18px;
+    border-width: 2px; border-color: #8ee06a;
+  }
+  .barkLine { font-size: 23px; font-weight: 600; color: #e8ecf1; }
+  .barkWhy { font-size: 16px; color: #96a1ae; }
+
+  .sectionTitle { font-size: 14px; font-weight: 700; color: #96a1ae; }
+
+  .rankRow { display: flex; flex-direction: row; align-items: center; gap: 12px; }
+  .rankIcon {
+    width: 56px; height: 56px; font-size: 30px;
+    background-color: #1b2027; border-radius: 16px;
+    align-items: center; justify-content: center;
+  }
+  .rankText { display: flex; flex-direction: column; gap: 2px; flex-grow: 1; }
+  .rankTitle { font-size: 20px; font-weight: 700; color: #e0b86a; }
+  .rankNext { font-size: 14px; color: #96a1ae; }
+
+  .barTrack {
+    height: 12px; background-color: #1b2027; border-radius: 6px;
+  }
+  .barFill { height: 12px; background-color: #e0b86a; border-radius: 6px; width: 40%; }
+
+  .spacer { flex-grow: 1; }
+
+  .askBtn {
+    height: 68px; font-size: 21px; font-weight: 700;
+    color: #12151a; background-color: #8ee06a; border-radius: 18px;
+    align-items: center; justify-content: center;
+  }
+  .hintRow { font-size: 14px; color: #6f7883; }
+</style>
+
+<div id="chef-root" class="root">
+  <div class="chefTop">
+    <span id="chef-face" class="face">👨‍🍳</span>
+    <div class="who">
+      <span class="chefName">Chef</span>
+      <span id="chef-mood" class="chefMood">watching</span>
+    </div>
+  </div>
+
+  <div class="bark">
+    <span id="chef-line" class="barkLine">Wash the cucumber before it goes anywhere.</span>
+    <span id="chef-why" class="barkWhy">It came off a shelf, not a farm. Thirty seconds now saves the whole bowl.</span>
+  </div>
+
+  <span class="sectionTitle">YOUR RANK</span>
+  <div class="rankRow">
+    <span id="chef-rank-icon" class="rankIcon">🍳</span>
+    <div class="rankText">
+      <span id="chef-rank-title" class="rankTitle">Line Cook</span>
+      <span id="chef-rank-next" class="rankNext">0.04 from Sous Chef</span>
+    </div>
+  </div>
+  <div class="barTrack"><div id="chef-rank-bar" class="barFill"></div></div>
+
+  <div class="spacer"></div>
+
+  <button id="chef-ask" class="askBtn">What am I missing?</button>
+  <span class="hintRow">or just say it out loud</span>
+</div>

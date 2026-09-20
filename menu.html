@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Panel layout preview</title>
+    <!--
+      Spatial preview of the headset panels, in plain DOM.
+
+      MULTI-PANEL, NOT MULTI-PAGE. In a headset you have the whole room, so panels sit around
+      the cook at once and update in place. Paging would hide the ingredients exactly when you
+      are choosing a recipe that depends on them, and hide the chef exactly when he has
+      something to say. The arrangement below is the arrangement in 3D, flattened.
+
+      It fetches the same .uikitml files the headset loads and drives them with the same core
+      functions, so there is no second copy of the layout to drift: edit a panel, reload here.
+
+      Not a renderer. UIKit resolves some properties differently from CSS, so read this as
+      faithful to content and proportion, not pixel-exact.
+    -->
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; min-height: 100vh; padding: 22px 26px 60px;
+        background:
+          radial-gradient(1200px 500px at 50% -10%, #171c24 0%, #0a0c10 60%);
+        color: #e8ecf1;
+        font: 400 14px/1.5 ui-sans-serif, system-ui, -apple-system, sans-serif;
+      }
+      header { display: flex; gap: 14px; align-items: baseline; margin-bottom: 6px; }
+      h1 { margin: 0; font-size: 16px; font-weight: 700; }
+      .hint { font-size: 12px; color: #6f7883; }
+      .controls { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+      .controls button {
+        padding: 7px 13px; font: 600 12px/1 inherit; cursor: pointer;
+        color: #e8ecf1; background: #161a20; border: 1px solid #262c35; border-radius: 8px;
+      }
+      .controls button[aria-pressed='true'] {
+        background: #8ee06a; color: #0a0c10; border-color: #8ee06a;
+      }
+
+      /* Mirrors where the panels sit around the cook: pantry left, work centre, chef right. */
+      #room {
+        display: grid;
+        grid-template-columns: auto auto auto;
+        grid-template-areas:
+          'pantry main  chef'
+          'pantry cut   board';
+        gap: 18px;
+        justify-content: center;
+        align-items: start;
+        padding-top: 10px;
+      }
+      .slot { position: relative; }
+      .slot > .label {
+        position: absolute; top: -17px; left: 2px;
+        font: 600 10px/1 ui-monospace, Menlo, monospace;
+        letter-spacing: 0.08em; color: #4d555f; text-transform: uppercase;
+      }
+      .panel { transform-origin: top left; }
+      #err { margin-top: 20px; color: #e06a6a; font: 400 12px ui-monospace, Menlo, monospace; white-space: pre-wrap; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Panel layout</h1>
+      <span class="hint">same .uikitml the headset loads, same core logic, all panels live at once</span>
+      <div class="controls">
+        <button id="mode-browse" aria-pressed="true">Browsing</button>
+        <button id="mode-cooking" aria-pressed="false">Cooking</button>
+      </div>
+    </header>
+    <div id="room"></div>
+    <pre id="err"></pre>
+
+    <script type="module">
+      import { RECIPES } from '/src/core/recipe.ts';
+      import { iconFor, matchRecipe, pantryFromScan, rankRecipes } from '/src/core/pantry.ts';
+      import { progressFor, rankFor } from '/src/core/rank.ts';
+      import { add as addEntry, rank as rankBoard } from '/src/core/leaderboard.ts';
+
+      const room = document.getElementById('room');
+      const errEl = document.getElementById('err');
+
+      /** Scale per slot, so a 900px panel and a 420px panel can share a row sensibly. */
+      const LAYOUT = [
+        { name: 'scan',        area: 'pantry', label: 'left · your counter',   scale: 0.52 },
+        { name: 'library',     area: 'main',   label: 'centre · what to cook', scale: 0.62 },
+        { name: 'chef',        area: 'chef',   label: 'right · the chef',      scale: 0.52 },
+        { name: 'cut',         area: 'cut',    label: 'centre · live cutting', scale: 0.62 },
+        { name: 'leaderboard', area: 'board',  label: 'right · the board',     scale: 0.52 },
+      ];
+
+      const PANTRY = pantryFromScan([
+        { ingredient: 'tomato', count: 3, category: 'vegetable', confidence: 0.96 },
+        { ingredient: 'mozzarella', count: 1, category: 'dairy', confidence: 0.88 },
+        { ingredient: 'olive oil', count: 1, category: 'pantry', confidence: 0.93 },
+        { ingredient: 'salt', count: 1, category: 'pantry', confidence: 0.99 },
+        { ingredient: 'cucumber', count: 2, category: 'vegetable', confidence: 0.62 },
+        { ingredient: 'basil', count: 2, category: 'herb', confidence: 0.41 },
+      ], 0);
+
+      const SCORE = {
+        meanMm: 5.2, sigmaMm: 0.4, meanAngleDeg: 4, accuracy: 0.88,
+        uniformity: 0.92, angleScore: 0.8, total: 0.71, count: 12,
+      };
+
+      async function mount({ name, area, label, scale }) {
+        const src = await fetch(`/ui/${name}.uikitml`).then((r) => {
+          if (!r.ok) throw new Error(`${name}.uikitml -> HTTP ${r.status}`);
+          return r.text();
+        });
+
+        const css = src.match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? '';
+        const body = src.replace(/<!--[\s\S]*?-->/g, '').replace(/<style>[\s\S]*?<\/style>/, '');
+
+        const scope = `p-${name}`;
+        const scoped = css
+          .replace(/(^|\})\s*([.#][\w-]+)/g, (_m, brace, sel) => `${brace} .${scope} ${sel}`)
+          // UIKit has no border-style: a borderWidth plus a borderColor is a visible border.
+          // CSS needs the style or it draws nothing, which silently hid the amber "unsure"
+          // rims here while they rendered correctly in the headset.
+          .replace(/border-width:/g, 'border-style: solid; border-width:');
+
+        const slot = document.createElement('div');
+        slot.className = 'slot';
+        slot.style.gridArea = area;
+        slot.dataset.panel = name;
+        slot.innerHTML = `<span class="label">${label}</span>`;
+
+        const panel = document.createElement('div');
+        panel.className = `panel ${scope}`;
+        panel.style.transform = `scale(${scale})`;
+        panel.innerHTML = `<style>${scoped}</style>${body}`;
+        slot.append(panel);
+        room.append(slot);
+
+        // The wrapper must reserve the SCALED size, or transformed panels overlap in grid flow.
+        requestAnimationFrame(() => {
+          const r = panel.firstElementChild?.nextElementSibling?.getBoundingClientRect?.()
+            ?? panel.getBoundingClientRect();
+          slot.style.width = `${r.width}px`;
+          slot.style.height = `${r.height}px`;
+        });
+        return slot;
+      }
+
+      const $ = (id) => document.getElementById(id);
+      const text = (id, v) => { const el = $(id); if (el) el.textContent = v; };
+      const showEl = (id, on) => { const el = $(id); if (el) el.style.display = on ? 'flex' : 'none'; };
+
+      function fillScan() {
+        const items = PANTRY.items;
+        text('scan-status', `Found ${items.length} — 2 I'm unsure about.`);
+        text('scan-notes', 'Some items overlapped and were hard to separate.');
+        for (let i = 0; i < 8; i += 1) {
+          const it = items[i];
+          const row = $(`scan-${i}`);
+          if (!row) continue;
+          if (!it) { row.style.display = 'none'; continue; }
+          row.style.display = 'flex';
+          text(`scan-${i}-icon`, iconFor(it.ingredient));
+          text(`scan-${i}-name`, it.ingredient);
+          text(`scan-${i}-count`, String(it.count));
+          text(`scan-${i}-conf`, `${Math.round(it.confidence * 100)}% sure`);
+          row.style.borderColor = it.confidence >= 0.75 ? '#2b323d' : '#e0b86a';
+        }
+        const done = $('scan-done');
+        if (done) {
+          done.textContent = 'Accept all';
+          done.style.background = '#8ee06a';
+          done.style.color = '#12151a';
+        }
+      }
+
+      function fillLibrary() {
+        const ranked = rankRecipes(PANTRY, RECIPES);
+        text('library-count', `${ranked.filter((m) => m.makeable).length} of ${ranked.length} ready`);
+        showEl('library-empty', false);
+        for (let i = 0; i < 6; i += 1) {
+          const m = ranked[i];
+          const row = $(`row-${i}`);
+          if (!row) continue;
+          if (!m) { row.style.display = 'none'; continue; }
+          row.style.display = 'flex';
+          text(`row-${i}-icon`, m.recipe.icon);
+          text(`row-${i}-name`, m.recipe.name);
+          text(`row-${i}-meta`, `${m.recipe.difficulty} · ${m.recipe.averageMinutes} min`);
+          text(`row-${i}-status`, m.makeable
+            ? 'Ready to cook'
+            : `Missing ${m.missing.length}: ${m.missing.map((x) => x.icon).join(' ')}`);
+          const s = $(`row-${i}-status`);
+          if (s) s.style.color = m.makeable ? '#8ee06a' : '#e0b86a';
+        }
+      }
+
+      function fillChef() {
+        const p = progressFor(SCORE.total);
+        text('chef-rank-icon', p.current.icon);
+        text('chef-rank-title', p.current.title);
+        text('chef-rank-next', p.next
+          ? `${p.remaining.toFixed(2)} from ${p.next.title}`
+          : 'Top of the ladder');
+        const bar = $('chef-rank-bar');
+        if (bar) { bar.style.width = `${Math.round(p.fraction * 100)}%`; bar.style.background = p.current.color; }
+        const title = $('chef-rank-title');
+        if (title) title.style.color = p.current.color;
+      }
+
+      function fillCut() {
+        text('cut-mm', SCORE.meanMm.toFixed(1));
+        text('cut-count', String(SCORE.count));
+        text('cut-streak', '7');
+        text('cut-sigma', `${SCORE.sigmaMm.toFixed(1)}mm`);
+        text('cut-score', SCORE.total.toFixed(2));
+      }
+
+      function fillBoard() {
+        const now = 1_700_000_000_000;
+        let board = [];
+        for (const [name, total, cuts, mean, sigma, ago] of [
+          ['Dhan', 0.94, 18, 5.0, 0.2, 9],
+          ['Shivansh', 0.89, 14, 5.1, 0.3, 7],
+          ['Devin', 0.83, 16, 4.8, 0.5, 5],
+          ['You', 0.71, 12, 5.2, 0.4, 1],
+          ['Priya', 0.66, 9, 5.9, 0.6, 12],
+          ['Sam', 0.52, 7, 6.4, 1.1, 21],
+        ]) {
+          board = addEntry(board, {
+            name, recipeId: 'tomato-mozzarella-salad',
+            meanMm: mean, sigmaMm: sigma, total, cuts, at: now - ago * 60_000,
+          });
+        }
+        const ranked = rankBoard(board);
+        for (let i = 0; i < 6; i += 1) {
+          const e = ranked[i];
+          const row = $(`lb-${i}`);
+          if (!row) continue;
+          if (!e) { row.style.display = 'none'; continue; }
+          row.style.display = 'flex';
+          text(`lb-${i}-pos`, String(i + 1));
+          text(`lb-${i}-badge`, rankFor(e.total).icon);
+          text(`lb-${i}-who`, e.name);
+          text(`lb-${i}-total`, e.total.toFixed(2));
+          text(`lb-${i}-detail`, `${e.cuts} cuts · ${e.sigmaMm.toFixed(1)}mm`);
+          row.style.borderColor = e.name === 'You' ? '#8ee06a' : '#1b2027';
+        }
+        const me = ranked.findIndex((e) => e.name === 'You');
+        text('lb-you', `You are ${me + 1}${['th','st','nd','rd'][(me + 1) % 10] ?? 'th'} of ${ranked.length} tonight`);
+      }
+
+      /**
+       * Browsing vs cooking. The SAME panels stay up; only their content changes, which is the
+       * point of a multi-panel layout. Nothing is hidden, because the ingredients matter while
+       * choosing and the chef matters while cutting.
+       */
+      function setMode(mode) {
+        const cooking = mode === 'cooking';
+        for (const slot of room.children) {
+          const dim = cooking
+            ? slot.dataset.panel === 'library'
+            : slot.dataset.panel === 'cut';
+          slot.style.opacity = dim ? '0.35' : '1';
+        }
+        text('chef-mood', cooking ? 'watching your hands' : 'waiting');
+        text('chef-line', cooking
+          ? 'Steady. You are drifting thick on the last three.'
+          : 'You have everything for the tomato salad. Shall we?');
+        text('chef-why', cooking
+          ? 'Scatter is what separates Line Cook from Sous. Slow the stroke, keep the angle.'
+          : 'Nine steps, no heat, and it resets in thirty seconds for the next person.');
+        $('mode-browse').setAttribute('aria-pressed', String(!cooking));
+        $('mode-cooking').setAttribute('aria-pressed', String(cooking));
+      }
+
+      try {
+        for (const item of LAYOUT) await mount(item);
+        fillScan(); fillLibrary(); fillChef(); fillCut(); fillBoard();
+        setMode('browse');
+        $('mode-browse').addEventListener('click', () => setMode('browse'));
+        $('mode-cooking').addEventListener('click', () => setMode('cooking'));
+      } catch (e) {
+        errEl.textContent = `preview failed: ${e?.stack ?? e}`;
+      }
+    </script>
+  </body>
+</html>
