@@ -17,8 +17,23 @@ import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { ObjectId } from 'mongodb';
 
-import { leaderboardQuerySchema, recipeInputSchema, recipeQuerySchema, scoreInputSchema } from './schemas.js';
+import { analyze, checkIngredients, scanRecipe } from './coach.js';
+import { coverFor } from './cover.js';
+import { createLlm } from './llm.js';
+import {
+  analyzeInputSchema,
+  ingredientCheckInputSchema,
+  leaderboardQuerySchema,
+  recipeInputSchema,
+  recipeQuerySchema,
+  scanInputSchema,
+  scoreInputSchema,
+  sessionRecordSchema,
+  sessionStartSchema,
+} from './schemas.js';
 import { normalizeName, slugify } from './sanitize.js';
+import { UNITS } from './config.js';
+import { checkPlausible, newSessionId, requiredSecondsFor, signSession, verifySession } from './sessions.js';
 
 /** One error shape for everything. A client that can parse one failure can parse all of them. */
 function fail(res, status, code, message, details) {
@@ -61,10 +76,27 @@ const publicRecipe = (doc) => ({
   ingredients: doc.ingredients,
   steps: doc.steps,
   coach: doc.coach ?? null,
+  /**
+   * Always present, never null. A stored cover wins; otherwise one is derived from the slug
+   * and tags, so a recipe seeded before covers existed still draws a card rather than a hole.
+   */
+  cover: doc.cover ?? coverFor(doc),
   createdAt: doc.createdAt.toISOString(),
 });
 
-export function createApp({ db, config }) {
+/**
+ * Decoded size of a base64 data URI, without decoding it.
+ *
+ * `Buffer.from(uri, 'base64')` to measure a 2MB string allocates 2MB to throw it away, once per
+ * request, on the endpoint that gets one every three seconds per headset.
+ */
+function base64Bytes(dataUri) {
+  const payload = dataUri.slice(dataUri.indexOf(',') + 1);
+  const padding = payload.endsWith('==') ? 2 : payload.endsWith('=') ? 1 : 0;
+  return Math.floor((payload.length * 3) / 4) - padding;
+}
+
+export function createApp({ db, config, llm = createLlm(config) }) {
   const app = express();
 
   // Off by default. Express trusts nothing unless told, and a proxy hop that is not accounted
@@ -95,8 +127,24 @@ export function createApp({ db, config }) {
     maxAge: 600,
   }));
 
-  // 10kb. A recipe is a page of text; anything larger is a mistake or an attack, and either way
-  // the answer is the same.
+  /**
+   * Two body limits, and the order matters.
+   *
+   * body-parser marks a request it has parsed and every later parser skips it, so mounting the
+   * generous limits FIRST on their own paths and the strict one after gives each route the
+   * ceiling it needs. Registering the 10kb one first would cap everything at 10kb and the
+   * coach would 413 on every frame.
+   *
+   * 2mb for sessions: twenty 25KB JPEGs is 500KB, and base64 inflates by a third.
+   * 1mb for the coach: one 60KB frame with room for a bad camera day.
+   */
+  app.use('/api/sessions', express.json({ limit: '2mb' }));
+  app.use('/api/coach', express.json({ limit: '1mb' }));
+  app.use('/api/recipes/scan', express.json({ limit: '1mb' }));
+  app.use('/api/ingredients', express.json({ limit: '1mb' }));
+
+  // 10kb for everything else. A recipe is a page of text; anything larger is a mistake or an
+  // attack, and either way the answer is the same.
   app.use(express.json({ limit: '10kb' }));
 
   const writeLimiter = rateLimit({
@@ -111,10 +159,43 @@ export function createApp({ db, config }) {
 
   const recipes = db.collection('recipes');
   const scores = db.collection('scores');
+  const sessions = db.collection('sessions');
+
+  /**
+   * A separate, tighter bucket for the endpoints that cost money.
+   *
+   * The write limiter is deliberately generous because a venue NATs hundreds of people behind
+   * one address. An LLM call is not free, so it gets its own window -- still generous enough
+   * for a headset posting every three seconds (20/minute), with headroom for two of them.
+   */
+  const coachLimiter = rateLimit({
+    windowMs: config.rateLimitWindowMs,
+    limit: config.rateLimitMaxCoachCalls,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    handler: (_req, res) => fail(res, 429, 'rate_limited', 'too many coach calls, slow down'),
+  });
+
+  /** Shared by all three vision routes: validate, then bound the decoded image. */
+  const guardImage = (res, dataUri) => {
+    const bytes = base64Bytes(dataUri);
+    if (bytes > config.llm.maxImageBytes) {
+      fail(res, 413, 'image_too_large', `image is ${bytes} bytes, limit is ${config.llm.maxImageBytes}`);
+      return false;
+    }
+    return true;
+  };
 
   app.get('/api/health', async (_req, res) => {
     await db.command({ ping: 1 });
-    res.json({ ok: true, db: db.databaseName, time: new Date().toISOString() });
+    res.json({
+      ok: true,
+      db: db.databaseName,
+      time: new Date().toISOString(),
+      // Models and whether a key is present. Never the key, never the base URL -- a base URL
+      // can carry credentials in its userinfo and this endpoint is public.
+      coach: llm.describe(),
+    });
   });
 
   app.get('/api/recipes', async (req, res) => {
@@ -222,6 +303,39 @@ export function createApp({ db, config }) {
     const name = normalizeName(parsed.data.name);
     if (!name.ok) return fail(res, 400, 'invalid_name', name.reason);
 
+    const { sessionId, sessionToken } = parsed.data;
+    if (!verifySession(sessionId, sessionToken, config.sessionSecret)) {
+      return fail(res, 401, 'bad_session', 'session token does not match, start a new run');
+    }
+    const session = await sessions.findOne({ _id: sessionId });
+    if (session === null) {
+      // Also the answer when a session aged out of the TTL window mid-run. Both cases mean the
+      // same thing to the cook: this run can no longer be submitted.
+      return fail(res, 404, 'no_session', 'no such session, start a new run');
+    }
+    if (session.practice) {
+      return fail(res, 409, 'practice_run', 'practice runs are not ranked');
+    }
+
+    const plausible = checkPlausible(session, {
+      minRunSeconds: config.minRunSeconds,
+      maxRunSeconds: config.maxRunSeconds,
+    });
+    if (!plausible.ok) return fail(res, 409, 'implausible', plausible.reason);
+
+    /**
+     * Consume first, write second.
+     *
+     * `findOneAndUpdate` with `consumedAt: null` in the filter is the atomic half: two requests
+     * racing with one token means exactly one of them matches, and the loser gets the same 409
+     * a deliberate replay would. Checking then updating would let both through.
+     */
+    const claimed = await sessions.findOneAndUpdate(
+      { _id: sessionId, consumedAt: null },
+      { $set: { consumedAt: new Date() } },
+    );
+    if (claimed === null) return fail(res, 409, 'implausible', 'session already used');
+
     const doc = {
       name: name.name,
       score: round1(parsed.data.score),
@@ -230,6 +344,8 @@ export function createApp({ db, config }) {
     };
     if (parsed.data.metrics !== undefined) doc.metrics = parsed.data.metrics;
     if (parsed.data.recipeSlug !== undefined) doc.recipeSlug = parsed.data.recipeSlug;
+    else if (session.recipeSlug != null) doc.recipeSlug = session.recipeSlug;
+    doc.sessionId = sessionId;
 
     const { insertedId } = await scores.insertOne(doc);
 
@@ -268,6 +384,154 @@ export function createApp({ db, config }) {
       limit,
       offset,
     });
+  });
+
+  /* --------------------------------------------------------------------- *
+   * Sessions
+   * --------------------------------------------------------------------- */
+
+  /**
+   * Start a run. Cheap, unauthenticated, rate-limited.
+   *
+   * `requiredSeconds` is computed HERE from the recipe the cook named, and stored on the
+   * session. Computing it at submit time from a slug the client sends would let a client pick
+   * a recipe with no timed steps and submit instantly against a different one.
+   */
+  app.post('/api/sessions/start', writeLimiter, async (req, res) => {
+    const parsed = sessionStartSchema.safeParse(req.body ?? {});
+    if (!parsed.success) return fail(res, 400, 'invalid_session', 'bad session request', issuesOf(parsed.error));
+
+    const recipe = parsed.data.recipeSlug === undefined
+      ? null
+      : await recipes.findOne({ slug: parsed.data.recipeSlug });
+
+    const sessionId = newSessionId();
+    const createdAt = new Date();
+    const doc = {
+      _id: sessionId,
+      createdAt,
+      practice: parsed.data.practice,
+      requiredSeconds: requiredSecondsFor(recipe),
+      consumedAt: null,
+      recorded: false,
+    };
+    if (recipe !== null) doc.recipeSlug = recipe.slug;
+
+    await sessions.insertOne(doc);
+
+    res.status(201).json({
+      sessionId,
+      token: signSession(sessionId, config.sessionSecret),
+      startedAt: createdAt.toISOString(),
+      requiredSeconds: doc.requiredSeconds,
+      minRunSeconds: config.minRunSeconds,
+      practice: doc.practice,
+    });
+  });
+
+  /**
+   * Store a recorded run, for the replay screen.
+   *
+   * Separate from the score submit on purpose: a practice run is worth replaying and is not
+   * worth ranking, and a run whose score was rejected as implausible is still a run the cook
+   * may want to watch. `$set` rather than insert so a re-POST of the same session overwrites
+   * rather than duplicating -- a flaky connection retrying should not double the storage.
+   */
+  app.post('/api/sessions', writeLimiter, async (req, res) => {
+    const parsed = sessionRecordSchema.safeParse(req.body);
+    if (!parsed.success) return fail(res, 400, 'invalid_session', 'session did not validate', issuesOf(parsed.error));
+
+    const { sessionId, sessionToken, ...record } = parsed.data;
+    if (!verifySession(sessionId, sessionToken, config.sessionSecret)) {
+      return fail(res, 401, 'bad_session', 'session token does not match');
+    }
+
+    const result = await sessions.updateOne(
+      { _id: sessionId },
+      {
+        $set: {
+          recorded: true,
+          recordedAt: new Date(),
+          durationMs: record.durationMs,
+          events: record.events,
+          coachResults: record.coachResults,
+          thumbnails: record.thumbnails,
+          ...(record.score === undefined ? {} : { score: record.score }),
+          ...(record.recipeSlug === undefined ? {} : { recipeSlug: record.recipeSlug }),
+        },
+      },
+    );
+    if (result.matchedCount === 0) return fail(res, 404, 'no_session', 'no such session, start a new run');
+
+    res.status(201).json({ id: sessionId, thumbnails: record.thumbnails.length, events: record.events.length });
+  });
+
+  /**
+   * Read a recorded run back.
+   *
+   * No token required, and that is a deliberate, bounded decision: the id is 128 bits of
+   * randomness, so this is an unguessable-URL secret rather than an authenticated one. It is
+   * what lets a replay be handed to the person at the next headset. Sessions carry no name and
+   * no address, and they expire; see the TTL index in src/db.js.
+   */
+  app.get('/api/sessions/:id', async (req, res) => {
+    const doc = await sessions.findOne({ _id: req.params.id });
+    if (doc === null || doc.recorded !== true) return fail(res, 404, 'not_found', 'no recorded session with that id');
+
+    res.json({
+      id: doc._id,
+      recipeSlug: doc.recipeSlug ?? null,
+      practice: doc.practice === true,
+      score: doc.score ?? null,
+      durationMs: doc.durationMs ?? 0,
+      events: doc.events ?? [],
+      coachResults: doc.coachResults ?? [],
+      thumbnails: doc.thumbnails ?? [],
+      createdAt: doc.createdAt.toISOString(),
+    });
+  });
+
+  /* --------------------------------------------------------------------- *
+   * Coach: the three routes that spend money and can always be told "no".
+   *
+   * None of them 500s when the model is unreachable. Each returns 200 with `offline: true`,
+   * because the headset's scoring engine is deterministic and local -- losing the coach costs
+   * commentary, and an error status would make the client treat a talkative feature as a
+   * broken one.
+   * --------------------------------------------------------------------- */
+
+  app.post('/api/coach/analyze', coachLimiter, async (req, res) => {
+    const parsed = analyzeInputSchema.safeParse(req.body);
+    if (!parsed.success) return fail(res, 400, 'invalid_request', 'analyze request did not validate', issuesOf(parsed.error));
+    if (!guardImage(res, parsed.data.image)) return undefined;
+
+    const result = await analyze(llm, {
+      imageDataUri: parsed.data.image,
+      recipeTitle: parsed.data.recipeTitle,
+      stepText: parsed.data.stepText,
+      rubricItems: parsed.data.rubricItems,
+      hot: parsed.data.hot,
+      knife: parsed.data.knife,
+    });
+    return res.json(result);
+  });
+
+  app.post('/api/recipes/scan', coachLimiter, async (req, res) => {
+    const parsed = scanInputSchema.safeParse(req.body);
+    if (!parsed.success) return fail(res, 400, 'invalid_request', 'scan request did not validate', issuesOf(parsed.error));
+    if (!guardImage(res, parsed.data.image)) return undefined;
+
+    const result = await scanRecipe(llm, { imageDataUri: parsed.data.image, units: UNITS });
+    return res.json(result);
+  });
+
+  app.post('/api/ingredients/check', coachLimiter, async (req, res) => {
+    const parsed = ingredientCheckInputSchema.safeParse(req.body);
+    if (!parsed.success) return fail(res, 400, 'invalid_request', 'check request did not validate', issuesOf(parsed.error));
+    if (!guardImage(res, parsed.data.image)) return undefined;
+
+    const result = await checkIngredients(llm, { imageDataUri: parsed.data.image, wanted: parsed.data.wanted });
+    return res.json(result);
   });
 
   /**

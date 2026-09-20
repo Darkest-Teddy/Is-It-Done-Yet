@@ -20,7 +20,7 @@ let db = null;
  * descending, then `createdAt` ascending as the tie-break. A different order and Mongo sorts
  * in memory, which is fine at booth scale and wrong to ship.
  */
-export async function ensureIndexes(database) {
+export async function ensureIndexes(database, { sessionTtlDays = 7 } = {}) {
   await database.collection('recipes').createIndex({ slug: 1 }, { unique: true, name: 'slug_unique' });
   await database.collection('recipes').createIndex(
     { title: 'text', tags: 'text' },
@@ -30,9 +30,40 @@ export async function ensureIndexes(database) {
     { hidden: 1, score: -1, createdAt: 1 },
     { name: 'leaderboard' },
   );
+
+  /**
+   * Sessions expire, and this is the only mechanism that makes them expire.
+   *
+   * A recorded session carries up to twenty JPEGs of somebody's kitchen. Nothing else in this
+   * server deletes anything, so without a TTL index those photographs are kept forever by
+   * default -- which is a decision nobody made.
+   */
+  await ensureTtlIndex(database, 'sessions', sessionTtlDays);
+  await database.collection('sessions').createIndex({ recipeSlug: 1, createdAt: -1 }, { name: 'by_recipe' });
 }
 
-export async function connect(uri, dbName) {
+/**
+ * `createIndex` with a different `expireAfterSeconds` than the live index does not update it --
+ * it fails with IndexOptionsConflict (85). Changing the retention window therefore has to go
+ * through `collMod`, and a server that cannot do that (a read-only user, an old mongod) should
+ * still start: the old window is wrong, not dangerous.
+ */
+async function ensureTtlIndex(database, collectionName, days) {
+  const expireAfterSeconds = Math.max(60, Math.round(days * 86_400));
+  const name = 'session_ttl';
+  try {
+    await database.collection(collectionName).createIndex({ createdAt: 1 }, { name, expireAfterSeconds });
+  } catch (error) {
+    if (error?.code !== 85) throw error;
+    try {
+      await database.command({ collMod: collectionName, index: { name, expireAfterSeconds } });
+    } catch (modError) {
+      console.warn(`[api] could not change the session TTL window: ${modError.message}`);
+    }
+  }
+}
+
+export async function connect(uri, dbName, indexOptions = {}) {
   if (db !== null) return db;
   client = new MongoClient(uri, {
     // Fail fast rather than hang: a wrong URI at a venue should say so in seconds.
@@ -41,7 +72,7 @@ export async function connect(uri, dbName) {
   });
   await client.connect();
   db = client.db(dbName);
-  await ensureIndexes(db);
+  await ensureIndexes(db, indexOptions);
   return db;
 }
 

@@ -26,7 +26,7 @@ if (uri === null) {
   stopEmbedded = embedded.stop;
 }
 
-const db = await connect(uri, config.dbName);
+const db = await connect(uri, config.dbName, { sessionTtlDays: config.sessionTtlDays });
 
 if (config.mongoUri === null) {
   const result = await seed(db);

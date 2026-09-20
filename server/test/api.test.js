@@ -10,13 +10,21 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
 
 import { seed } from '../src/seed.js';
-import { appWith, resetDatabase, startDatabase, stopDatabase } from './helpers.js';
+import { appWith, fakeLlm, makeSession, resetDatabase, seedSessions, startDatabase, stopDatabase } from './helpers.js';
 
 let db;
 
 beforeAll(async () => { db = await startDatabase(); });
 afterAll(async () => { await stopDatabase(); });
-beforeEach(async () => { await resetDatabase(db); });
+/**
+ * Every POST /api/scores needs a server-issued session. These are minted fresh per test and
+ * handed out by `post` below, so the assertions stay about the thing under test.
+ */
+let sessionPool = [];
+beforeEach(async () => {
+  await resetDatabase(db);
+  sessionPool = await seedSessions(db, 40);
+});
 
 /** A minimal valid recipe body, spread-and-overridden per test. */
 const recipeBody = (over = {}) => ({
@@ -29,7 +37,12 @@ const recipeBody = (over = {}) => ({
 });
 
 const post = (app, path, body, headers = {}) => {
-  const req = request(app).post(path).send(body);
+  // A score with no session of its own gets the next one from the pool. A test that cares
+  // about the session -- replay, practice, a too-short run -- passes its own and wins.
+  const payload = path === '/api/scores' && body !== undefined && body.sessionId === undefined
+    ? { ...sessionPool.shift(), ...body }
+    : body;
+  const req = request(app).post(path).send(payload);
   for (const [k, v] of Object.entries(headers)) req.set(k, v);
   return req;
 };
@@ -222,7 +235,12 @@ describe('what the board gives away', () => {
 
     const doc = await db.collection('scores').findOne({ name: 'Ada' });
     expect(JSON.stringify(doc)).not.toMatch(/203\.0\.113\.9/);
-    expect(Object.keys(doc).sort()).toEqual(['_id', 'createdAt', 'hidden', 'name', 'score']);
+    /**
+     * Asserted as an exhaustive column list rather than "no ip field", so that a column added
+     * later has to come through this test. `sessionId` is a random 128-bit string with no
+     * address and no name behind it; it exists so a score can be traced to its replay.
+     */
+    expect(Object.keys(doc).sort()).toEqual(['_id', 'createdAt', 'hidden', 'name', 'score', 'sessionId']);
   });
 });
 
