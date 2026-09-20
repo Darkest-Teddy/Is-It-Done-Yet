@@ -1,0 +1,844 @@
+{
+  "recipes": [
+    {
+      "id": "",
+      "slug": "tomato-mozzarella-salad",
+      "title": "Tomato Mozzarella Salad",
+      "description": "Sliced tomato, olive oil, mozzarella and seasoning on a platter. Nine steps, no heat, and it comes apart as fast as it goes together.",
+      "servings": 2,
+      "tags": [
+        "salad",
+        "no-cook",
+        "italian",
+        "quick",
+        "captaincook4d"
+      ],
+      "source": "captaincook4d",
+      "ingredients": [
+        {
+          "name": "tomato",
+          "quantity": 1,
+          "unit": "piece",
+          "notes": "1-3"
+        },
+        {
+          "name": "mozzarella",
+          "quantity": 1,
+          "unit": "piece",
+          "notes": "1-2"
+        },
+        {
+          "name": "olive oil",
+          "quantity": 1,
+          "unit": "piece",
+          "notes": ""
+        },
+        {
+          "name": "salt",
+          "quantity": 1,
+          "unit": "piece",
+          "notes": ""
+        }
+      ],
+      "steps": [
+        {
+          "order": 0,
+          "text": "Rinse a tomato",
+          "durationSec": 0,
+          "technique": "",
+          "stepId": "rinse",
+          "verifiable": "vision",
+          "hot": false,
+          "knife": false
+        },
+        {
+          "order": 1,
+          "text": "Gently dry it with a paper or tea towel",
+          "durationSec": 0,
+          "technique": "",
+          "stepId": "dry",
+          "verifiable": "vision",
+          "hot": false,
+          "knife": false
+        },
+        {
+          "order": 2,
+          "text": "Slice one tomato into about 1/2 inch thick slices",
+          "durationSec": 0,
+          "technique": "",
+          "stepId": "slice",
+          "verifiable": "vision",
+          "hot": false,
+          "knife": true
+        },
+        {
+          "order": 3,
+          "text": "Place the slices on a platter in a single layer",
+          "durationSec": 0,
+          "technique": "",
+          "stepId": "place",
+          "verifiable": "vision",
+          "hot": false,
+          "knife": false
+        },
+        {
+          "order": 4,
+          "text": "Add a drizzle of extra-virgin olive oil, about 1 tablespoon",
+          "durationSec": 0,
+          "technique": "",
+          "stepId": "oil",
+          "verifiable": "vision",
+          "hot": false,
+          "knife": false
+        },
+        {
+          "order": 5,
+          "text": "Season the tomato slices with salt",
+          "durationSec": 0,
+          "technique": "",
+          "stepId": "salt",
+          "verifiable": "cook-confirmed",
+          "hot": false,
+          "knife": false
+        },
+        {
+          "order": 6,
+          "text": "Season the platter with 1/4 teaspoon black pepper",
+          "durationSec": 0,
+          "technique": "",
+          "stepId": "pepper",
+          "verifiable": "cook-confirmed",
+          "hot": false,
+          "knife": false
+        },
+        {
+          "order": 7,
+          "text": "Sprinkle mozzarella over the tomato throughout the platter",
+          "durationSec": 0,
+          "technique": "",
+          "stepId": "mozzarella",
+          "verifiable": "vision",
+          "hot": false,
+          "knife": false
+        },
+        {
+          "order": 8,
+          "text": "Garnish the platter with italian seasoning",
+          "durationSec": 0,
+          "technique": "",
+          "stepId": "garnish",
+          "verifiable": "cook-confirmed",
+          "hot": false,
+          "knife": false
+        }
+      ],
+      "cover": {
+        "tint": "#CDE6C7",
+        "ink": "#46101A",
+        "accent": "#FBD24B"
+      }
+    },
+    {
+      "id": "",
+      "slug": "cucumber-raita",
+      "title": "Cucumber Raita",
+      "description": "Grated cucumber folded through whisked curd with cumin and chaat masala. The most-recorded dish in the dataset, and almost every mistake in it is one of order.",
+      "servings": 2,
+      "tags": [
+        "raita",
+        "no-cook",
+        "indian",
+        "yogurt",
+        "captaincook4d"
+      ],
+      "source": "captaincook4d",
+      "ingredients": [
+        {
+          "name": "cucumber",
+          "quantity": 1,
+          "unit": "piece",
+          "notes": "1-2"
+        },
+        {
+          "name": "curd",
+          "quantity": 1,
+          "unit": "piece",
+          "notes": ""
+        },
+        {
+          "name": "cilantro",
+          "quantity": 1,
+          "unit": "piece",
+          "notes": ""
+        },
+        {
+          "name": "salt",
+          "quantity": 1,
+          "unit": "piece",
+          "notes": ""
+        }
+      ],
+      "steps": [
+        {
+          "order": 0,
+          "text": "Rinse 1 medium sized cucumber",
+          "durationSec": 0,
+          "technique": "",
+          "stepId": "rinse",
+          "verifiable": "vision",
+          "hot": false,
+          "knife": false
+        },
+        {
+          "order": 1,
+          "text": "Peel the cucumber",
+          "durationSec": 0,
+          "technique": "",
+          "stepId": "peel",
+          "verifiable": "vision",
+          "hot": false,
+          "knife": false
+        },
+        {
+          "order": 2,
+          "text": "Chop or grate the cucumber",
+          "durationSec": 0,
+          "technique": "",
+          "stepId": "chop",
+          "verifiable": "vision",
+          "hot": false,
+          "knife": true
+        },
+        {
+          "order": 3,
+          "text": "Whisk 1 cup of chilled curd in a mixing bowl until smooth",
+          "durationSec": 0,
+          "technique": "",
+          "stepId": "whisk",
+          "verifiable": "vision",
+          "hot": false,
+          "knife": false
+        },
+        {
+          "order": 4,
+          "text": "Add 1/4 teaspoon salt to the bowl",
+          "durationSec": 0,
+          "technique": "",
+          "stepId": "salt",
+          "verifiable": "cook-confirmed",
+          "hot": false,
+          "knife": false
+        },
+        {
+          "order": 5,
+          "text": "Add 1/4 teaspoon of red chilli powder to the bowl",
+          "durationSec": 0,
+          "technique": "",
+          "stepId": "chilli",
+          "verifiable": "cook-confirmed",
+          "hot": false,
+          "knife": false
+        },
+        {
+          "order": 6,
+          "text": "Add 1 teaspoon of cumin powder to the bowl",
+          "durationSec": 0,
+          "technique": "",
+          "stepId": "cumin",
+          "verifiable": "cook-confirmed",
+          "hot": false,
+          "knife": false
+        },
+        {
+          "order": 7,
+          "text": "Add 1/2 teaspoon of chaat masala powder to the bowl",
+          "durationSec": 0,
+          "technique": "",
+          "stepId": "chaat",
+          "verifiable": "cook-confirmed",
+          "hot": false,
+          "knife": false
+        },
+        {
+          "order": 8,
+          "text": "Add the chopped cucumber to the whisked curd",
+          "durationSec": 0,
+          "technique": "",
+          "stepId": "fold",
+          "verifiable": "vision",
+          "hot": false,
+          "knife": true
+        },
+        {
+          "order": 9,
+          "text": "Add 1 tablespoon of chopped cilantro leaves to the bowl",
+          "durationSec": 0,
+          "technique": "",
+          "stepId": "cilantro",
+          "verifiable": "vision",
+          "hot": false,
+          "knife": true
+        },
+        {
+          "order": 10,
+          "text": "Combine all the ingredients in the bowl",
+          "durationSec": 0,
+          "technique": "",
+          "stepId": "combine",
+          "verifiable": "vision",
+          "hot": false,
+          "knife": false
+        }
+      ],
+      "cover": {
+        "tint": "#CDE6C7",
+        "ink": "#46101A",
+        "accent": "#FBD24B"
+      }
+    },
+    {
+      "id": "",
+      "slug": "caprese-bruschetta",
+      "title": "Caprese Bruschetta",
+      "description": "Cherry tomato, mozzarella and basil spooned onto toasted baguette. The only short recipe here that can go wrong in all seven ways the dataset records.",
+      "servings": 2,
+      "tags": [
+        "bruschetta",
+        "italian",
+        "toast",
+        "captaincook4d"
+      ],
+      "source": "captaincook4d",
+      "ingredients": [
+        {
+          "name": "cherry tomato",
+          "quantity": 4,
+          "unit": "piece",
+          "notes": "4-12"
+        },
+        {
+          "name": "mozzarella",
+          "quantity": 1,
+          "unit": "piece",
+          "notes": "1-2"
+        },
+        {
+          "name": "basil",
+          "quantity": 1,
+          "unit": "piece",
+          "notes": "1-3"
+        },
+        {
+          "name": "baguette",
+          "quantity": 1,
+          "unit": "piece",
+          "notes": ""
+        },
+        {
+          "name": "olive oil",
+          "quantity": 1,
+          "unit": "piece",
+          "notes": ""
+        }
+      ],
+      "steps": [
+        {
+          "order": 0,
+          "text": "Cut 1/4 cup of cherry tomatoes into halves",
+          "durationSec": 0,
+          "technique": "",
+          "stepId": "cut-tomato",
+          "verifiable": "vision",
+          "hot": false,
+          "knife": true
+        },
+        {
+          "order": 1,
+          "text": "Add the cut cherry tomatoes to a bowl",
+          "durationSec": 0,
+          "technique": "",
+          "stepId": "bowl-tomato",
+          "verifiable": "vision",
+          "hot": false,
+          "knife": true
+        },
+        {
+          "order": 2,
+          "text": "Add 1/8 cup shredded mozzarella to the bowl",
+          "durationSec": 0,
+          "technique": "",
+          "stepId": "bowl-mozzarella",
+          "verifiable": "vision",
+          "hot": false,
+          "knife": false
+        },
+        {
+          "order": 3,
+          "text": "Add 1/16 cup basil to the bowl",
+          "durationSec": 0,
+          "technique": "",
+          "stepId": "bowl-basil",
+          "verifiable": "vision",
+          "hot": false,
+          "knife": false
+        },
+        {
+          "order": 4,
+          "text": "Add 1/4 tsp salt to the bowl",
+          "durationSec": 0,
+          "technique": "",
+          "stepId": "bowl-salt",
+          "verifiable": "cook-confirmed",
+          "hot": false,
+          "knife": false
+        },
+        {
+          "order": 5,
+          "text": "Add 1/4 tsp pepper to the bowl",
+          "durationSec": 0,
+          "technique": "",
+          "stepId": "bowl-pepper",
+          "verifiable": "cook-confirmed",
+          "hot": false,
+          "knife": false
+        },
+        {
+          "order": 6,
+          "text": "Combine the contents of the bowl",
+          "durationSec": 0,
+          "technique": "",
+          "stepId": "combine",
+          "verifiable": "vision",
+          "hot": false,
+          "knife": false
+        },
+        {
+          "order": 7,
+          "text": "Slice two 1/2 inch thick rounds from a baguette, cut slanted",
+          "durationSec": 0,
+          "technique": "",
+          "stepId": "slice",
+          "verifiable": "vision",
+          "hot": false,
+          "knife": true
+        },
+        {
+          "order": 8,
+          "text": "Brush both sides of the 2 slices with olive oil",
+          "durationSec": 0,
+          "technique": "",
+          "stepId": "brush",
+          "verifiable": "vision",
+          "hot": false,
+          "knife": false
+        },
+        {
+          "order": 9,
+          "text": "Toast both sides for 2 to 3 minutes until lightly charred, then transfer to a plate",
+          "durationSec": 0,
+          "technique": "",
+          "stepId": "toast",
+          "verifiable": "cook-confirmed",
+          "hot": true,
+          "knife": false
+        },
+        {
+          "order": 10,
+          "text": "Spoon the mixture from the bowl onto the bread",
+          "durationSec": 0,
+          "technique": "",
+          "stepId": "spoon",
+          "verifiable": "vision",
+          "hot": false,
+          "knife": false
+        }
+      ],
+      "cover": {
+        "tint": "#CDE6C7",
+        "ink": "#46101A",
+        "accent": "#FBD24B"
+      }
+    },
+    {
+      "id": "",
+      "slug": "cut-tzatziki",
+      "title": "Tzatziki",
+      "description": "Thin rounds. They have to disappear into the yoghurt.",
+      "servings": 1,
+      "tags": [
+        "cutting",
+        "ticket",
+        "cucumber"
+      ],
+      "source": "builtin",
+      "ingredients": [
+        {
+          "name": "cucumber",
+          "quantity": 1,
+          "unit": "piece",
+          "notes": ""
+        }
+      ],
+      "steps": [
+        {
+          "order": 0,
+          "text": "Cut 8 slices of cucumber at 4mm, within 1.5mm.",
+          "durationSec": 0,
+          "technique": "knife",
+          "stepId": "cut",
+          "verifiable": "vision",
+          "hot": false,
+          "knife": true
+        }
+      ],
+      "cover": {
+        "tint": "#C4DAEE",
+        "ink": "#46101A",
+        "accent": "#FBD24B"
+      }
+    },
+    {
+      "id": "",
+      "slug": "cut-sandwich",
+      "title": "Sandwich rounds",
+      "description": "Even rounds. Every bite the same.",
+      "servings": 1,
+      "tags": [
+        "cutting",
+        "ticket",
+        "cucumber"
+      ],
+      "source": "builtin",
+      "ingredients": [
+        {
+          "name": "cucumber",
+          "quantity": 1,
+          "unit": "piece",
+          "notes": ""
+        }
+      ],
+      "steps": [
+        {
+          "order": 0,
+          "text": "Cut 6 slices of cucumber at 6mm, within 2mm.",
+          "durationSec": 0,
+          "technique": "knife",
+          "stepId": "cut",
+          "verifiable": "vision",
+          "hot": false,
+          "knife": true
+        }
+      ],
+      "cover": {
+        "tint": "#F9C7BE",
+        "ink": "#46101A",
+        "accent": "#F5230E"
+      }
+    },
+    {
+      "id": "",
+      "slug": "cut-greek",
+      "title": "Greek salad",
+      "description": "Chunky half-moons. They should hold their shape.",
+      "servings": 1,
+      "tags": [
+        "cutting",
+        "ticket",
+        "cucumber"
+      ],
+      "source": "builtin",
+      "ingredients": [
+        {
+          "name": "cucumber",
+          "quantity": 1,
+          "unit": "piece",
+          "notes": ""
+        }
+      ],
+      "steps": [
+        {
+          "order": 0,
+          "text": "Cut 6 slices of cucumber at 10mm, within 2.5mm.",
+          "durationSec": 0,
+          "technique": "knife",
+          "stepId": "cut",
+          "verifiable": "vision",
+          "hot": false,
+          "knife": true
+        }
+      ],
+      "cover": {
+        "tint": "#F9C7BE",
+        "ink": "#46101A",
+        "accent": "#F5230E"
+      }
+    },
+    {
+      "id": "",
+      "slug": "cut-crudites",
+      "title": "Crudites",
+      "description": "Batons for dipping. Sturdy enough to hold hummus.",
+      "servings": 1,
+      "tags": [
+        "cutting",
+        "ticket",
+        "cucumber"
+      ],
+      "source": "builtin",
+      "ingredients": [
+        {
+          "name": "cucumber",
+          "quantity": 1,
+          "unit": "piece",
+          "notes": ""
+        }
+      ],
+      "steps": [
+        {
+          "order": 0,
+          "text": "Cut 5 slices of cucumber at 12mm, within 3mm.",
+          "durationSec": 0,
+          "technique": "knife",
+          "stepId": "cut",
+          "verifiable": "vision",
+          "hot": false,
+          "knife": true
+        }
+      ],
+      "cover": {
+        "tint": "#FBE3A0",
+        "ink": "#46101A",
+        "accent": "#F5230E"
+      }
+    },
+    {
+      "id": "",
+      "slug": "cut-pickles",
+      "title": "Quick pickles",
+      "description": "Ten rounds, all matching. The brine is unforgiving.",
+      "servings": 1,
+      "tags": [
+        "cutting",
+        "ticket",
+        "cucumber"
+      ],
+      "source": "builtin",
+      "ingredients": [
+        {
+          "name": "cucumber",
+          "quantity": 1,
+          "unit": "piece",
+          "notes": ""
+        }
+      ],
+      "steps": [
+        {
+          "order": 0,
+          "text": "Cut 10 slices of cucumber at 5mm, within 1.5mm.",
+          "durationSec": 0,
+          "technique": "knife",
+          "stepId": "cut",
+          "verifiable": "vision",
+          "hot": false,
+          "knife": true
+        }
+      ],
+      "cover": {
+        "tint": "#F9C7BE",
+        "ink": "#46101A",
+        "accent": "#F5230E"
+      }
+    },
+    {
+      "id": "",
+      "slug": "cut-sunomono",
+      "title": "Sunomono",
+      "description": "Paper thin. This is the hard one.",
+      "servings": 1,
+      "tags": [
+        "cutting",
+        "ticket",
+        "cucumber"
+      ],
+      "source": "builtin",
+      "ingredients": [
+        {
+          "name": "cucumber",
+          "quantity": 1,
+          "unit": "piece",
+          "notes": ""
+        }
+      ],
+      "steps": [
+        {
+          "order": 0,
+          "text": "Cut 8 slices of cucumber at 2.5mm, within 1mm.",
+          "durationSec": 0,
+          "technique": "knife",
+          "stepId": "cut",
+          "verifiable": "vision",
+          "hot": false,
+          "knife": true
+        }
+      ],
+      "cover": {
+        "tint": "#F9D3B4",
+        "ink": "#46101A",
+        "accent": "#F5230E"
+      }
+    },
+    {
+      "id": "",
+      "slug": "cut-raita",
+      "title": "Raita",
+      "description": "Thick rounds, to be diced after.",
+      "servings": 1,
+      "tags": [
+        "cutting",
+        "ticket",
+        "cucumber"
+      ],
+      "source": "builtin",
+      "ingredients": [
+        {
+          "name": "cucumber",
+          "quantity": 1,
+          "unit": "piece",
+          "notes": ""
+        }
+      ],
+      "steps": [
+        {
+          "order": 0,
+          "text": "Cut 6 slices of cucumber at 8mm, within 2mm.",
+          "durationSec": 0,
+          "technique": "knife",
+          "stepId": "cut",
+          "verifiable": "vision",
+          "hot": false,
+          "knife": true
+        }
+      ],
+      "cover": {
+        "tint": "#FBE3A0",
+        "ink": "#46101A",
+        "accent": "#F5230E"
+      }
+    },
+    {
+      "id": "",
+      "slug": "cut-gazpacho",
+      "title": "Gazpacho prep",
+      "description": "Rough chunks. It all goes in the blender anyway.",
+      "servings": 1,
+      "tags": [
+        "cutting",
+        "ticket",
+        "cucumber"
+      ],
+      "source": "builtin",
+      "ingredients": [
+        {
+          "name": "cucumber",
+          "quantity": 1,
+          "unit": "piece",
+          "notes": ""
+        }
+      ],
+      "steps": [
+        {
+          "order": 0,
+          "text": "Cut 4 slices of cucumber at 15mm, within 4mm.",
+          "durationSec": 0,
+          "technique": "knife",
+          "stepId": "cut",
+          "verifiable": "vision",
+          "hot": false,
+          "knife": true
+        }
+      ],
+      "cover": {
+        "tint": "#F9C7BE",
+        "ink": "#46101A",
+        "accent": "#F5230E"
+      }
+    },
+    {
+      "id": "",
+      "slug": "cut-banh-mi",
+      "title": "Banh mi",
+      "description": "Long thin strips. Precision work.",
+      "servings": 1,
+      "tags": [
+        "cutting",
+        "ticket",
+        "cucumber"
+      ],
+      "source": "builtin",
+      "ingredients": [
+        {
+          "name": "cucumber",
+          "quantity": 1,
+          "unit": "piece",
+          "notes": ""
+        }
+      ],
+      "steps": [
+        {
+          "order": 0,
+          "text": "Cut 8 slices of cucumber at 3mm, within 1mm.",
+          "durationSec": 0,
+          "technique": "knife",
+          "stepId": "cut",
+          "verifiable": "vision",
+          "hot": false,
+          "knife": true
+        }
+      ],
+      "cover": {
+        "tint": "#CDE6C7",
+        "ink": "#46101A",
+        "accent": "#FBD24B"
+      }
+    },
+    {
+      "id": "",
+      "slug": "cut-service",
+      "title": "Full service",
+      "description": "Twelve rounds at six millimetres. No excuses.",
+      "servings": 1,
+      "tags": [
+        "cutting",
+        "ticket",
+        "cucumber"
+      ],
+      "source": "builtin",
+      "ingredients": [
+        {
+          "name": "cucumber",
+          "quantity": 1,
+          "unit": "piece",
+          "notes": ""
+        }
+      ],
+      "steps": [
+        {
+          "order": 0,
+          "text": "Cut 12 slices of cucumber at 6mm, within 1mm.",
+          "durationSec": 0,
+          "technique": "knife",
+          "stepId": "cut",
+          "verifiable": "vision",
+          "hot": false,
+          "knife": true
+        }
+      ],
+      "cover": {
+        "tint": "#CDE6C7",
+        "ink": "#46101A",
+        "accent": "#FBD24B"
+      }
+    }
+  ],
+  "total": 13
+}

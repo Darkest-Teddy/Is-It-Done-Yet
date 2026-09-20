@@ -43,6 +43,19 @@ export const stepSchema = z.object({
   stepId: z.string().trim().max(60).optional(),
   verifiable: z.enum(['vision', 'cook-confirmed']).optional(),
   satisfies: z.array(trimmed(60)).max(20).optional(),
+  /**
+   * Does this step involve heat, or a blade?
+   *
+   * Load-bearing, not metadata. The headset reads these to decide when to collapse its HUD
+   * into SAFE mode -- a small, calm, motionless pill -- because somebody is about to reach
+   * toward a hot pan or pick up a knife.
+   *
+   * They were missing from this schema, which is `.strict()`, so two things were true at once:
+   * no recipe could ever carry them, meaning safe mode could never fire; and a scan draft,
+   * which does carry them, was rejected with a 400 on its way back in. Both silent.
+   */
+  hot: z.boolean().default(false),
+  knife: z.boolean().default(false),
 }).strict();
 
 /**

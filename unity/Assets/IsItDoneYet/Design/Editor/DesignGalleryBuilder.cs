@@ -244,6 +244,10 @@ namespace IsItDoneYet.Design.Editor
         /// </summary>
         public static bool Capture()
         {
+            // The gallery's scene is built, rendered and discarded, so the materials TMP
+            // instantiates for an outline go with it. Without this the previews would show
+            // text with no outline -- the one treatment that keeps it readable over passthrough.
+            Label.ForceOutlineInEditor = true;
             var scene = Build();
             var camera = Object.FindAnyObjectByType<Camera>();
             var theme = Object.FindAnyObjectByType<ThemeManager>();
@@ -281,6 +285,7 @@ namespace IsItDoneYet.Design.Editor
             Object.DestroyImmediate(sheet);
             foreach (var shot in shots) Object.DestroyImmediate(shot);
 
+            Label.ForceOutlineInEditor = false;
             Debug.Log($"[Design] previews written to {PreviewDir}");
             return true;
         }

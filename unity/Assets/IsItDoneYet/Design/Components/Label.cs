@@ -36,6 +36,16 @@ namespace IsItDoneYet.Design
         /// </summary>
         public const float LargeTextDmm = 16f;
 
+        /// <summary>
+        /// Lets an edit-mode renderer opt back into outlines, accepting the material it costs.
+        ///
+        /// Only the Design Gallery sets this. Its scene is built, rendered and thrown away and
+        /// never saved, so the instantiated materials go with it -- and without outlines the
+        /// previews would stop showing the treatment that actually keeps text readable over
+        /// passthrough.
+        /// </summary>
+        public static bool ForceOutlineInEditor;
+
 
         [Header("Content")]
         [TextArea] public string Text = "Label";
@@ -123,9 +133,25 @@ namespace IsItDoneYet.Design
             // internally. Linearising here double-converts and every label goes dark.
             if (theme != null) _text.color = Srgb.ForText(theme.Color(Color));
 
-            var outline = OutlineWidth * AdaptiveLegibility.OutlineBoost;
-            _text.outlineWidth = Mathf.Clamp01(outline);
-            if (theme != null) _text.outlineColor = Srgb.ForText(theme.Color(OutlineColor));
+            /*
+             * Outline is set at RUNTIME only, and that is not an optimisation.
+             *
+             * TMP's `outlineWidth` setter reaches for `renderer.material`, which INSTANTIATES a
+             * material. This component is [ExecuteAlways], so in the Editor every refresh --
+             * and a theme switch refreshes every label at once -- leaks one material per label
+             * into the open scene, where it is then saved into the scene file.
+             *
+             * At runtime the instantiation is expected: TMP does it for any per-instance
+             * material property, and the adaptive-legibility pass needs to vary the outline per
+             * label as the room's brightness changes. In edit mode the shared material's own
+             * outline carries the baseline, which is what the previews were rendered against.
+             */
+            if (Application.isPlaying || ForceOutlineInEditor)
+            {
+                var outline = OutlineWidth * AdaptiveLegibility.OutlineBoost;
+                _text.outlineWidth = Mathf.Clamp01(outline);
+                if (theme != null) _text.outlineColor = Srgb.ForText(theme.Color(OutlineColor));
+            }
 
 #if UNITY_EDITOR
             WarnIfUnreadable(theme, role, heightM);

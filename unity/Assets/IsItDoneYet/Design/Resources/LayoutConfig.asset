@@ -1,0 +1,50 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 366c06b5dc63c4a9d8c92f7a0525fcd2, type: 3}
+  m_Name: LayoutConfig
+  m_EditorClassIdentifier: IsItDoneYet.Design::IsItDoneYet.Design.LayoutConfig
+  TitlePitchDeg: 15
+  TitleYawDeg: 0
+  TitleDistanceM: 1.4
+  ScoreYawDeg: 24
+  ScorePitchDeg: 12
+  ScoreDistanceM: 1.3
+  ToastPitchDeg: -12
+  ToastYawDeg: 0
+  ToastDistanceM: 1.1
+  ToastDeadZoneDeg: 8
+  ToastFollowSmoothing: 4
+  ToastSpacingM: 0.09
+  ToastMaxStack: 3
+  ToastDismissSeconds: 6
+  MenuCentreYawDeg: -52
+  MenuRadiusM: 0.9
+  MenuArcDeg: 34
+  MenuItemHeightM: 0.085
+  PanelDistanceM: 0.8
+  PanelMinDistanceM: 0.6
+  PanelMaxDistanceM: 1
+  RecipeBookYawDeg: 0
+  RecipeBookPitchDeg: -4
+  ChecklistYawDeg: 38
+  ChecklistPitchDeg: -6
+  TimelineYawDeg: 0
+  TimelinePitchDeg: -18
+  LeaderboardYawDeg: -14
+  LeaderboardPitchDeg: 4
+  LeaderboardDistanceM: 2.2
+  SafePillPitchDeg: -8
+  SafePillYawDeg: 0
+  SafePillDistanceM: 1
+  ComfortFovDeg: 41
+  MinBodyTextDmm: 24
+  MinTouchTargetDmm: 64

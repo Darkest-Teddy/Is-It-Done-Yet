@@ -9,7 +9,8 @@
         "IsItDoneYet.Audio",
         "Unity.TextMeshPro",
         "UnityEngine.TestRunner",
-        "UnityEditor.TestRunner"
+        "UnityEditor.TestRunner",
+        "IsItDoneYet.App.Editor"
     ],
     "includePlatforms": [
         "Editor"

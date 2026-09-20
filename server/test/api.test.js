@@ -434,3 +434,40 @@ describe('seeding', () => {
     expect(after.createdAt.getTime()).toBe(before.createdAt.getTime());
   });
 });
+
+describe('step safety flags', () => {
+  /**
+   * These decide when the headset collapses its HUD into SAFE mode. They were absent from a
+   * `.strict()` schema, so a recipe could not carry them and safe mode could never fire --
+   * and the round trip below returned 400 rather than saying why.
+   */
+  it('accepts hot and knife on a step and returns them', async () => {
+    const body = recipeBody({
+      steps: [
+        { order: 0, text: 'Slice the onion', knife: true },
+        { order: 1, text: 'Sear the patty', hot: true, durationSec: 90 },
+      ],
+    });
+    const res = await post(appWith(db), '/api/recipes', body).expect(201);
+    expect(res.body.steps[0]).toMatchObject({ knife: true, hot: false });
+    expect(res.body.steps[1]).toMatchObject({ hot: true, knife: false });
+  });
+
+  it('defaults them to false rather than leaving them undefined', async () => {
+    const res = await post(appWith(db), '/api/recipes', recipeBody()).expect(201);
+    expect(res.body.steps[0].hot).toBe(false);
+    expect(res.body.steps[0].knife).toBe(false);
+  });
+
+  /** The exact shape POST /api/recipes gets when a cook confirms a scanned card. */
+  it('accepts a confirmed scan draft unchanged', async () => {
+    const draft = {
+      title: 'Scanned Card',
+      servings: 2,
+      tags: ['scanned'],
+      ingredients: [{ name: 'onion', quantity: 1, unit: 'piece' }],
+      steps: [{ order: 0, text: 'Dice it', technique: 'brunoise', knife: true, hot: false, durationSec: 60 }],
+    };
+    await post(appWith(db), '/api/recipes', draft).expect(201);
+  });
+});

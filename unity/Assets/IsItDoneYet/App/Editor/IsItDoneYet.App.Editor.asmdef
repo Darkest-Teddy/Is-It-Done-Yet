@@ -1,0 +1,24 @@
+{
+    "name": "IsItDoneYet.App.Editor",
+    "rootNamespace": "IsItDoneYet.App.Editor",
+    "references": [
+        "IsItDoneYet.Core",
+        "IsItDoneYet.Design",
+        "IsItDoneYet.App",
+        "IsItDoneYet.Audio",
+        "Unity.TextMeshPro",
+        "Oculus.VR",
+        "meta.xr.mrutilitykit"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

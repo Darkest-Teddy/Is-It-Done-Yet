@@ -21,7 +21,7 @@ namespace IsItDoneYet.App
     public class ApiClient : MonoBehaviour
     {
         [Tooltip("https://... to the server. Must be HTTPS on device; Quest blocks cleartext by default.")]
-        public string BaseUrl = "http://localhost:3000";
+        public string BaseUrl = "https://orders-surgical-backup-typical.trycloudflare.com";
 
         [Tooltip("Per-request ceiling. Past this the caller uses its fallback.")]
         public int TimeoutSeconds = 8;
